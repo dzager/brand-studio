@@ -1,0 +1,32 @@
+{
+    "defaultMode": "acceptEdits",
+    "permissions": {
+        "allow": [
+            "Read",
+            "Edit",
+            "Write",
+            "Bash(npm install)",
+            "Bash(npm run dev)",
+            "Bash(npm run build)",
+            "Bash(npm run lint)",
+            "Bash(npm run test)",
+            "Bash(git status)",
+            "Bash(git diff *)",
+            "Bash(git add *)",
+            "Bash(git commit *)"
+        ],
+        "deny": [
+            "Read(.env)",
+            "Read(.env.*)",
+            "Read(src/**/secrets/*)",
+            "Bash(rm -rf *)",
+            "Bash(sudo *)",
+            "Bash(curl *)",
+            "Bash(wget *)"
+        ]
+    },
+    "sandbox": {
+        "enabled": true,
+        "autoAllowBashIfSandboxed": true
+    }
+}

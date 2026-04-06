@@ -1,0 +1,319 @@
+// src/pages/api/clusters/index.ts
+// GET: list clusters (filtered by company_id)
+// POST: generate a new cluster strategy via LLM, embed pages, detect overlaps
+
+import type { NextApiRequest, NextApiResponse } from "next";
+import { getSupabase } from "@/lib/supabase";
+import { buildBrandEngine, type CompanyRecord } from "@/lib/buildBrandEngine";
+import { compileBlogSystemPrompt } from "@/brand/engine";
+import {
+    generateEmbeddings,
+    buildPageEmbeddingText,
+    findOverlaps,
+    classifySeverity,
+    formatVectorForSupabase,
+    type PageEmbedding,
+    type OverlapWarnings,
+} from "@/lib/embeddings";
+import { resolveModelId, getStructuredResponse } from "@/lib/ai-client";
+
+const ClusterStrategySchema = {
+    type: "object",
+    additionalProperties: false,
+    required: ["cluster_name", "pillar", "supporting", "long_tail"],
+    properties: {
+        cluster_name: { type: "string" },
+        pillar: {
+            type: "object",
+            additionalProperties: false,
+            required: ["title", "keyword", "slug", "description", "word_count", "links_to"],
+            properties: {
+                title: { type: "string" },
+                keyword: { type: "string" },
+                slug: { type: "string" },
+                description: { type: "string" },
+                word_count: { type: "string" },
+                links_to: { type: "array", items: { type: "string" } },
+            },
+        },
+        supporting: {
+            type: "array",
+            items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["title", "keyword", "slug", "description", "word_count", "links_to"],
+                properties: {
+                    title: { type: "string" },
+                    keyword: { type: "string" },
+                    slug: { type: "string" },
+                    description: { type: "string" },
+                    word_count: { type: "string" },
+                    links_to: { type: "array", items: { type: "string" } },
+                },
+            },
+            minItems: 3,
+            maxItems: 8,
+        },
+        long_tail: {
+            type: "array",
+            items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["title", "keyword", "slug", "description", "word_count", "links_to"],
+                properties: {
+                    title: { type: "string" },
+                    keyword: { type: "string" },
+                    slug: { type: "string" },
+                    description: { type: "string" },
+                    word_count: { type: "string" },
+                    links_to: { type: "array", items: { type: "string" } },
+                },
+            },
+            minItems: 5,
+            maxItems: 15,
+        },
+    },
+} as const;
+
+function buildClusterSystemPrompt(brand: ReturnType<typeof buildBrandEngine>): string {
+    const brandName = brand.engine_meta.brand_name;
+    const industry = brand.latent_brand_profile.archetype;
+
+    const parts: string[] = [
+        `You are a senior SEO content strategist for ${brandName}.`,
+        `Your job is to design topical clusters — interconnected content systems that dominate a category in search.`,
+        ``,
+        `## What is a Topical Cluster?`,
+        `A topical cluster is a content architecture with:`,
+        `1. **Pillar Page** — comprehensive hub article targeting the broadest keyword (2,500–4,000 words)`,
+        `2. **Supporting Pages** (5–8) — deep-dive articles on major subtopics, each targeting a mid-volume keyword (1,500–2,500 words)`,
+        `3. **Long-Tail Pages** (8–15) — focused articles targeting specific, low-competition queries (800–1,200 words)`,
+        ``,
+        `## Strategy Rules`,
+        `- Every page must target a UNIQUE primary keyword — no keyword cannibalization`,
+        `- Every supporting and long-tail page links back to the pillar`,
+        `- Supporting pages interlink with each other where topically relevant`,
+        `- Long-tail pages link to their parent supporting page AND the pillar`,
+        `- The links_to field contains slugs of pages this page should link to`,
+        `- Slugs must be URL-safe (lowercase, hyphenated, 3-8 words)`,
+        `- Keywords should reflect real search queries — how actual users would type them`,
+        `- Descriptions should explain what makes each page unique and what specific angle it covers`,
+        ``,
+        `## Keyword Strategy`,
+        `- Pillar keyword: highest volume, broadest intent (e.g., \"dental implants\")`,
+        `- Supporting keywords: mid-volume, subtopic-specific (e.g., \"dental implants vs bridges\")`,
+        `- Long-tail keywords: low-competition, very specific queries (e.g., \"dental implant cost in Seattle with insurance\")`,
+        `- Include "People Also Ask" style questions as long-tail keywords where appropriate`,
+        `- Include comparison, cost, timeline, and eligibility keywords`,
+        ``,
+        `## Content Differentiation`,
+        `- Each page must have a clear, unique angle — not just a different title for the same content`,
+        `- Supporting pages should cover subtopics the pillar only summarizes`,
+        `- Long-tail pages should answer one specific question in depth`,
+        `- Never plan two pages that a reader would consider "the same article"`,
+    ];
+
+    // Inject company editorial guidelines for topic guidance
+    if (brand.editorial_guidelines) {
+        parts.push(``);
+        parts.push(`## Company Context`);
+        parts.push(`Use the following company editorial context to inform topic selection, terminology, audience targeting, and content angles:`);
+        parts.push(brand.editorial_guidelines);
+    }
+
+    return parts.join("\n");
+}
+
+function buildClusterUserPrompt(topic: string): string {
+    return [
+        `Design a complete topical cluster strategy for the topic: "${topic}"`,
+        ``,
+        `Generate:`,
+        `1. One pillar page (comprehensive, 2,500-4,000 words)`,
+        `2. 5-8 supporting pages (mid-depth, 1,500-2,500 words each)`,
+        `3. 8-15 long-tail pages (focused, 800-1,200 words each)`,
+        ``,
+        `For each page, provide:`,
+        `- title: click-worthy, includes the keyword naturally`,
+        `- keyword: the exact search query this page targets`,
+        `- slug: URL-safe slug (3-8 words, lowercase, hyphenated)`,
+        `- description: 1-2 sentences explaining the unique angle and content`,
+        `- word_count: target word range (e.g., "2500-4000")`,
+        `- links_to: array of slugs this page should link to`,
+        ``,
+        `The pillar page's links_to should include ALL supporting and long-tail slugs.`,
+        `Supporting pages should link to the pillar slug plus 2-3 related slugs.`,
+        `Long-tail pages should link to the pillar slug plus their parent supporting slug.`,
+    ].join("\n");
+}
+
+export default async function handler(
+    req: NextApiRequest,
+    res: NextApiResponse
+) {
+    const supabase = getSupabase();
+
+    try {
+        if (req.method === "GET") {
+            const { company_id } = req.query;
+
+            let query = supabase
+                .from("clusters")
+                .select("*")
+                .order("created_at", { ascending: false });
+
+            if (typeof company_id === "string" && company_id) {
+                query = query.eq("company_id", company_id);
+            }
+
+            const { data, error } = await query;
+            if (error) throw error;
+            return res.status(200).json(data);
+        }
+
+        if (req.method === "POST") {
+            const { company_id, topic, model: requestedModel } = req.body ?? {};
+
+            if (!company_id || !topic) {
+                return res.status(400).json({ error: "company_id and topic are required" });
+            }
+
+            // Build brand engine for company context
+            const { data: companyData, error: companyErr } = await supabase
+                .from("companies")
+                .select("*")
+                .eq("id", company_id)
+                .single();
+
+            if (companyErr || !companyData) {
+                return res.status(400).json({ error: "Company not found" });
+            }
+
+            const brand = buildBrandEngine(companyData as CompanyRecord);
+
+            const selectedModel = resolveModelId(requestedModel);
+
+            const system = buildClusterSystemPrompt(brand);
+            const user = buildClusterUserPrompt(topic.trim());
+
+            const strategy = await getStructuredResponse<any>(
+                selectedModel,
+                system,
+                user,
+                ClusterStrategySchema as any,
+                { schemaName: "cluster_strategy" }
+            );
+
+            // ── Embedding & Overlap Detection ───────────────────────────
+
+            // Collect all planned pages
+            const allPages = [
+                { ...strategy.pillar, _type: "pillar" as const },
+                ...strategy.supporting.map((p: any) => ({ ...p, _type: "supporting" as const })),
+                ...strategy.long_tail.map((p: any) => ({ ...p, _type: "long_tail" as const })),
+            ];
+
+            // Build embedding texts for all pages
+            const embeddingTexts = allPages.map((p) =>
+                buildPageEmbeddingText({ title: p.title, keyword: p.keyword, description: p.description })
+            );
+
+            // Generate embeddings in batch
+            let pageEmbeddings: PageEmbedding[] = [];
+            let overlapWarnings: OverlapWarnings = { intra_cluster: [], existing_content: [] };
+
+            try {
+                const vectors = await generateEmbeddings(embeddingTexts);
+
+                pageEmbeddings = allPages.map((p, i) => ({
+                    slug: p.slug,
+                    keyword: p.keyword,
+                    title: p.title,
+                    embedding: vectors[i],
+                }));
+
+                // Intra-cluster overlap detection
+                const intraItems = pageEmbeddings.map((pe) => ({
+                    slug: pe.slug,
+                    keyword: pe.keyword,
+                    vector: pe.embedding,
+                }));
+                overlapWarnings.intra_cluster = findOverlaps(intraItems);
+
+                // Cross-content overlap detection (against all company articles)
+                for (const pe of pageEmbeddings) {
+                    try {
+                        const vectorStr = formatVectorForSupabase(pe.embedding);
+                        const { data: matches } = await supabase.rpc(
+                            "match_company_articles",
+                            {
+                                query_embedding: vectorStr,
+                                target_company_id: company_id,
+                                match_threshold: 0.80,
+                                match_count: 5,
+                            }
+                        );
+
+                        if (matches && matches.length > 0) {
+                            for (const m of matches) {
+                                overlapWarnings.existing_content.push({
+                                    planned_slug: pe.slug,
+                                    planned_keyword: pe.keyword,
+                                    existing_article_id: m.id,
+                                    existing_title: m.title,
+                                    existing_slug: m.slug,
+                                    similarity: Math.round(m.similarity * 1000) / 1000,
+                                    severity: classifySeverity(m.similarity),
+                                });
+                            }
+                        }
+                    } catch (rpcErr) {
+                        console.warn("Cross-content overlap check failed for", pe.slug, rpcErr);
+                    }
+                }
+
+                // Sort existing_content by similarity desc
+                overlapWarnings.existing_content.sort((a, b) => b.similarity - a.similarity);
+            } catch (embErr) {
+                console.warn("Embedding generation failed (non-blocking):", embErr);
+            }
+
+            // Strip full vectors from stored page_embeddings to keep JSONB manageable
+            // (store only slug/keyword/title — vectors are large)
+            const storedEmbeddings = pageEmbeddings.map(({ slug, keyword, title, embedding }) => ({
+                slug,
+                keyword,
+                title,
+                embedding: embedding.slice(0, 10), // store first 10 dims as fingerprint
+                full_dims: embedding.length,
+            }));
+
+            // Save cluster with page embeddings
+            const { data: cluster, error: saveErr } = await supabase
+                .from("clusters")
+                .insert({
+                    company_id,
+                    name: strategy.cluster_name || topic.trim(),
+                    pillar_topic: topic.trim(),
+                    strategy,
+                    status: "draft",
+                    page_embeddings: storedEmbeddings,
+                })
+                .select()
+                .single();
+
+            if (saveErr) throw saveErr;
+
+            return res.status(201).json({
+                ...cluster,
+                overlap_warnings: overlapWarnings,
+            });
+        }
+
+        return res.status(405).json({ error: "Method not allowed" });
+    } catch (err) {
+        console.error("API /api/clusters error:", err);
+        const message = err instanceof Error ? err.message : "Unknown server error";
+        return res.status(500).json({ error: message });
+    }
+}

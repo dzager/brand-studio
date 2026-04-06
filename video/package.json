@@ -1,0 +1,21 @@
+{
+  "name": "automouse-demo-video",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "studio": "npx remotion studio src/index.ts",
+    "render": "npx remotion render src/index.ts AutoMouseDemo out/automouse-demo.mp4"
+  },
+  "dependencies": {
+    "@fontsource/geist": "^5.1.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "^4.0.0"
+  },
+  "devDependencies": {
+    "@remotion/cli": "^4.0.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "typescript": "^5"
+  }
+}
