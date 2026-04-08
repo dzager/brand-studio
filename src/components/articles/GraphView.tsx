@@ -2,6 +2,9 @@
 // Nodes = articles, edges = cluster links + semantic similarity
 
 import { useRef, useEffect, useState, useCallback } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 type Article = {
     id: string;
@@ -44,7 +47,7 @@ type Props = {
     onSelectArticle: (id: string) => void;
 };
 
-const CLUSTER_HUES = [220, 150, 30, 280, 0, 60, 190, 320, 100, 350];
+const CLUSTER_HUES = [264, 150, 30, 330, 0, 60, 190, 320, 100, 350];
 
 function getClusterColor(idx: number, light = false): string {
     const hue = CLUSTER_HUES[idx % CLUSTER_HUES.length];
@@ -66,17 +69,27 @@ export default function GraphView({ articles, clusters, onSelectArticle }: Props
     const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
     const [dimensions, setDimensions] = useState({ w: 900, h: 500 });
     const dragRef = useRef<{ node: GraphNode; offsetX: number; offsetY: number } | null>(null);
+    const isDarkRef = useRef(false);
+
+    // Detect dark mode
+    useEffect(() => {
+        const check = () => {
+            isDarkRef.current = document.documentElement.classList.contains("dark");
+        };
+        check();
+        const observer = new MutationObserver(check);
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+        return () => observer.disconnect();
+    }, []);
 
     // Build graph data
     useEffect(() => {
-        const clusterIds = clusters.map((c) => c.id);
         const clusterIndexMap: Record<string, number> = {};
         clusters.forEach((c, i) => { clusterIndexMap[c.id] = i; });
 
         const cx = dimensions.w / 2;
         const cy = dimensions.h / 2;
 
-        // Create nodes
         const nodes: GraphNode[] = articles.map((a, i) => {
             const cIdx = a.cluster_id ? (clusterIndexMap[a.cluster_id] ?? -1) : -1;
             const angle = (i / articles.length) * Math.PI * 2;
@@ -91,11 +104,10 @@ export default function GraphView({ articles, clusters, onSelectArticle }: Props
                 vx: 0,
                 vy: 0,
                 radius: getRoleRadius(a.cluster_role),
-                color: cIdx >= 0 ? getClusterColor(cIdx) : "#aaa",
+                color: cIdx >= 0 ? getClusterColor(cIdx) : "#888",
             };
         });
 
-        // Create edges from cluster strategy links_to
         const edges: GraphEdge[] = [];
         const slugToId: Record<string, string> = {};
         articles.forEach((a) => { slugToId[a.slug] = a.id; });
@@ -151,15 +163,13 @@ export default function GraphView({ articles, clusters, onSelectArticle }: Props
             const damping = 0.92;
             const cx = dimensions.w / 2;
             const cy = dimensions.h / 2;
+            const dark = isDarkRef.current;
 
-            // Forces
             for (let i = 0; i < nodes.length; i++) {
                 const a = nodes[i];
-                // Centering force
                 a.vx += (cx - a.x) * 0.0005;
                 a.vy += (cy - a.y) * 0.0005;
 
-                // Repulsion between all nodes
                 for (let j = i + 1; j < nodes.length; j++) {
                     const b = nodes[j];
                     let dx = b.x - a.x;
@@ -174,7 +184,6 @@ export default function GraphView({ articles, clusters, onSelectArticle }: Props
                         b.vy += dy * force;
                     }
 
-                    // Same cluster attraction
                     if (a.cluster_id && a.cluster_id === b.cluster_id) {
                         const attractForce = 0.002;
                         a.vx += dx * attractForce;
@@ -185,7 +194,6 @@ export default function GraphView({ articles, clusters, onSelectArticle }: Props
                 }
             }
 
-            // Edge spring forces
             for (const edge of edges) {
                 const a = nodes.find((n) => n.id === edge.source);
                 const b = nodes.find((n) => n.id === edge.target);
@@ -201,14 +209,12 @@ export default function GraphView({ articles, clusters, onSelectArticle }: Props
                 b.vy -= dy * force;
             }
 
-            // Apply velocities
             for (const n of nodes) {
                 if (dragRef.current?.node.id === n.id) continue;
                 n.vx *= damping;
                 n.vy *= damping;
                 n.x += n.vx;
                 n.y += n.vy;
-                // Keep in bounds
                 n.x = Math.max(n.radius, Math.min(dimensions.w - n.radius, n.x));
                 n.y = Math.max(n.radius, Math.min(dimensions.h - n.radius, n.y));
             }
@@ -216,16 +222,21 @@ export default function GraphView({ articles, clusters, onSelectArticle }: Props
             // Render
             ctx!.clearRect(0, 0, dimensions.w, dimensions.h);
 
+            // Background
+            ctx!.fillStyle = dark ? "hsl(260, 15%, 8%)" : "hsl(260, 20%, 98%)";
+            ctx!.fillRect(0, 0, dimensions.w, dimensions.h);
+
             // Draw edges
             for (const edge of edges) {
                 const a = nodes.find((n) => n.id === edge.source);
                 const b = nodes.find((n) => n.id === edge.target);
                 if (!a || !b) continue;
                 ctx!.beginPath();
-                ctx!.moveTo(a.x, b.y > a.y ? a.y : a.y);
                 ctx!.moveTo(a.x, a.y);
                 ctx!.lineTo(b.x, b.y);
-                ctx!.strokeStyle = edge.type === "link" ? "rgba(99,102,241,0.3)" : "rgba(245,158,11,0.25)";
+                ctx!.strokeStyle = dark
+                    ? (edge.type === "link" ? "rgba(139,92,246,0.3)" : "rgba(245,158,11,0.2)")
+                    : (edge.type === "link" ? "rgba(99,102,241,0.3)" : "rgba(245,158,11,0.25)");
                 ctx!.lineWidth = edge.type === "link" ? 1.5 : 1;
                 if (edge.type === "similarity") ctx!.setLineDash([4, 4]);
                 else ctx!.setLineDash([]);
@@ -240,13 +251,14 @@ export default function GraphView({ articles, clusters, onSelectArticle }: Props
                 ctx!.arc(n.x, n.y, n.radius + (isHovered ? 3 : 0), 0, Math.PI * 2);
                 ctx!.fillStyle = n.color;
                 ctx!.fill();
-                ctx!.strokeStyle = isHovered ? "#191F1D" : "rgba(255,255,255,0.8)";
+                ctx!.strokeStyle = isHovered
+                    ? (dark ? "#e2e8f0" : "#1e1b4b")
+                    : (dark ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.8)");
                 ctx!.lineWidth = isHovered ? 2.5 : 1.5;
                 ctx!.stroke();
 
-                // Label for pillar nodes or hovered
                 if (n.role === "pillar" || isHovered) {
-                    ctx!.fillStyle = "#333";
+                    ctx!.fillStyle = dark ? "#e2e8f0" : "#333";
                     ctx!.font = isHovered ? "bold 12px system-ui" : "11px system-ui";
                     ctx!.textAlign = "center";
                     ctx!.fillText(n.label, n.x, n.y + n.radius + 14);
@@ -330,14 +342,13 @@ export default function GraphView({ articles, clusters, onSelectArticle }: Props
         return () => ro.disconnect();
     }, []);
 
-    // Build legend
     const clusterLegend = clusters.map((c, i) => ({
         name: c.name,
         color: getClusterColor(i),
     }));
 
     return (
-        <div ref={containerRef} style={{ width: "100%", height: "calc(100vh - 160px)", position: "relative" }}>
+        <div ref={containerRef} className="relative w-full h-[calc(100vh-14rem)]">
             <canvas
                 ref={canvasRef}
                 width={dimensions.w}
@@ -347,66 +358,61 @@ export default function GraphView({ articles, clusters, onSelectArticle }: Props
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
                 onClick={handleClick}
-                style={{ width: "100%", height: "100%", borderRadius: 12, background: "#fafafa", border: "1px solid #e5e5e5" }}
+                className="w-full h-full rounded-xl border border-border"
             />
 
             {/* Legend */}
-            <div style={{
-                position: "absolute", top: 12, left: 12, background: "rgba(255,255,255,0.92)",
-                borderRadius: 8, padding: "10px 14px", fontSize: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-                border: "1px solid #e5e5e5", maxWidth: 200,
-            }}>
-                <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: 0.5 }}>
-                    Clusters
-                </div>
-                {clusterLegend.map((c) => (
-                    <div key={c.name} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                        <span style={{ width: 10, height: 10, borderRadius: "50%", background: c.color, flexShrink: 0 }} />
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
+            <Card className="absolute top-3 left-3 max-w-[200px] shadow-md">
+                <CardContent className="p-3">
+                    <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                        Clusters
                     </div>
-                ))}
-                {articles.some((a) => !a.cluster_id) && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
-                        <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#aaa", flexShrink: 0 }} />
-                        <span style={{ color: "#888" }}>Unclustered</span>
-                    </div>
-                )}
+                    {clusterLegend.map((c) => (
+                        <div key={c.name} className="flex items-center gap-1.5 mb-1 text-xs">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: c.color }} />
+                            <span className="truncate">{c.name}</span>
+                        </div>
+                    ))}
+                    {articles.some((a) => !a.cluster_id) && (
+                        <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-muted-foreground/50" />
+                            <span>Unclustered</span>
+                        </div>
+                    )}
 
-                <div style={{ borderTop: "1px solid #e5e5e5", marginTop: 8, paddingTop: 8, fontSize: 11, color: "#999" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                        <span style={{ width: 18, height: 18, borderRadius: "50%", background: "#6366f1", display: "inline-block" }} />
-                        Pillar
+                    <div className="border-t border-border mt-2 pt-2 text-[11px] text-muted-foreground space-y-1">
+                        <div className="flex items-center gap-1.5">
+                            <span className="w-[18px] h-[18px] rounded-full bg-primary inline-block" />
+                            Pillar
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <span className="w-3 h-3 rounded-full bg-primary inline-block" />
+                            Supporting
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-primary inline-block" />
+                            Long-tail
+                        </div>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                        <span style={{ width: 12, height: 12, borderRadius: "50%", background: "#6366f1", display: "inline-block" }} />
-                        Supporting
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#6366f1", display: "inline-block" }} />
-                        Long-tail
-                    </div>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
 
             {/* Hover tooltip */}
             {hoveredNode && (
-                <div style={{
-                    position: "absolute", top: 12, right: 12, background: "#fff",
-                    borderRadius: 8, padding: "10px 14px", fontSize: 13, boxShadow: "0 2px 12px rgba(0,0,0,0.12)",
-                    border: "1px solid #e5e5e5", maxWidth: 260,
-                }}>
-                    <div style={{ fontWeight: 600, marginBottom: 4 }}>{hoveredNode.label}</div>
-                    {hoveredNode.role && (
-                        <span style={{
-                            padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 500,
-                            background: hoveredNode.role === "pillar" ? "#eef2ff" : hoveredNode.role === "supporting" ? "#f0fdf4" : "#fefce8",
-                            color: hoveredNode.role === "pillar" ? "#4338ca" : hoveredNode.role === "supporting" ? "#16a34a" : "#a16207",
-                        }}>
-                            {hoveredNode.role.replace("_", "-")}
-                        </span>
-                    )}
-                    <div style={{ fontSize: 11, color: "#888", marginTop: 4 }}>Click to view details →</div>
-                </div>
+                <Card className="absolute top-3 right-3 max-w-[260px] shadow-lg">
+                    <CardContent className="p-3">
+                        <div className="font-semibold text-sm mb-1.5">{hoveredNode.label}</div>
+                        {hoveredNode.role && (
+                            <Badge variant={
+                                hoveredNode.role === "pillar" ? "default" :
+                                hoveredNode.role === "supporting" ? "secondary" : "outline"
+                            }>
+                                {hoveredNode.role.replace("_", "-")}
+                            </Badge>
+                        )}
+                        <div className="text-[11px] text-muted-foreground mt-2">Click to view details →</div>
+                    </CardContent>
+                </Card>
             )}
         </div>
     );

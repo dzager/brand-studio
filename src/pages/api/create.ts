@@ -184,6 +184,40 @@ export default async function handler(
             brandCategories.some((c) => c.id === rawStyle)
         ) {
             styleId = rawStyle;
+        } else if (brandCategories.length > 1) {
+            // Auto-recommend style based on prompt content
+            try {
+                const styleDescriptions = brandCategories
+                    .map(
+                        (s, i) =>
+                            `${i + 1}. **${s.label}** (id: ${s.id})\n   Narrative: ${s.narrative || "N/A"}\n   Cues: ${(s.storytelling_cues || []).join(", ") || "N/A"}\n   Prompt style: ${s.image_prompt_style || "N/A"}`
+                    )
+                    .join("\n\n");
+
+                const recSystem = `You are an expert creative director. Given an article topic and a list of available image styles, recommend the single best-fit style. Be concise and practical.
+
+Respond with ONLY valid JSON in this exact format:
+{"id": "<style id>", "reason": "<1 sentence explanation>"}`;
+
+                const recUser = `Article topic: "${creation_prompt.trim()}"
+
+Available image styles:
+
+${styleDescriptions}
+
+Which style best fits this article? Respond with JSON only.`;
+
+                const recRaw = await getTextResponse("gpt-4.1-nano", recSystem, recUser, { temperature: 0.2 });
+                const recJson = recRaw.replace(/^```json?\s*/i, "").replace(/\s*```$/i, "");
+                const recResult = JSON.parse(recJson);
+
+                if (recResult?.id && brandCategories.some((c) => c.id === recResult.id)) {
+                    styleId = recResult.id;
+                    console.log(`Auto-recommended image style "${styleId}": ${recResult.reason || ""}`);
+                }
+            } catch (recErr) {
+                console.warn("Image style auto-recommendation failed (non-blocking), using default:", recErr);
+            }
         }
 
         let system = compileBlogSystemPrompt(brand);

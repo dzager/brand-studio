@@ -2,6 +2,28 @@
 // Shows similarity analysis, SEO data, article content, and all action buttons
 
 import { useState, useRef, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+    DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+    DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import {
+    Copy, Rocket, Pencil, RefreshCw, ImageIcon, Trash2,
+    Search, Sparkles, Upload, AlertCircle, CheckCircle2,
+    Crown, BookOpen, Scroll, Eye, Code, Layers, ArrowLeft,
+    ChevronDown, FileText, ClipboardCopy, Scissors,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type SearchImage = {
     title: string;
@@ -50,7 +72,6 @@ type Props = {
 };
 
 export default function PanelView({ article, companies, onUpdate, onDelete, onSelectArticle }: Props) {
-    // Edit state
     const [editing, setEditing] = useState(false);
     const [editTitle, setEditTitle] = useState("");
     const [editExcerpt, setEditExcerpt] = useState("");
@@ -59,37 +80,32 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     const [saving, setSaving] = useState(false);
     const contentEditableRef = useRef<HTMLDivElement>(null);
 
-    // Delete
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [deleting, setDeleting] = useState(false);
-
-    // Publish
     const [publishing, setPublishing] = useState(false);
     const [published, setPublished] = useState(false);
-
-    // Copy
-    const [copied, setCopied] = useState(false);
-
-    // Regenerate article
+    const [copied, setCopied] = useState<false | "rich" | "plain">(false);
     const [regenerating, setRegenerating] = useState(false);
     const [regenErr, setRegenErr] = useState<string | null>(null);
 
-    // Image refresh & style
+    const [shortening, setShortening] = useState(false);
+    const [shortened, setShortened] = useState(false);
+    const [shortenErr, setShortenErr] = useState<string | null>(null);
+    const [shortenInfo, setShortenInfo] = useState<{ original: number; shortened: number } | null>(null);
+
     const [refreshingImage, setRefreshingImage] = useState(false);
     const [imagePromptInput, setImagePromptInput] = useState("");
     const [imageStyles, setImageStyles] = useState<{ id: string; label: string; narrative?: string }[]>([]);
     const [selectedStyle, setSelectedStyle] = useState(article.image_style ?? "default");
     const [refreshErr, setRefreshErr] = useState<string | null>(null);
 
-    // Similarity
     const [similarResults, setSimilarResults] = useState<SimilarityResult[] | null>(null);
     const [checkingSimilarity, setCheckingSimilarity] = useState(false);
     const [simErr, setSimErr] = useState<string | null>(null);
 
-    // Insert image modal
     const [showInsertModal, setShowInsertModal] = useState(false);
     const [insertMode, setInsertMode] = useState<"inline" | "featured" | "editInline">("inline");
-    const [insertTab, setInsertTab] = useState<"search" | "generate" | "upload">("search");
+    const [insertTab, setInsertTab] = useState<"search" | "generate" | "composite" | "upload">("search");
     const [insertSearchQuery, setInsertSearchQuery] = useState("");
     const [insertSearchResults, setInsertSearchResults] = useState<SearchImage[]>([]);
     const [insertSearching, setInsertSearching] = useState(false);
@@ -100,14 +116,24 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     const [insertErr, setInsertErr] = useState<string | null>(null);
     const [insertSaving, setInsertSaving] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Composite tab state
+    const [compositeStep, setCompositeStep] = useState<"search" | "confirm" | "generating" | "preview">("search");
+    const [compositeProductUrl, setCompositeProductUrl] = useState<string | null>(null);
+    const [compositeProductThumb, setCompositeProductThumb] = useState<string | null>(null);
+    const [compositeSearchQuery, setCompositeSearchQuery] = useState("");
+    const [compositeSearchResults, setCompositeSearchResults] = useState<SearchImage[]>([]);
+    const [compositeSearching, setCompositeSearching] = useState(false);
+    const [compositeBgPrompt, setCompositeBgPrompt] = useState("");
+    const [compositeGenerating, setCompositeGenerating] = useState(false);
+    const [compositeResult, setCompositeResult] = useState<string | null>(null);
+    const [compositeErr, setCompositeErr] = useState<string | null>(null);
     const savedRangeRef = useRef<Range | null>(null);
 
-    // Lazy-load full article data (html, image_base64 excluded from list for performance)
     const [fullArticle, setFullArticle] = useState<Article | null>(null);
     const [loadingFull, setLoadingFull] = useState(false);
 
     useEffect(() => {
-        // If article already has html, it's already full
         if (article.html !== null && article.html !== undefined) {
             setFullArticle(article);
             return;
@@ -125,25 +151,29 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
             .finally(() => setLoadingFull(false));
     }, [article.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Fetch company image styles
+    // Sync fullArticle when the parent article prop updates (e.g. after image regeneration or edits)
     useEffect(() => {
-        if (!article.company_id) {
-            setImageStyles([]);
-            return;
+        if (fullArticle && (
+            article.image_base64 !== fullArticle.image_base64 ||
+            article.html !== fullArticle.html ||
+            article.updated_at !== fullArticle.updated_at
+        )) {
+            setFullArticle({ ...fullArticle, ...article });
         }
+    }, [article.image_base64, article.html, article.updated_at]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        if (!article.company_id) { setImageStyles([]); return; }
         fetch(`/api/companies/${article.company_id}`)
             .then((r) => r.json())
             .then((data) => {
                 if (data?.image_style_categories && Array.isArray(data.image_style_categories) && data.image_style_categories.length > 0) {
                     setImageStyles(data.image_style_categories);
-                } else {
-                    setImageStyles([]);
-                }
+                } else { setImageStyles([]); }
             })
             .catch(() => setImageStyles([]));
     }, [article.company_id]);
 
-    // Use fullArticle for content/image display, fallback to article for metadata
     const displayArticle = fullArticle || article;
 
     function startEdit() {
@@ -179,9 +209,8 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
             if (!r.ok) throw new Error(data.error || "Failed to update");
             onUpdate({ ...article, ...data });
             setEditing(false);
-        } catch (e: any) {
-            alert(`Save failed: ${e.message}`);
-        } finally { setSaving(false); }
+        } catch (e: any) { alert(`Save failed: ${e.message}`); }
+        finally { setSaving(false); }
     }
 
     async function handleDelete() {
@@ -191,9 +220,8 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
             const data = await r.json();
             if (!r.ok) throw new Error(data.error || "Failed to delete");
             onDelete(article.id);
-        } catch (e: any) {
-            alert(`Delete failed: ${e.message}`);
-        } finally { setDeleting(false); setConfirmDelete(false); }
+        } catch (e: any) { alert(`Delete failed: ${e.message}`); }
+        finally { setDeleting(false); setConfirmDelete(false); }
     }
 
     async function handlePublish() {
@@ -215,22 +243,56 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
             if (!r.ok) throw new Error(data.error || "Publish failed");
             setPublished(true);
             setTimeout(() => setPublished(false), 3000);
-        } catch (e: any) {
-            alert(`Publish failed: ${e.message}`);
-        } finally { setPublishing(false); }
+        } catch (e: any) { alert(`Publish failed: ${e.message}`); }
+        finally { setPublishing(false); }
     }
 
-    async function handleCopy() {
-        const html = [`<h1>${article.title}</h1>`, article.excerpt ? `<p><em>${article.excerpt}</em></p>` : "", displayArticle.html ?? ""].filter(Boolean).join("\n");
-        const plain = article.title + (article.excerpt ? `\n\n${article.excerpt}` : "") + "\n\n" + (displayArticle.html ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    async function handleCopyRich() {
+        // Build Word/CMS-compatible HTML with embedded images
+        const featuredImg = displayArticle.image_base64
+            ? `<p style="text-align:center;margin-bottom:24px"><img src="data:image/png;base64,${displayArticle.image_base64}" alt="${article.title.replace(/"/g, '&quot;')}" style="max-width:100%;height:auto;border-radius:8px" width="680" /></p>`
+            : "";
+
+        const bodyHtml = displayArticle.html ?? "";
+
+        // Wrap in a minimal styled container for Word compatibility
+        const richHtml = [
+            `<div style="font-family:'Segoe UI',Arial,Helvetica,sans-serif;max-width:720px;margin:0 auto;color:#1a1a1a;line-height:1.6">`,
+            `<h1 style="font-size:28px;font-weight:700;margin-bottom:8px;line-height:1.25">${article.title}</h1>`,
+            article.excerpt ? `<p style="font-size:16px;color:#555;font-style:italic;margin-bottom:20px">${article.excerpt}</p>` : "",
+            featuredImg,
+            bodyHtml,
+            `</div>`,
+        ].filter(Boolean).join("\n");
+
+        const plain = article.title
+            + (article.excerpt ? `\n\n${article.excerpt}` : "")
+            + "\n\n"
+            + bodyHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
         try {
             await navigator.clipboard.write([new ClipboardItem({
-                "text/html": new Blob([html], { type: "text/html" }),
+                "text/html": new Blob([richHtml], { type: "text/html" }),
                 "text/plain": new Blob([plain], { type: "text/plain" }),
             })]);
-        } catch { await navigator.clipboard.writeText(plain); }
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        } catch {
+            await navigator.clipboard.writeText(plain);
+        }
+        setCopied("rich");
+        setTimeout(() => setCopied(false), 2500);
+    }
+
+    async function handleCopyPlain() {
+        const bodyHtml = displayArticle.html ?? "";
+        const plain = article.title
+            + (article.excerpt ? `\n\n${article.excerpt}` : "")
+            + "\n\n"
+            + bodyHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+        try {
+            await navigator.clipboard.writeText(plain);
+        } catch { /* noop */ }
+        setCopied("plain");
+        setTimeout(() => setCopied(false), 2500);
     }
 
     async function handleRegenerate() {
@@ -247,19 +309,12 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
             });
             const data = await r.json();
             if (!r.ok) throw new Error(data.error || "Regeneration failed");
-
-            // Update the existing article with new content
             const saveResp = await fetch(`/api/articles/${article.id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    html: data.html,
-                    excerpt: data.excerpt,
-                    image_base64: data.image_base64,
-                    image_prompt: data.image_prompt,
-                    seo: data.seo,
-                    outline: data.outline,
-                    model_used: data.model_used,
+                    html: data.html, excerpt: data.excerpt, image_base64: data.image_base64,
+                    image_prompt: data.image_prompt, seo: data.seo, outline: data.outline, model_used: data.model_used,
                 }),
             });
             const saveData = await saveResp.json();
@@ -267,6 +322,50 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
             onUpdate({ ...article, ...saveData });
         } catch (e: any) { setRegenErr(e.message); }
         finally { setRegenerating(false); }
+    }
+
+    async function handleShorten() {
+        if (!displayArticle.html) return;
+        setShortening(true); setShortenErr(null); setShortened(false); setShortenInfo(null);
+        try {
+            const r = await fetch("/api/shorten", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    html: displayArticle.html,
+                    title: article.title,
+                    excerpt: article.excerpt || undefined,
+                    company_id: article.company_id ?? undefined,
+                }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || "Shortening failed");
+
+            // If already under limit, show info but don't save
+            if (data.word_count === data.original_word_count) {
+                setShortenInfo({ original: data.original_word_count, shortened: data.word_count });
+                setShortened(true);
+                setTimeout(() => setShortened(false), 4000);
+                return;
+            }
+
+            // Save shortened content
+            const saveResp = await fetch(`/api/articles/${article.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    html: data.html,
+                    ...(data.excerpt ? { excerpt: data.excerpt } : {}),
+                }),
+            });
+            const saveData = await saveResp.json();
+            if (!saveResp.ok) throw new Error(saveData.error || "Failed to save");
+            onUpdate({ ...article, ...saveData });
+            setShortenInfo({ original: data.original_word_count, shortened: data.word_count });
+            setShortened(true);
+            setTimeout(() => { setShortened(false); setShortenInfo(null); }, 5000);
+        } catch (e: any) { setShortenErr(e.message); }
+        finally { setShortening(false); }
     }
 
     async function refreshImage() {
@@ -309,7 +408,6 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
         finally { setCheckingSimilarity(false); }
     }
 
-    // Insert image helpers
     async function onInsertSearch() {
         if (!insertSearchQuery.trim()) return;
         setInsertSearching(true); setInsertErr(null); setInsertPreview(null);
@@ -320,6 +418,70 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
             setInsertSearchResults(data.images ?? []);
         } catch (e: any) { setInsertErr(e.message); }
         finally { setInsertSearching(false); }
+    }
+
+    async function onCompositeSearch() {
+        if (!compositeSearchQuery.trim()) return;
+        setCompositeSearching(true); setCompositeErr(null);
+        try {
+            const r = await fetch("/api/image-search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: compositeSearchQuery.trim(), num: 12 }) });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data?.error || "Search failed");
+            setCompositeSearchResults(data.images ?? []);
+        } catch (e: any) { setCompositeErr(e.message); }
+        finally { setCompositeSearching(false); }
+    }
+
+    async function onCompositeGenerate() {
+        if (!compositeProductUrl) return;
+        setCompositeGenerating(true); setCompositeErr(null); setCompositeStep("generating");
+        try {
+            const r = await fetch("/api/composite-image", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    product_image_url: compositeProductUrl,
+                    article_title: article.title,
+                    article_excerpt: article.excerpt || "",
+                    custom_bg_prompt: compositeBgPrompt.trim() || undefined,
+                    image_style: selectedStyle,
+                    company_id: article.company_id ?? undefined,
+                }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data?.error || "Composite generation failed");
+            setCompositeResult(data.image_base64);
+            setCompositeStep("preview");
+        } catch (e: any) { setCompositeErr(e.message); setCompositeStep("confirm"); }
+        finally { setCompositeGenerating(false); }
+    }
+
+    async function onCompositeSave() {
+        if (!compositeResult) return;
+        setInsertSaving(true); setCompositeErr(null);
+        try {
+            const r = await fetch(`/api/articles/${article.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image_base64: compositeResult }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || "Save failed");
+            onUpdate({ ...article, ...data });
+            setShowInsertModal(false);
+        } catch (e: any) { setCompositeErr(e.message); }
+        finally { setInsertSaving(false); }
+    }
+
+    function resetComposite() {
+        setCompositeStep("search");
+        setCompositeProductUrl(null);
+        setCompositeProductThumb(null);
+        setCompositeSearchQuery("");
+        setCompositeSearchResults([]);
+        setCompositeBgPrompt("");
+        setCompositeResult(null);
+        setCompositeErr(null);
     }
 
     async function onInsertGenerate() {
@@ -334,17 +496,14 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
         finally { setInsertGenerating(false); }
     }
 
-    // Auto-save featured image when a preview is set in featured mode
     useEffect(() => {
         if (insertMode !== "featured" || !insertPreview || !showInsertModal) return;
-        // Auto-trigger the save
         (async () => {
             setInsertSaving(true); setInsertErr(null);
             try {
                 let base64Data: string;
-                if (insertPreview.type === "base64") {
-                    base64Data = insertPreview.src;
-                } else {
+                if (insertPreview.type === "base64") { base64Data = insertPreview.src; }
+                else {
                     const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(insertPreview.src)}`;
                     const imgResp = await fetch(proxyUrl);
                     if (!imgResp.ok) throw new Error("Failed to fetch image");
@@ -394,19 +553,14 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                 if (!r.ok) throw new Error(data.error || "Save failed");
                 onUpdate({ ...article, ...data });
             } else if (insertMode === "editInline" && contentEditableRef.current) {
-                // Insert at cursor in the contentEditable editor
                 const imgSrc = insertPreview.type === "base64" ? `data:image/png;base64,${insertPreview.src}` : `/api/image-proxy?url=${encodeURIComponent(insertPreview.src)}`;
                 const figureHtml = `<figure style="margin:24px 0;text-align:center"><img src="${imgSrc}" alt="" style="max-width:100%;border-radius:10px" /></figure>`;
-
-                // Restore saved selection and insert
                 const sel = window.getSelection();
                 if (savedRangeRef.current && sel) {
                     sel.removeAllRanges();
                     sel.addRange(savedRangeRef.current);
-                    // Insert using execCommand for undo support
                     document.execCommand("insertHTML", false, figureHtml);
                 } else {
-                    // Fallback: append to editor
                     contentEditableRef.current.innerHTML += "\n" + figureHtml;
                 }
                 syncFromContentEditable();
@@ -427,453 +581,573 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     }
 
     const seo = article.seo as any;
-    const roleColor = article.cluster_role ? ({
-        pillar: { bg: "#eef2ff", fg: "#4338ca" },
-        supporting: { bg: "#f0fdf4", fg: "#16a34a" },
-        long_tail: { bg: "#fefce8", fg: "#a16207" },
-    } as any)[article.cluster_role] : null;
 
-    const btnStyle: React.CSSProperties = {
-        padding: "6px 14px", fontSize: 12, fontWeight: 500, borderRadius: 5,
-        border: "1px solid #ddd", background: "#fff", cursor: "pointer",
-    };
+    const RoleIcon = article.cluster_role === "pillar" ? Crown : article.cluster_role === "supporting" ? BookOpen : Scroll;
 
+    // ======= INSERT IMAGE MODAL =======
+    const insertImageModal = (
+        <Dialog open={showInsertModal} onOpenChange={setShowInsertModal}>
+            <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <ImageIcon className="h-5 w-5" />
+                        {insertMode === "featured" ? "Change Featured Image" : "Insert Image"}
+                    </DialogTitle>
+                </DialogHeader>
+
+                <Tabs value={insertTab} onValueChange={(v) => { setInsertTab(v as any); setInsertPreview(null); setInsertErr(null); if (v === "composite") resetComposite(); }}>
+                    <TabsList className="grid w-full grid-cols-4">
+                        <TabsTrigger value="search" className="gap-1.5"><Search className="h-3.5 w-3.5" />Search</TabsTrigger>
+                        <TabsTrigger value="generate" className="gap-1.5"><Sparkles className="h-3.5 w-3.5" />Generate</TabsTrigger>
+                        <TabsTrigger value="composite" className="gap-1.5"><Layers className="h-3.5 w-3.5" />Composite</TabsTrigger>
+                        <TabsTrigger value="upload" className="gap-1.5"><Upload className="h-3.5 w-3.5" />Upload</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="search" className="space-y-3">
+                        <div className="flex gap-2">
+                            <Input placeholder="e.g. family hiking mountain trail" value={insertSearchQuery} onChange={(e) => setInsertSearchQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onInsertSearch(); }} />
+                            <Button onClick={onInsertSearch} disabled={insertSearching || !insertSearchQuery.trim()}>
+                                {insertSearching ? "Searching…" : "Search"}
+                            </Button>
+                        </div>
+                        {insertSearchResults.length > 0 && (
+                            <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-2 max-h-72 overflow-y-auto">
+                                {insertSearchResults.map((img, i) => (
+                                    <button key={i} onClick={() => setInsertPreview({ src: img.imageUrl, type: "url" })}
+                                        className={cn("p-0 rounded-lg overflow-hidden cursor-pointer border-2 transition-colors",
+                                            insertPreview?.src === img.imageUrl ? "border-primary" : "border-border hover:border-primary/50"
+                                        )}>
+                                        <img src={img.thumbnailUrl || img.imageUrl} alt={img.title} className="w-full h-24 object-cover" />
+                                        <div className="px-1.5 py-1 text-[10px] text-muted-foreground truncate">{img.domain}</div>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </TabsContent>
+
+                    <TabsContent value="generate" className="space-y-3">
+                        {imageStyles.length > 0 && (
+                            <div>
+                                <Label className="text-xs">Image Style</Label>
+                                <select value={selectedStyle} onChange={(e) => setSelectedStyle(e.target.value)}
+                                    className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                    {imageStyles.map((s) => (
+                                        <option key={s.id} value={s.id}>{s.label}{s.narrative ? ` — ${s.narrative.slice(0, 60)}…` : ""}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                        <div className="flex gap-2">
+                            <Input placeholder={article.image_prompt ? "Leave empty to use original prompt…" : "Describe the image…"} value={insertGenPrompt} onChange={(e) => setInsertGenPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onInsertGenerate(); }} />
+                            <Button onClick={onInsertGenerate} disabled={insertGenerating}>
+                                {insertGenerating ? "Generating…" : "Generate"}
+                            </Button>
+                        </div>
+                        {!insertGenPrompt.trim() && article.image_prompt && (
+                            <p className="text-xs text-muted-foreground">💡 Will use: <em>{article.image_prompt.slice(0, 120)}{article.image_prompt.length > 120 ? "…" : ""}</em></p>
+                        )}
+                    </TabsContent>
+
+                    <TabsContent value="composite" className="space-y-3">
+                        {/* Step 1: Search for product */}
+                        {compositeStep === "search" && (
+                            <>
+                                <div className="text-sm text-muted-foreground mb-1">
+                                    <strong>Step 1:</strong> Search for your product image
+                                </div>
+                                <div className="flex gap-2">
+                                    <Input placeholder="e.g. Nike Air Max 90 product photo" value={compositeSearchQuery} onChange={(e) => setCompositeSearchQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onCompositeSearch(); }} />
+                                    <Button onClick={onCompositeSearch} disabled={compositeSearching || !compositeSearchQuery.trim()}>
+                                        {compositeSearching ? "Searching…" : "Search"}
+                                    </Button>
+                                </div>
+                                {compositeSearchResults.length > 0 && (
+                                    <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-2 max-h-72 overflow-y-auto">
+                                        {compositeSearchResults.map((img, i) => (
+                                            <button key={i} onClick={() => {
+                                                setCompositeProductUrl(img.imageUrl);
+                                                setCompositeProductThumb(img.thumbnailUrl || img.imageUrl);
+                                                setCompositeStep("confirm");
+                                            }}
+                                                className={cn("p-0 rounded-lg overflow-hidden cursor-pointer border-2 transition-colors border-border hover:border-primary/50")}>
+                                                <img src={img.thumbnailUrl || img.imageUrl} alt={img.title} className="w-full h-24 object-cover" />
+                                                <div className="px-1.5 py-1 text-[10px] text-muted-foreground truncate">{img.domain}</div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        {/* Step 2: Confirm product selection */}
+                        {compositeStep === "confirm" && compositeProductUrl && (
+                            <>
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                                    <button onClick={() => setCompositeStep("search")} className="flex items-center gap-1 hover:text-foreground transition-colors">
+                                        <ArrowLeft className="h-3.5 w-3.5" /> Back
+                                    </button>
+                                    <span>·</span>
+                                    <strong>Step 2:</strong> Confirm product & set background
+                                </div>
+                                <div className="flex gap-4">
+                                    <div className="shrink-0 w-32">
+                                        <img src={compositeProductThumb || compositeProductUrl} alt="Selected product" className="w-full rounded-lg border border-border object-contain bg-white" />
+                                        <div className="text-[10px] text-muted-foreground text-center mt-1">Selected product</div>
+                                    </div>
+                                    <div className="flex-1 space-y-3">
+                                        {imageStyles.length > 0 && (
+                                            <div>
+                                                <Label className="text-xs">Image Style</Label>
+                                                <select value={selectedStyle} onChange={(e) => setSelectedStyle(e.target.value)}
+                                                    className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                                    {imageStyles.map((s) => (
+                                                        <option key={s.id} value={s.id}>{s.label}{s.narrative ? ` — ${s.narrative.slice(0, 50)}…` : ""}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
+                                        <div>
+                                            <Label className="text-xs">Background Direction <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                                            <Textarea
+                                                placeholder={`Auto-generated from article: "${article.title.slice(0, 60)}${article.title.length > 60 ? "…" : ""}". Add extra direction here…`}
+                                                value={compositeBgPrompt}
+                                                onChange={(e) => setCompositeBgPrompt(e.target.value)}
+                                                rows={3}
+                                                className="mt-1 text-sm"
+                                            />
+                                        </div>
+                                        <Button onClick={onCompositeGenerate} className="w-full gap-1.5">
+                                            <Sparkles className="h-3.5 w-3.5" /> Generate Background & Composite
+                                        </Button>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                        {/* Step 3: Generating */}
+                        {compositeStep === "generating" && (
+                            <div className="py-10 text-center space-y-4">
+                                <div className="relative mx-auto w-16 h-16">
+                                    <div className="absolute inset-0 rounded-full border-4 border-muted" />
+                                    <div className="absolute inset-0 rounded-full border-4 border-t-primary animate-spin" />
+                                </div>
+                                <div>
+                                    <div className="text-sm font-medium">Creating your composite…</div>
+                                    <div className="text-xs text-muted-foreground mt-1">Generating contextual background → Removing product background → Compositing</div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Step 4: Preview composite result */}
+                        {compositeStep === "preview" && compositeResult && (
+                            <>
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                                    <button onClick={() => setCompositeStep("confirm")} className="flex items-center gap-1 hover:text-foreground transition-colors">
+                                        <ArrowLeft className="h-3.5 w-3.5" /> Adjust
+                                    </button>
+                                    <span>·</span>
+                                    <strong>Result</strong>
+                                </div>
+                                <img src={`data:image/png;base64,${compositeResult}`} alt="Composite preview" className="w-full rounded-lg border border-border" />
+                                <div className="flex gap-2 justify-end pt-2">
+                                    <Button variant="outline" onClick={() => {
+                                        setCompositeResult(null);
+                                        setCompositeStep("confirm");
+                                    }}>
+                                        Regenerate
+                                    </Button>
+                                    <Button onClick={onCompositeSave} disabled={insertSaving} className="gap-1.5">
+                                        <CheckCircle2 className="h-3.5 w-3.5" />
+                                        {insertSaving ? "Saving…" : "Save as Featured Image"}
+                                    </Button>
+                                </div>
+                            </>
+                        )}
+                    </TabsContent>
+
+                    <TabsContent value="upload">
+                        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
+                            const file = e.target.files?.[0]; if (!file) return;
+                            const reader = new FileReader(); reader.onloadend = () => setInsertPreview({ src: (reader.result as string).split(",")[1], type: "base64" }); reader.readAsDataURL(file); e.target.value = "";
+                        }} />
+                        <div onClick={() => fileInputRef.current?.click()} onDragOver={(e) => e.preventDefault()} onDrop={(e) => {
+                            e.preventDefault(); const file = e.dataTransfer.files?.[0]; if (!file?.type.startsWith("image/")) return;
+                            const reader = new FileReader(); reader.onloadend = () => setInsertPreview({ src: (reader.result as string).split(",")[1], type: "base64" }); reader.readAsDataURL(file);
+                        }} className="border-2 border-dashed border-border rounded-xl p-10 text-center cursor-pointer hover:border-primary/50 transition-colors">
+                            <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                            <div className="text-sm font-medium">Click to browse or drag & drop</div>
+                        </div>
+                    </TabsContent>
+                </Tabs>
+
+                {(insertErr || compositeErr) && (
+                    <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{insertErr || compositeErr}</AlertDescription>
+                    </Alert>
+                )}
+
+                {insertPreview && (
+                    <div>
+                        <Label className="text-xs mb-2 block">Preview</Label>
+                        <img src={insertPreview.type === "base64" ? `data:image/png;base64,${insertPreview.src}` : insertPreview.src} alt="Preview"
+                            className="w-full max-h-72 object-contain rounded-lg border border-border" />
+                    </div>
+                )}
+
+                {insertPreview && (
+                    <div className="flex items-center justify-between gap-3 pt-3 border-t border-border">
+                        {insertMode === "inline" && (
+                            <div className="flex items-center gap-4 text-sm">
+                                <span className="font-medium">Position:</span>
+                                {(["top", "bottom"] as const).map((pos) => (
+                                    <label key={pos} className="flex items-center gap-1.5 cursor-pointer">
+                                        <input type="radio" name="insert-pos-panel" checked={insertPosition === pos} onChange={() => setInsertPosition(pos)} className="accent-primary" />
+                                        {pos === "top" ? "Top" : "Bottom"}
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                        {insertMode === "editInline" && <span className="text-sm text-muted-foreground">Inserted at cursor</span>}
+                        {insertMode === "featured" && (
+                            <span className={cn("text-sm font-medium", insertSaving ? "text-warning" : "text-success")}>
+                                {insertSaving ? "⏳ Saving…" : "✓ Updated"}
+                            </span>
+                        )}
+                        {insertMode !== "featured" && (
+                            <Button onClick={doInsertImage} disabled={insertSaving}>
+                                {insertSaving ? "Saving…" : "Insert & Save"}
+                            </Button>
+                        )}
+                    </div>
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+
+    // ======= EDIT MODE =======
     if (editing) {
         return (
-            <div style={{ padding: 20 }}>
-                <h3 style={{ margin: "0 0 16px" }}>✏️ Edit Article</h3>
-                <div style={{ marginBottom: 12 }}>
-                    <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Title</label>
-                    <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
-                        style={{ width: "100%", padding: "8px 12px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box" }} />
+            <div className="p-5 space-y-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Pencil className="h-4 w-4" /> Edit Article
+                </h3>
+                <div className="space-y-1.5">
+                    <Label>Title</Label>
+                    <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
                 </div>
-                <div style={{ marginBottom: 12 }}>
-                    <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Excerpt</label>
-                    <textarea value={editExcerpt} onChange={(e) => setEditExcerpt(e.target.value)} rows={2}
-                        style={{ width: "100%", padding: "8px 12px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box", resize: "vertical" }} />
+                <div className="space-y-1.5">
+                    <Label>Excerpt</Label>
+                    <Textarea value={editExcerpt} onChange={(e) => setEditExcerpt(e.target.value)} rows={2} />
                 </div>
-                <div style={{ marginBottom: 16 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                        <label style={{ fontSize: 13, fontWeight: 500 }}>Body</label>
-                        <div style={{ display: "flex", gap: 0, border: "1px solid #ccc", borderRadius: 5, overflow: "hidden" }}>
-                            {(["visual", "html"] as const).map((mode) => (
-                                <button key={mode} type="button" onClick={() => { if (mode === "html" && editViewMode === "visual") syncFromContentEditable(); setEditViewMode(mode); }}
-                                    style={{ padding: "4px 12px", fontSize: 11, fontWeight: editViewMode === mode ? 600 : 400, border: "none", background: editViewMode === mode ? "#191F1D" : "#fff", color: editViewMode === mode ? "#fff" : "#555", cursor: "pointer" }}>
-                                    {mode === "visual" ? "Visual" : "HTML"}
-                                </button>
-                            ))}
+                <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                        <Label>Body</Label>
+                        <div className="flex border border-border rounded-md overflow-hidden">
+                            <button onClick={() => { if (editViewMode === "html") setEditViewMode("visual"); }}
+                                className={cn("px-3 py-1 text-xs flex items-center gap-1", editViewMode === "visual" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted")}>
+                                <Eye className="h-3 w-3" /> Visual
+                            </button>
+                            <button onClick={() => { if (editViewMode === "visual") { syncFromContentEditable(); setEditViewMode("html"); } }}
+                                className={cn("px-3 py-1 text-xs flex items-center gap-1", editViewMode === "html" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted")}>
+                                <Code className="h-3 w-3" /> HTML
+                            </button>
                         </div>
                     </div>
                     {editViewMode === "visual" && (
-                        <div style={{ display: "flex", gap: 2, flexWrap: "wrap", padding: "6px 8px", background: "#f5f5f5", border: "1px solid #ccc", borderBottom: "none", borderRadius: "6px 6px 0 0" }}>
+                        <div className="flex gap-1 flex-wrap p-1.5 bg-muted border border-border border-b-0 rounded-t-md">
                             {[{ label: "B", cmd: "bold" }, { label: "I", cmd: "italic" }, { label: "H2", cmd: "formatBlock", value: "H2" }, { label: "H3", cmd: "formatBlock", value: "H3" }, { label: "P", cmd: "formatBlock", value: "P" }].map((btn) => (
-                                <button key={btn.label} type="button" onMouseDown={(e) => { e.preventDefault(); execFormat(btn.cmd, btn.value); }}
-                                    style={{ padding: "4px 10px", fontSize: 13, border: "1px solid #ddd", borderRadius: 4, background: "#fff", cursor: "pointer" }}>{btn.label}</button>
+                                <Button key={btn.label} variant="outline" size="sm" className="h-7 px-2.5 text-xs" onMouseDown={(e) => { e.preventDefault(); execFormat(btn.cmd, btn.value); }}>
+                                    {btn.label}
+                                </Button>
                             ))}
-                            <div style={{ width: 1, background: "#ddd", margin: "0 4px" }} />
-                            <button type="button" onMouseDown={(e) => { e.preventDefault(); const url = prompt("Enter URL:"); if (url) execFormat("createLink", url); }}
-                                style={{ padding: "4px 10px", fontSize: 13, border: "1px solid #ddd", borderRadius: 4, background: "#fff", cursor: "pointer" }}>🔗</button>
-                            <button type="button" onMouseDown={(e) => { e.preventDefault(); execFormat("insertUnorderedList"); }}
-                                style={{ padding: "4px 10px", fontSize: 13, border: "1px solid #ddd", borderRadius: 4, background: "#fff", cursor: "pointer" }}>• List</button>
-                            <div style={{ width: 1, background: "#ddd", margin: "0 4px" }} />
-                            <button type="button" onMouseDown={(e) => {
+                            <Separator orientation="vertical" className="h-5 mx-0.5" />
+                            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onMouseDown={(e) => { e.preventDefault(); const url = prompt("Enter URL:"); if (url) execFormat("createLink", url); }}>
+                                🔗
+                            </Button>
+                            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onMouseDown={(e) => { e.preventDefault(); execFormat("insertUnorderedList"); }}>
+                                • List
+                            </Button>
+                            <Separator orientation="vertical" className="h-5 mx-0.5" />
+                            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onMouseDown={(e) => {
                                 e.preventDefault();
-                                // Save current cursor position before opening modal
                                 const sel = window.getSelection();
-                                if (sel && sel.rangeCount > 0) {
-                                    savedRangeRef.current = sel.getRangeAt(0).cloneRange();
-                                }
-                                setInsertMode("editInline");
-                                setInsertPreview(null);
-                                setInsertErr(null);
-                                setShowInsertModal(true);
-                            }}
-                                style={{ padding: "4px 10px", fontSize: 13, border: "1px solid #ddd", borderRadius: 4, background: "#fff", cursor: "pointer" }}>🖼</button>
+                                if (sel && sel.rangeCount > 0) savedRangeRef.current = sel.getRangeAt(0).cloneRange();
+                                setInsertMode("editInline"); setInsertPreview(null); setInsertErr(null); setShowInsertModal(true);
+                            }}>
+                                <ImageIcon className="h-3 w-3" />
+                            </Button>
                         </div>
                     )}
                     {editViewMode === "visual" ? (
                         <div ref={contentEditableRef} contentEditable suppressContentEditableWarning dangerouslySetInnerHTML={{ __html: editHtml }} onBlur={syncFromContentEditable}
-                            style={{ width: "100%", minHeight: 250, padding: "12px 14px", fontSize: 14, lineHeight: 1.7, borderRadius: "0 0 6px 6px", border: "1px solid #ccc", boxSizing: "border-box", background: "#fff", outline: "none", overflowY: "auto", maxHeight: 500 }} />
+                            className="w-full min-h-[250px] p-3 text-sm leading-relaxed rounded-b-md border border-border bg-background outline-none overflow-y-auto max-h-[500px] prose prose-sm dark:prose-invert" />
                     ) : (
-                        <textarea value={editHtml} onChange={(e) => setEditHtml(e.target.value)} rows={14}
-                            style={{ width: "100%", padding: "8px 12px", fontSize: 13, fontFamily: "monospace", borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box", resize: "vertical" }} />
+                        <Textarea value={editHtml} onChange={(e) => setEditHtml(e.target.value)} rows={14} className="font-mono text-xs" />
                     )}
                 </div>
-                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                    <button onClick={() => setEditing(false)} disabled={saving} style={{ ...btnStyle }}>Cancel</button>
-                    <button onClick={saveEdit} disabled={saving} style={{ ...btnStyle, border: "1px solid #FDB72A", background: "#FDB72A", color: "#191F1D", fontWeight: 600 }}>
-                        {saving ? "Saving…" : "Save Changes"}
-                    </button>
+                <div className="flex gap-2 justify-end">
+                    <Button variant="outline" onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
+                    <Button onClick={saveEdit} disabled={saving}>{saving ? "Saving…" : "Save Changes"}</Button>
                 </div>
-
-                {/* Insert Image Modal — rendered inside edit mode so it overlays the editor */}
-                {showInsertModal && (
-                    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setShowInsertModal(false)}>
-                        <div style={{ background: "#fff", borderRadius: 12, width: "90%", maxWidth: 720, maxHeight: "85vh", overflowY: "auto", padding: 24, boxShadow: "0 12px 40px rgba(0,0,0,0.18)" }} onClick={(e) => e.stopPropagation()}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                                <h2 style={{ margin: 0, fontSize: 18 }}>🖼 Insert Image into Article</h2>
-                                <button onClick={() => setShowInsertModal(false)} style={btnStyle}>✕ Close</button>
-                            </div>
-                            <div style={{ display: "flex", gap: 0, marginBottom: 16, borderBottom: "2px solid #e5e5e5" }}>
-                                {(["search", "generate", "upload"] as const).map((tab) => (
-                                    <button key={tab} onClick={() => { setInsertTab(tab); setInsertPreview(null); setInsertErr(null); }}
-                                        style={{ padding: "10px 20px", fontSize: 14, fontWeight: insertTab === tab ? 600 : 400, border: "none", borderBottom: insertTab === tab ? "2px solid #FDB72A" : "2px solid transparent", background: "none", cursor: "pointer", color: insertTab === tab ? "#191F1D" : "#888", marginBottom: -2 }}>
-                                        {tab === "search" ? "🔍 Search Web" : tab === "generate" ? "✨ Generate" : "📁 Upload"}
-                                    </button>
-                                ))}
-                            </div>
-                            {insertTab === "search" && (
-                                <div>
-                                    <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                                        <input type="text" placeholder="e.g. family hiking mountain trail" value={insertSearchQuery} onChange={(e) => setInsertSearchQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onInsertSearch(); }}
-                                            style={{ flex: 1, padding: "10px 14px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc" }} />
-                                        <button onClick={onInsertSearch} disabled={insertSearching || !insertSearchQuery.trim()} style={{ ...btnStyle, padding: "10px 18px" }}>{insertSearching ? "Searching…" : "Search"}</button>
-                                    </div>
-                                    {insertSearchResults.length > 0 && (
-                                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10, maxHeight: 300, overflowY: "auto", marginBottom: 12 }}>
-                                            {insertSearchResults.map((img, i) => (
-                                                <button key={i} onClick={() => setInsertPreview({ src: img.imageUrl, type: "url" })} style={{ padding: 0, border: insertPreview?.src === img.imageUrl ? "3px solid #FDB72A" : "2px solid #e5e5e5", borderRadius: 8, overflow: "hidden", cursor: "pointer", background: "none" }}>
-                                                    <img src={img.thumbnailUrl || img.imageUrl} alt={img.title} style={{ width: "100%", height: 100, objectFit: "cover", display: "block" }} />
-                                                    <div style={{ padding: "4px 6px", fontSize: 10, color: "#666", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{img.domain}</div>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                            {insertTab === "generate" && (
-                                <div style={{ marginBottom: 12 }}>
-                                    {imageStyles.length > 0 && (
-                                        <div style={{ marginBottom: 10 }}>
-                                            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#666", marginBottom: 4 }}>Image Style</label>
-                                            <select value={selectedStyle} onChange={(e) => setSelectedStyle(e.target.value)}
-                                                style={{ width: "100%", padding: "8px 12px", fontSize: 13, borderRadius: 6, border: "1px solid #ccc" }}>
-                                                {imageStyles.map((s) => (
-                                                    <option key={s.id} value={s.id}>{s.label}{s.narrative ? ` — ${s.narrative.slice(0, 60)}…` : ""}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    )}
-                                    <div style={{ display: "flex", gap: 8 }}>
-                                        <input type="text" placeholder={article.image_prompt ? "Leave empty to use original prompt…" : "Describe the image…"} value={insertGenPrompt} onChange={(e) => setInsertGenPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onInsertGenerate(); }}
-                                            style={{ flex: 1, padding: "10px 14px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc" }} />
-                                        <button onClick={onInsertGenerate} disabled={insertGenerating} style={{ ...btnStyle, padding: "10px 18px" }}>{insertGenerating ? "Generating…" : "Generate"}</button>
-                                    </div>
-                                    {!insertGenPrompt.trim() && article.image_prompt && (
-                                        <div style={{ fontSize: 11, color: "#888", marginTop: 6 }}>💡 Will use: <em>{article.image_prompt.slice(0, 120)}{article.image_prompt.length > 120 ? "…" : ""}</em></div>
-                                    )}
-                                </div>
-                            )}
-                            {insertTab === "upload" && (
-                                <div>
-                                    <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => {
-                                        const file = e.target.files?.[0]; if (!file) return;
-                                        const reader = new FileReader(); reader.onloadend = () => setInsertPreview({ src: (reader.result as string).split(",")[1], type: "base64" }); reader.readAsDataURL(file); e.target.value = "";
-                                    }} />
-                                    <div onClick={() => fileInputRef.current?.click()} onDragOver={(e) => { e.preventDefault(); }} onDrop={(e) => {
-                                        e.preventDefault(); const file = e.dataTransfer.files?.[0]; if (!file?.type.startsWith("image/")) return;
-                                        const reader = new FileReader(); reader.onloadend = () => setInsertPreview({ src: (reader.result as string).split(",")[1], type: "base64" }); reader.readAsDataURL(file);
-                                    }} style={{ border: "2px dashed #ccc", borderRadius: 10, padding: "40px 20px", textAlign: "center", cursor: "pointer", color: "#888" }}>
-                                        <div style={{ fontSize: 32, marginBottom: 8 }}>📁</div>
-                                        <div style={{ fontWeight: 500, color: "#555" }}>Click to browse or drag & drop</div>
-                                    </div>
-                                </div>
-                            )}
-                            {insertErr && <p style={{ color: "crimson", fontSize: 13, margin: "8px 0" }}>{insertErr}</p>}
-                            {insertPreview && (
-                                <div style={{ marginBottom: 16 }}>
-                                    <p style={{ fontSize: 13, fontWeight: 500, color: "#555", marginBottom: 8 }}>Preview</p>
-                                    <img src={insertPreview.type === "base64" ? `data:image/png;base64,${insertPreview.src}` : insertPreview.src} alt="Preview" style={{ width: "100%", maxHeight: 300, objectFit: "contain", borderRadius: 8, border: "1px solid #e5e5e5" }} />
-                                </div>
-                            )}
-                            {insertPreview && (
-                                <div style={{ borderTop: "1px solid #e5e5e5", paddingTop: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                                    <span style={{ fontSize: 13, color: "#666" }}>Image will be inserted at cursor position</span>
-                                    <button onClick={doInsertImage} disabled={insertSaving} style={{ ...btnStyle, border: "1px solid #FDB72A", background: "#FDB72A", color: "#191F1D", fontWeight: 600, padding: "10px 24px" }}>
-                                        {insertSaving ? "Saving…" : "Insert"}
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
+                {insertImageModal}
             </div>
         );
     }
 
+    // ======= READ MODE =======
     return (
-        <div style={{ padding: 20, overflowY: "auto", height: "100%" }}>
+        <div className="p-5 overflow-y-auto h-full space-y-4">
             {/* Header */}
-            <div style={{ marginBottom: 16 }}>
-                <h2 style={{ margin: "0 0 6px", fontSize: 20 }}>{article.title}</h2>
-                {article.excerpt && <p style={{ margin: "0 0 10px", color: "#666", fontSize: 14 }}><em>{article.excerpt}</em></p>}
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 12 }}>
-                    <span style={{ padding: "2px 8px", borderRadius: 4, background: "#e0f2fe", color: "#0369a1", fontWeight: 500 }}>
+            <div>
+                <h2 className="text-xl font-semibold tracking-tight mb-1.5">{article.title}</h2>
+                {article.excerpt && <p className="text-sm text-muted-foreground italic mb-3">{article.excerpt}</p>}
+                <div className="flex gap-2 flex-wrap">
+                    <Badge variant="secondary">
                         {article.company_id && companies[article.company_id] ? companies[article.company_id] : "Brand Studio"}
-                    </span>
-                    {roleColor && (
-                        <span style={{ padding: "2px 8px", borderRadius: 4, background: roleColor.bg, color: roleColor.fg, fontWeight: 600 }}>
-                            🔗 {article.cluster_role?.replace("_", "-")}
-                        </span>
+                    </Badge>
+                    {article.cluster_role && (
+                        <Badge variant="outline" className="gap-1">
+                            <RoleIcon className="h-3 w-3" />
+                            {article.cluster_role.replace("_", "-")}
+                        </Badge>
                     )}
-                    {article.model_used && <span style={{ padding: "2px 8px", borderRadius: 4, background: "#f0f0f0" }}>{article.model_used}</span>}
-                    <span style={{ color: "#999" }}>{new Date(article.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                    {article.model_used && <Badge variant="outline">{article.model_used}</Badge>}
+                    <span className="text-xs text-muted-foreground self-center">
+                        {new Date(article.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </span>
                 </div>
             </div>
 
-            {loadingFull && <p style={{ color: "#888", fontSize: 13 }}>Loading article content…</p>}
+            {loadingFull && (
+                <div className="space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                </div>
+            )}
 
-            {/* Actions bar */}
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16, paddingBottom: 16, borderBottom: "1px solid #e5e5e5" }}>
-                <button onClick={handleCopy} style={{ ...btnStyle, background: copied ? "#f0fdf4" : "#fff", color: copied ? "#22c55e" : undefined }}>
-                    {copied ? "Copied ✓" : "📋 Copy"}
-                </button>
-                <button onClick={handlePublish} disabled={publishing} style={{ ...btnStyle, border: published ? "1px solid #22c55e" : undefined, background: published ? "#f0fdf4" : "#fff", color: published ? "#22c55e" : undefined }}>
-                    {publishing ? "Publishing…" : published ? "✓ Published!" : "🚀 Publish"}
-                </button>
-                <button onClick={startEdit} style={btnStyle}>✏️ Edit</button>
-                <button onClick={handleRegenerate} disabled={regenerating} style={{ ...btnStyle, color: regenerating ? "#999" : "#b45309" }}>
-                    {regenerating ? "Regenerating…" : "🔄 Regenerate"}
-                </button>
-                <button onClick={() => { setShowInsertModal(true); setInsertMode("inline"); }} style={btnStyle}>🖼 Image</button>
+            {/* Actions */}
+            <div className="flex gap-2 flex-wrap pb-4 border-b border-border">
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className={cn("gap-1.5", copied && "text-success border-success")}>
+                            {copied ? <><CheckCircle2 className="h-3.5 w-3.5" /> {copied === "rich" ? "Copied for CMS" : "Copied"}</> : <><Copy className="h-3.5 w-3.5" /> Copy</>}
+                            <ChevronDown className="h-3 w-3 ml-0.5 opacity-60" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="min-w-[220px]">
+                        <DropdownMenuLabel>Copy Article</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={handleCopyRich} className="gap-2 cursor-pointer">
+                            <FileText className="h-4 w-4" />
+                            <div>
+                                <div className="font-medium">Copy for Word / CMS</div>
+                                <div className="text-xs text-muted-foreground">Rich HTML with images embedded</div>
+                            </div>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleCopyPlain} className="gap-2 cursor-pointer">
+                            <ClipboardCopy className="h-4 w-4" />
+                            <div>
+                                <div className="font-medium">Copy as Plain Text</div>
+                                <div className="text-xs text-muted-foreground">Text only, no formatting</div>
+                            </div>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+                <Button variant="outline" size="sm" onClick={handlePublish} disabled={publishing} className={cn("gap-1.5", published && "text-success border-success")}>
+                    {publishing ? "Publishing…" : published ? <><CheckCircle2 className="h-3.5 w-3.5" /> Published!</> : <><Rocket className="h-3.5 w-3.5" /> Publish</>}
+                </Button>
+                <Button variant="outline" size="sm" onClick={startEdit} className="gap-1.5">
+                    <Pencil className="h-3.5 w-3.5" /> Edit
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleRegenerate} disabled={regenerating} className="gap-1.5">
+                    <RefreshCw className={cn("h-3.5 w-3.5", regenerating && "animate-spin")} /> {regenerating ? "Regenerating…" : "Regenerate"}
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleShorten} disabled={shortening || !displayArticle.html}
+                    className={cn("gap-1.5", shortened && "text-success border-success")}>
+                    <Scissors className={cn("h-3.5 w-3.5", shortening && "animate-pulse")} />
+                    {shortening ? "Shortening…" : shortened ? (
+                        shortenInfo && shortenInfo.original === shortenInfo.shortened
+                            ? `Already <2k (${shortenInfo.original} words)`
+                            : `Shortened! ${shortenInfo ? `${shortenInfo.original} → ${shortenInfo.shortened}` : ""}`
+                    ) : "Shorten"}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => { setShowInsertModal(true); setInsertMode("inline"); }} className="gap-1.5">
+                    <ImageIcon className="h-3.5 w-3.5" /> Image
+                </Button>
                 {confirmDelete ? (
-                    <div style={{ display: "flex", gap: 4 }}>
-                        <button onClick={handleDelete} disabled={deleting} style={{ ...btnStyle, border: "1px solid #ef4444", background: "#fef2f2", color: "#ef4444", fontWeight: 600 }}>
+                    <div className="flex gap-1.5">
+                        <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
                             {deleting ? "…" : "Confirm"}
-                        </button>
-                        <button onClick={() => setConfirmDelete(false)} style={btnStyle}>Cancel</button>
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setConfirmDelete(false)}>Cancel</Button>
                     </div>
                 ) : (
-                    <button onClick={() => setConfirmDelete(true)} style={{ ...btnStyle, color: "#ef4444" }}>🗑 Delete</button>
+                    <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(true)} className="text-destructive hover:text-destructive gap-1.5">
+                        <Trash2 className="h-3.5 w-3.5" /> Delete
+                    </Button>
                 )}
             </div>
 
-            {regenErr && <p style={{ color: "crimson", fontSize: 13, margin: "0 0 12px" }}>Regeneration failed: {regenErr}</p>}
+            {regenErr && (
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>Regeneration failed: {regenErr}</AlertDescription>
+                </Alert>
+            )}
+
+            {shortenErr && (
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>Shortening failed: {shortenErr}</AlertDescription>
+                </Alert>
+            )}
 
             {/* Similarity Analysis */}
-            <div style={{ marginBottom: 16, padding: 14, borderRadius: 8, border: "1px solid #e5e5e5", background: "#fafafa" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: similarResults ? 10 : 0 }}>
-                    <h4 style={{ margin: 0, fontSize: 14, color: "#555" }}>🔍 Similarity Analysis</h4>
-                    <button onClick={checkSimilarity} disabled={checkingSimilarity || !article.company_id}
-                        style={{ ...btnStyle, border: "1px solid #f59e0b", color: "#b45309", fontSize: 12, opacity: !article.company_id ? 0.5 : 1 }}>
-                        {checkingSimilarity ? "Checking…" : "Find Similar"}
-                    </button>
-                </div>
-                {simErr && <p style={{ color: "crimson", fontSize: 12, margin: "4px 0 0" }}>{simErr}</p>}
-                {similarResults !== null && (
-                    similarResults.length === 0 ? (
-                        <div style={{ fontSize: 13, color: "#16a34a", display: "flex", alignItems: "center", gap: 6 }}>
-                            ✅ No significant overlap found
-                        </div>
-                    ) : (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                            {similarResults.map((r) => {
-                                const pct = Math.round(r.similarity * 100);
-                                const color = pct >= 92 ? "#dc2626" : pct >= 85 ? "#c2410c" : "#a16207";
-                                return (
-                                    <button key={r.id} onClick={() => onSelectArticle(r.id)}
-                                        style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 5, background: "#fff", border: "1px solid #e5e5e5", cursor: "pointer", fontSize: 12, textAlign: "left", width: "100%" }}>
-                                        <span style={{ padding: "1px 6px", borderRadius: 3, fontSize: 11, fontWeight: 700, color, background: pct >= 92 ? "#fef2f2" : pct >= 85 ? "#fff7ed" : "#fefce8", flexShrink: 0 }}>{pct}%</span>
-                                        <div style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</div>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    )
-                )}
-            </div>
+            <Card>
+                <CardContent className="p-4">
+                    <div className="flex justify-between items-center mb-2">
+                        <h4 className="text-sm font-medium flex items-center gap-1.5">
+                            <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                            Similarity Analysis
+                        </h4>
+                        <Button variant="outline" size="sm" onClick={checkSimilarity} disabled={checkingSimilarity || !article.company_id}
+                            className={cn("text-xs", !article.company_id && "opacity-50")}>
+                            {checkingSimilarity ? "Checking…" : "Find Similar"}
+                        </Button>
+                    </div>
+                    {simErr && <p className="text-xs text-destructive mt-1">{simErr}</p>}
+                    {similarResults !== null && (
+                        similarResults.length === 0 ? (
+                            <div className="flex items-center gap-1.5 text-sm text-success">
+                                <CheckCircle2 className="h-4 w-4" /> No significant overlap found
+                            </div>
+                        ) : (
+                            <div className="space-y-1.5 mt-2">
+                                {similarResults.map((r) => {
+                                    const pct = Math.round(r.similarity * 100);
+                                    return (
+                                        <button key={r.id} onClick={() => onSelectArticle(r.id)}
+                                            className="flex items-center gap-2 w-full p-2 rounded-md border border-border bg-background hover:bg-accent text-left text-xs transition-colors">
+                                            <Badge variant={pct >= 92 ? "destructive" : "secondary"} className="text-[11px] font-bold shrink-0">
+                                                {pct}%
+                                            </Badge>
+                                            <span className="truncate">{r.title}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )
+                    )}
+                </CardContent>
+            </Card>
 
             {/* SEO Data */}
             {seo && (
-                <details style={{ marginBottom: 16 }}>
-                    <summary style={{ cursor: "pointer", fontSize: 14, fontWeight: 500, color: "#555", padding: "8px 0" }}>📊 SEO Data</summary>
-                    <div style={{ padding: 14, borderRadius: 8, border: "1px solid #e5e5e5", background: "#fff", fontSize: 13 }}>
-                        {seo.primary_keyword && <div style={{ marginBottom: 6 }}><strong>Primary:</strong> {seo.primary_keyword}</div>}
-                        {seo.secondary_keywords && <div style={{ marginBottom: 6 }}><strong>Secondary:</strong> {(seo.secondary_keywords as string[]).join(", ")}</div>}
-                        {seo.meta_title && <div style={{ marginBottom: 6 }}><strong>Meta Title:</strong> {seo.meta_title}</div>}
-                        {seo.meta_description && <div><strong>Meta Desc:</strong> {seo.meta_description}</div>}
-                    </div>
+                <details className="group">
+                    <summary className="cursor-pointer text-sm font-medium py-2 flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
+                        📊 SEO Data
+                    </summary>
+                    <Card className="mt-1">
+                        <CardContent className="p-4 text-sm space-y-1.5">
+                            {seo.primary_keyword && <div><strong className="text-muted-foreground">Primary:</strong> {seo.primary_keyword}</div>}
+                            {seo.secondary_keywords && <div><strong className="text-muted-foreground">Secondary:</strong> {(seo.secondary_keywords as string[]).join(", ")}</div>}
+                            {seo.meta_title && <div><strong className="text-muted-foreground">Meta Title:</strong> {seo.meta_title}</div>}
+                            {seo.meta_description && <div><strong className="text-muted-foreground">Meta Desc:</strong> {seo.meta_description}</div>}
+                        </CardContent>
+                    </Card>
                 </details>
             )}
 
             {/* Featured Image */}
             {displayArticle.image_base64 && (
-                <div style={{ marginBottom: 16, position: "relative" }}>
+                <div className="relative group">
                     <img src={`data:image/png;base64,${displayArticle.image_base64}`} alt={article.title}
-                        style={{ width: "100%", borderRadius: 10, display: "block" }} />
-                    <button onClick={() => { setShowInsertModal(true); setInsertMode("featured"); setInsertGenPrompt(""); setInsertPreview(null); setInsertErr(null); setInsertTab("generate"); }}
-                        style={{ position: "absolute", bottom: 10, right: 10, ...btnStyle, background: "rgba(0,0,0,0.55)", color: "#fff", border: "1px solid rgba(255,255,255,0.6)", backdropFilter: "blur(4px)" }}>
-                        🖼 Change Image
-                    </button>
+                        className="w-full rounded-xl" />
+                    <Button variant="secondary" size="sm" onClick={() => { setShowInsertModal(true); setInsertMode("featured"); setInsertGenPrompt(""); setInsertPreview(null); setInsertErr(null); setInsertTab("generate"); }}
+                        className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity gap-1.5 shadow-lg backdrop-blur-sm">
+                        <ImageIcon className="h-3.5 w-3.5" /> Change
+                    </Button>
                 </div>
             )}
 
             {/* Image controls */}
             {article.image_prompt && (
-                <div style={{ marginBottom: 16, padding: 14, borderRadius: 8, border: "1px solid #e5e5e5", background: "#fafafa" }}>
-                    <h4 style={{ margin: "0 0 10px", fontSize: 14, color: "#555" }}>🖼️ Image Options</h4>
-
-                    {/* Style selector */}
-                    {imageStyles.length > 0 && (
-                        <div style={{ marginBottom: 10 }}>
-                            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#666", marginBottom: 4 }}>Image Style</label>
-                            <select
-                                value={selectedStyle}
-                                onChange={(e) => setSelectedStyle(e.target.value)}
-                                style={{ width: "100%", padding: "8px 12px", fontSize: 13, borderRadius: 6, border: "1px solid #ccc" }}
-                            >
-                                {imageStyles.map((s) => (
-                                    <option key={s.id} value={s.id}>
-                                        {s.label}{s.narrative ? ` — ${s.narrative.slice(0, 60)}…` : ""}
-                                    </option>
-                                ))}
-                            </select>
-                            {selectedStyle !== (article.image_style ?? "default") && (
-                                <div style={{ fontSize: 11, color: "#b45309", marginTop: 4 }}>⚡ Style changed — regenerate to apply</div>
-                            )}
+                <Card>
+                    <CardContent className="p-4 space-y-3">
+                        <h4 className="text-sm font-medium flex items-center gap-1.5">
+                            <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" /> Image Options
+                        </h4>
+                        {imageStyles.length > 0 && (
+                            <div>
+                                <Label className="text-xs">Image Style</Label>
+                                <select value={selectedStyle} onChange={(e) => {
+                                        const newStyle = e.target.value;
+                                        setSelectedStyle(newStyle);
+                                        if (newStyle !== (article.image_style ?? "default") && article.image_prompt && !refreshingImage) {
+                                            // Auto-regenerate with new style
+                                            setTimeout(() => {
+                                                setRefreshingImage(true); setRefreshErr(null);
+                                                fetch("/api/regenerate-image", {
+                                                    method: "POST",
+                                                    headers: { "Content-Type": "application/json" },
+                                                    body: JSON.stringify({ base_prompt: article.image_prompt, image_style: newStyle, company_id: article.company_id ?? undefined }),
+                                                })
+                                                    .then((r) => r.json())
+                                                    .then(async (data) => {
+                                                        if (data.error) throw new Error(data.error);
+                                                        const saveResp = await fetch(`/api/articles/${article.id}`, {
+                                                            method: "PUT",
+                                                            headers: { "Content-Type": "application/json" },
+                                                            body: JSON.stringify({ image_base64: data.image_base64, image_prompt: data.final_prompt, image_style: newStyle }),
+                                                        });
+                                                        const saveData = await saveResp.json();
+                                                        if (!saveResp.ok) throw new Error(saveData.error || "Failed to save");
+                                                        onUpdate({ ...article, image_base64: data.image_base64, image_prompt: data.final_prompt, image_style: newStyle });
+                                                    })
+                                                    .catch((err: any) => setRefreshErr(err.message))
+                                                    .finally(() => setRefreshingImage(false));
+                                            }, 0);
+                                        }
+                                    }}
+                                    className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                    {imageStyles.map((s) => (
+                                        <option key={s.id} value={s.id}>{s.label}{s.narrative ? ` — ${s.narrative.slice(0, 60)}…` : ""}</option>
+                                    ))}
+                                </select>
+                                {refreshingImage && (
+                                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                                        <RefreshCw className="h-3 w-3 animate-spin" /> Regenerating with new style…
+                                    </p>
+                                )}
+                            </div>
+                        )}
+                        <div className="flex gap-2">
+                            <Input placeholder="Optional: add extra image direction…" value={imagePromptInput} onChange={(e) => setImagePromptInput(e.target.value)} className="text-sm" />
+                            <Button variant="outline" size="sm" onClick={refreshImage} disabled={refreshingImage} className="gap-1.5 whitespace-nowrap">
+                                <RefreshCw className={cn("h-3.5 w-3.5", refreshingImage && "animate-spin")} />
+                                {refreshingImage ? "Generating…" : "Regenerate"}
+                            </Button>
                         </div>
-                    )}
-
-                    {/* Prompt + refresh */}
-                    <div style={{ display: "flex", gap: 8, alignItems: "stretch", flexWrap: "wrap" }}>
-                        <input type="text" placeholder="Optional: add extra image direction…" value={imagePromptInput} onChange={(e) => setImagePromptInput(e.target.value)}
-                            style={{ flex: 1, minWidth: 200, padding: "8px 12px", fontSize: 13, borderRadius: 6, border: "1px solid #ccc" }} />
-                        <button onClick={refreshImage} disabled={refreshingImage}
-                            style={{ ...btnStyle, whiteSpace: "nowrap" }}>
-                            {refreshingImage ? "Generating…" : "🔄 Regenerate"}
-                        </button>
-                    </div>
-
-                    {refreshErr && <p style={{ color: "crimson", fontSize: 12, margin: "8px 0 0" }}>{refreshErr}</p>}
-                </div>
+                        {refreshErr && <p className="text-xs text-destructive">{refreshErr}</p>}
+                    </CardContent>
+                </Card>
             )}
 
             {/* Article Content */}
-            <div dangerouslySetInnerHTML={{ __html: displayArticle.html ?? "" }} style={{ lineHeight: 1.7, fontSize: 15 }} />
+            <div dangerouslySetInnerHTML={{ __html: displayArticle.html ?? "" }}
+                className="prose prose-sm dark:prose-invert max-w-none leading-relaxed" />
 
             {/* Image Prompt */}
             {article.image_prompt && (
-                <details style={{ marginTop: 16 }}>
-                    <summary style={{ cursor: "pointer", fontSize: 13, color: "#888" }}>Image prompt</summary>
-                    <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, color: "#666" }}>{article.image_prompt}</pre>
+                <details className="group">
+                    <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors">Image prompt</summary>
+                    <pre className="whitespace-pre-wrap text-xs text-muted-foreground mt-1 p-3 bg-muted rounded-md">{article.image_prompt}</pre>
                 </details>
             )}
 
-            {/* ====== Insert Image Modal ====== */}
-            {showInsertModal && (
-                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setShowInsertModal(false)}>
-                    <div style={{ background: "#fff", borderRadius: 12, width: "90%", maxWidth: 720, maxHeight: "85vh", overflowY: "auto", padding: 24, boxShadow: "0 12px 40px rgba(0,0,0,0.18)" }} onClick={(e) => e.stopPropagation()}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                            <h2 style={{ margin: 0, fontSize: 18 }}>🖼 {insertMode === "featured" ? "Change Featured Image" : insertMode === "editInline" ? "Insert Image" : "Insert Image"}</h2>
-                            <button onClick={() => setShowInsertModal(false)} style={btnStyle}>✕ Close</button>
-                        </div>
-                        <div style={{ display: "flex", gap: 0, marginBottom: 16, borderBottom: "2px solid #e5e5e5" }}>
-                            {(["search", "generate", "upload"] as const).map((tab) => (
-                                <button key={tab} onClick={() => { setInsertTab(tab); setInsertPreview(null); setInsertErr(null); }}
-                                    style={{ padding: "10px 20px", fontSize: 14, fontWeight: insertTab === tab ? 600 : 400, border: "none", borderBottom: insertTab === tab ? "2px solid #FDB72A" : "2px solid transparent", background: "none", cursor: "pointer", color: insertTab === tab ? "#191F1D" : "#888", marginBottom: -2 }}>
-                                    {tab === "search" ? "🔍 Search Web" : tab === "generate" ? "✨ Generate" : "📁 Upload"}
-                                </button>
-                            ))}
-                        </div>
-                        {insertTab === "search" && (
-                            <div>
-                                <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                                    <input type="text" placeholder="e.g. family hiking mountain trail" value={insertSearchQuery} onChange={(e) => setInsertSearchQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onInsertSearch(); }}
-                                        style={{ flex: 1, padding: "10px 14px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc" }} />
-                                    <button onClick={onInsertSearch} disabled={insertSearching || !insertSearchQuery.trim()} style={{ ...btnStyle, padding: "10px 18px" }}>{insertSearching ? "Searching…" : "Search"}</button>
-                                </div>
-                                {insertSearchResults.length > 0 && (
-                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10, maxHeight: 300, overflowY: "auto", marginBottom: 12 }}>
-                                        {insertSearchResults.map((img, i) => (
-                                            <button key={i} onClick={() => setInsertPreview({ src: img.imageUrl, type: "url" })} style={{ padding: 0, border: insertPreview?.src === img.imageUrl ? "3px solid #FDB72A" : "2px solid #e5e5e5", borderRadius: 8, overflow: "hidden", cursor: "pointer", background: "none" }}>
-                                                <img src={img.thumbnailUrl || img.imageUrl} alt={img.title} style={{ width: "100%", height: 100, objectFit: "cover", display: "block" }} />
-                                                <div style={{ padding: "4px 6px", fontSize: 10, color: "#666", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{img.domain}</div>
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                        {insertTab === "generate" && (
-                            <div style={{ marginBottom: 12 }}>
-                                {/* Style selector in generate tab */}
-                                {imageStyles.length > 0 && (
-                                    <div style={{ marginBottom: 10 }}>
-                                        <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#666", marginBottom: 4 }}>Image Style</label>
-                                        <select
-                                            value={selectedStyle}
-                                            onChange={(e) => setSelectedStyle(e.target.value)}
-                                            style={{ width: "100%", padding: "8px 12px", fontSize: 13, borderRadius: 6, border: "1px solid #ccc" }}
-                                        >
-                                            {imageStyles.map((s) => (
-                                                <option key={s.id} value={s.id}>
-                                                    {s.label}{s.narrative ? ` — ${s.narrative.slice(0, 60)}…` : ""}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
-                                <div style={{ display: "flex", gap: 8 }}>
-                                    <input type="text" placeholder={article.image_prompt ? "Leave empty to use original prompt…" : "Describe the image…"} value={insertGenPrompt} onChange={(e) => setInsertGenPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onInsertGenerate(); }}
-                                        style={{ flex: 1, padding: "10px 14px", fontSize: 14, borderRadius: 6, border: "1px solid #ccc" }} />
-                                    <button onClick={onInsertGenerate} disabled={insertGenerating} style={{ ...btnStyle, padding: "10px 18px" }}>{insertGenerating ? "Generating…" : "Generate"}</button>
-                                </div>
-                                {!insertGenPrompt.trim() && article.image_prompt && (
-                                    <div style={{ fontSize: 11, color: "#888", marginTop: 6 }}>💡 Will use: <em>{article.image_prompt.slice(0, 120)}{article.image_prompt.length > 120 ? "…" : ""}</em></div>
-                                )}
-                            </div>
-                        )}
-                        {insertTab === "upload" && (
-                            <div>
-                                <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => {
-                                    const file = e.target.files?.[0]; if (!file) return;
-                                    const reader = new FileReader(); reader.onloadend = () => setInsertPreview({ src: (reader.result as string).split(",")[1], type: "base64" }); reader.readAsDataURL(file); e.target.value = "";
-                                }} />
-                                <div onClick={() => fileInputRef.current?.click()} onDragOver={(e) => { e.preventDefault(); }} onDrop={(e) => {
-                                    e.preventDefault(); const file = e.dataTransfer.files?.[0]; if (!file?.type.startsWith("image/")) return;
-                                    const reader = new FileReader(); reader.onloadend = () => setInsertPreview({ src: (reader.result as string).split(",")[1], type: "base64" }); reader.readAsDataURL(file);
-                                }} style={{ border: "2px dashed #ccc", borderRadius: 10, padding: "40px 20px", textAlign: "center", cursor: "pointer", color: "#888" }}>
-                                    <div style={{ fontSize: 32, marginBottom: 8 }}>📁</div>
-                                    <div style={{ fontWeight: 500, color: "#555" }}>Click to browse or drag & drop</div>
-                                </div>
-                            </div>
-                        )}
-                        {insertErr && <p style={{ color: "crimson", fontSize: 13, margin: "8px 0" }}>{insertErr}</p>}
-                        {insertPreview && (
-                            <div style={{ marginBottom: 16 }}>
-                                <p style={{ fontSize: 13, fontWeight: 500, color: "#555", marginBottom: 8 }}>Preview</p>
-                                <img src={insertPreview.type === "base64" ? `data:image/png;base64,${insertPreview.src}` : insertPreview.src} alt="Preview" style={{ width: "100%", maxHeight: 300, objectFit: "contain", borderRadius: 8, border: "1px solid #e5e5e5" }} />
-                            </div>
-                        )}
-                        {insertPreview && (
-                            <div style={{ borderTop: "1px solid #e5e5e5", paddingTop: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                                {insertMode === "inline" && (
-                                    <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 13 }}>
-                                        <span style={{ fontWeight: 500 }}>Insert at:</span>
-                                        {(["top", "bottom"] as const).map((pos) => (
-                                            <label key={pos} style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                                                <input type="radio" name="insert-pos-panel" checked={insertPosition === pos} onChange={() => setInsertPosition(pos)} />
-                                                {pos === "top" ? "Top" : "Bottom"}
-                                            </label>
-                                        ))}
-                                    </div>
-                                )}
-                                {insertMode === "editInline" && <span style={{ fontSize: 13, color: "#666" }}>Image will be inserted at cursor position</span>}
-                                {insertMode === "featured" && (
-                                    <span style={{ fontSize: 13, color: insertSaving ? "#b45309" : "#22c55e", fontWeight: 500 }}>
-                                        {insertSaving ? "⏳ Saving to article…" : "✓ Featured image updated"}
-                                    </span>
-                                )}
-                                {insertMode !== "featured" && (
-                                    <button onClick={doInsertImage} disabled={insertSaving} style={{ ...btnStyle, border: "1px solid #FDB72A", background: "#FDB72A", color: "#191F1D", fontWeight: 600, padding: "10px 24px" }}>
-                                        {insertSaving ? "Saving…" : "Insert & Save"}
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
+            {insertImageModal}
         </div>
     );
 }

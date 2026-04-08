@@ -1,7 +1,26 @@
 // OutlineView.tsx — Collapsible tree hierarchy for content management
 // Company → Cluster → Role Group → Article
+// Now includes cluster toolbar and cluster selection for ClusterPanel
 
 import { useState, useMemo } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+import {
+    Building2,
+    Network,
+    ChevronDown,
+    FileText,
+    Crown,
+    BookOpen,
+    Scroll,
+    FolderOpen,
+    Wand2,
+    FolderPlus,
+    Sparkles,
+    Trash2,
+} from "lucide-react";
 
 type Article = {
     id: string;
@@ -19,6 +38,7 @@ type Cluster = {
     name: string;
     status: string;
     strategy: any;
+    company_id?: string;
 };
 
 type Props = {
@@ -26,25 +46,21 @@ type Props = {
     clusters: Cluster[];
     companies: Record<string, string>;
     selectedArticleId: string | null;
+    selectedClusterId?: string | null;
     onSelectArticle: (id: string) => void;
+    onSelectCluster?: (id: string) => void;
     onRenameCluster?: (id: string, newName: string) => void;
+    onDeleteCluster?: (id: string) => void;
+    onCreateAiCluster?: () => void;
+    onCreateManualCluster?: () => void;
+    onAutoCluster?: () => void;
 };
 
 const ROLE_ORDER = ["pillar", "supporting", "long_tail"];
-const ROLE_LABELS: Record<string, string> = {
-    pillar: "🏛 Pillar",
-    supporting: "📘 Supporting",
-    long_tail: "📑 Long-tail",
-};
-const ROLE_COLORS: Record<string, { bg: string; fg: string }> = {
-    pillar: { bg: "#eef2ff", fg: "#4338ca" },
-    supporting: { bg: "#f0fdf4", fg: "#16a34a" },
-    long_tail: { bg: "#fefce8", fg: "#a16207" },
-};
-const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
-    draft: { bg: "#f5f5f5", fg: "#666" },
-    in_progress: { bg: "#fffbeb", fg: "#b45309" },
-    complete: { bg: "#f0fdf4", fg: "#16a34a" },
+const ROLE_META: Record<string, { label: string; icon: typeof Crown }> = {
+    pillar: { label: "Pillar", icon: Crown },
+    supporting: { label: "Supporting", icon: BookOpen },
+    long_tail: { label: "Long-tail", icon: Scroll },
 };
 
 type TreeData = {
@@ -60,10 +76,17 @@ type TreeData = {
     unclustered: Article[];
 };
 
-export default function OutlineView({ articles, clusters, companies, selectedArticleId, onSelectArticle, onRenameCluster }: Props) {
+export default function OutlineView({
+    articles, clusters, companies,
+    selectedArticleId, selectedClusterId,
+    onSelectArticle, onSelectCluster,
+    onRenameCluster, onDeleteCluster,
+    onCreateAiCluster, onCreateManualCluster, onAutoCluster,
+}: Props) {
     const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
     const [editingClusterId, setEditingClusterId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState("");
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
     const toggle = (key: string) => {
         setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -88,30 +111,54 @@ export default function OutlineView({ articles, clusters, companies, selectedArt
 
     // Build tree structure
     const tree = useMemo<TreeData[]>(() => {
-        const companyGroups: Record<string, Article[]> = {};
-        articles.forEach((a) => {
-            const cid = a.company_id || "__none__";
-            if (!companyGroups[cid]) companyGroups[cid] = [];
-            companyGroups[cid].push(a);
-        });
-
         const clusterMap: Record<string, Cluster> = {};
         clusters.forEach((c) => { clusterMap[c.id] = c; });
 
-        return Object.entries(companyGroups).map(([companyId, companyArticles]) => {
-            const clusterGroups: Record<string, Article[]> = {};
+        // Collect all company IDs from both articles and clusters
+        const allCompanyIds = new Set<string>();
+        articles.forEach((a) => allCompanyIds.add(a.company_id || "__none__"));
+        clusters.forEach((c) => allCompanyIds.add(c.company_id || "__none__"));
+
+        // Group articles by company
+        const companyArticles: Record<string, Article[]> = {};
+        articles.forEach((a) => {
+            const cid = a.company_id || "__none__";
+            if (!companyArticles[cid]) companyArticles[cid] = [];
+            companyArticles[cid].push(a);
+        });
+
+        // Group clusters by company
+        const companyClusters: Record<string, Cluster[]> = {};
+        clusters.forEach((c) => {
+            const cid = c.company_id || "__none__";
+            if (!companyClusters[cid]) companyClusters[cid] = [];
+            companyClusters[cid].push(c);
+        });
+
+        return Array.from(allCompanyIds).map((companyId) => {
+            const arts = companyArticles[companyId] || [];
+            const companyCls = companyClusters[companyId] || [];
+
+            // Group articles by cluster
+            const clusterArticleGroups: Record<string, Article[]> = {};
             const unclustered: Article[] = [];
 
-            companyArticles.forEach((a) => {
+            arts.forEach((a) => {
                 if (a.cluster_id) {
-                    if (!clusterGroups[a.cluster_id]) clusterGroups[a.cluster_id] = [];
-                    clusterGroups[a.cluster_id].push(a);
+                    if (!clusterArticleGroups[a.cluster_id]) clusterArticleGroups[a.cluster_id] = [];
+                    clusterArticleGroups[a.cluster_id].push(a);
                 } else {
                     unclustered.push(a);
                 }
             });
 
-            const clusterEntries = Object.entries(clusterGroups).map(([clusterId, clusterArticles]) => {
+            // Build cluster entries — include ALL clusters for this company
+            const seenClusterIds = new Set<string>();
+            const clusterEntries: TreeData["clusters"] = [];
+
+            // First, add clusters that have articles
+            for (const [clusterId, clusterArticles] of Object.entries(clusterArticleGroups)) {
+                seenClusterIds.add(clusterId);
                 const roleGroups: Record<string, Article[]> = {};
                 clusterArticles.forEach((a) => {
                     const role = a.cluster_role || "other";
@@ -123,18 +170,27 @@ export default function OutlineView({ articles, clusters, companies, selectedArt
                     .filter((r) => roleGroups[r])
                     .map((r) => ({ role: r, articles: roleGroups[r] }));
 
-                // Add any roles not in ROLE_ORDER
                 Object.keys(roleGroups).forEach((r) => {
                     if (!ROLE_ORDER.includes(r)) {
                         roles.push({ role: r, articles: roleGroups[r] });
                     }
                 });
 
-                return {
+                clusterEntries.push({
                     cluster: clusterMap[clusterId] || { id: clusterId, name: "Unknown Cluster", status: "draft", strategy: null },
                     roles,
-                };
-            });
+                });
+            }
+
+            // Then, add empty clusters (no articles assigned yet)
+            for (const cl of companyCls) {
+                if (!seenClusterIds.has(cl.id)) {
+                    clusterEntries.push({
+                        cluster: cl,
+                        roles: [],
+                    });
+                }
+            }
 
             return {
                 companyId,
@@ -145,55 +201,79 @@ export default function OutlineView({ articles, clusters, companies, selectedArt
         });
     }, [articles, clusters, companies]);
 
+    const hasClusterActions = onCreateAiCluster || onCreateManualCluster || onAutoCluster;
+
     return (
-        <div style={{ padding: "0 4px" }}>
+        <div className="px-1 py-2 space-y-3">
+            {/* Cluster toolbar */}
+            {hasClusterActions && (
+                <div className="flex gap-1.5 px-2 pb-2 border-b border-border">
+                    {onCreateAiCluster && (
+                        <Button variant="outline" size="sm" onClick={onCreateAiCluster} className="gap-1 text-xs h-7 flex-1">
+                            <Wand2 className="h-3 w-3" /> AI Cluster
+                        </Button>
+                    )}
+                    {onCreateManualCluster && (
+                        <Button variant="outline" size="sm" onClick={onCreateManualCluster} className="gap-1 text-xs h-7 flex-1">
+                            <FolderPlus className="h-3 w-3" /> Manual
+                        </Button>
+                    )}
+                    {onAutoCluster && (
+                        <Button variant="outline" size="sm" onClick={onAutoCluster} className="gap-1 text-xs h-7 flex-1">
+                            <Sparkles className="h-3 w-3" /> Auto
+                        </Button>
+                    )}
+                </div>
+            )}
+
             {tree.map((company) => {
                 const companyKey = `company-${company.companyId}`;
                 const isCompanyCollapsed = collapsed[companyKey];
                 const totalArticles = articles.filter((a) => (a.company_id || "__none__") === company.companyId).length;
 
                 return (
-                    <div key={company.companyId} style={{ marginBottom: 16 }}>
+                    <div key={company.companyId}>
                         {/* Company header */}
                         <button
                             onClick={() => toggle(companyKey)}
-                            style={{
-                                display: "flex", alignItems: "center", gap: 8, width: "100%",
-                                padding: "10px 14px", border: "none", background: "#f8f9fa",
-                                borderRadius: 8, cursor: "pointer", fontSize: 15, fontWeight: 600,
-                                color: "#191F1D", textAlign: "left",
-                            }}
+                            className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-left group"
                         >
-                            <span style={{ fontSize: 11, color: "#888", transition: "transform 0.15s", transform: isCompanyCollapsed ? "rotate(-90deg)" : "rotate(0)" }}>▼</span>
-                            <span>🏢 {company.companyName}</span>
-                            <span style={{ fontSize: 12, color: "#888", fontWeight: 400, marginLeft: "auto" }}>
-                                {totalArticles} article{totalArticles !== 1 ? "s" : ""}
+                            <ChevronDown className={cn(
+                                "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200",
+                                isCompanyCollapsed && "-rotate-90"
+                            )} />
+                            <Building2 className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-semibold text-sm">{company.companyName}</span>
+                            <span className="ml-auto text-xs text-muted-foreground">
+                                {totalArticles}
                             </span>
                         </button>
 
                         {!isCompanyCollapsed && (
-                            <div style={{ paddingLeft: 16, marginTop: 4 }}>
+                            <div className="pl-4 mt-1 space-y-1.5">
                                 {/* Clusters */}
                                 {company.clusters.map(({ cluster, roles }) => {
                                     const clusterKey = `cluster-${cluster.id}`;
                                     const isClusterCollapsed = collapsed[clusterKey];
                                     const clusterArticleCount = roles.reduce((sum, r) => sum + r.articles.length, 0);
-                                    const statusStyle = STATUS_COLORS[cluster.status] || STATUS_COLORS.draft;
+                                    const isSelected = selectedClusterId === cluster.id;
 
                                     return (
-                                        <div key={cluster.id} style={{ marginBottom: 8 }}>
-                                            <button
-                                                onClick={() => toggle(clusterKey)}
-                                                style={{
-                                                    display: "flex", alignItems: "center", gap: 8, width: "100%",
-                                                    padding: "8px 12px", border: "1px solid #e5e5e5", background: "#fff",
-                                                    borderRadius: 6, cursor: "pointer", fontSize: 14, fontWeight: 500,
-                                                    color: "#333", textAlign: "left",
-                                                }}
-                                            >
-                                                <span style={{ fontSize: 10, color: "#888", transition: "transform 0.15s", transform: isClusterCollapsed ? "rotate(-90deg)" : "rotate(0)" }}>▼</span>
+                                        <div key={cluster.id}>
+                                            <div className={cn(
+                                                "flex items-center gap-2 w-full px-3 py-2 rounded-md border transition-colors text-left text-sm group",
+                                                isSelected
+                                                    ? "border-primary bg-primary/10"
+                                                    : "border-border bg-card hover:bg-accent/50"
+                                            )}>
+                                                <button onClick={() => toggle(clusterKey)} className="shrink-0">
+                                                    <ChevronDown className={cn(
+                                                        "h-3 w-3 text-muted-foreground transition-transform duration-200",
+                                                        isClusterCollapsed && "-rotate-90"
+                                                    )} />
+                                                </button>
                                                 {editingClusterId === cluster.id ? (
-                                                    <input
+                                                    <Input
                                                         autoFocus
                                                         value={editingName}
                                                         onChange={(e) => setEditingName(e.target.value)}
@@ -203,79 +283,89 @@ export default function OutlineView({ articles, clusters, companies, selectedArt
                                                             if (e.key === "Escape") setEditingClusterId(null);
                                                         }}
                                                         onClick={(e) => e.stopPropagation()}
-                                                        style={{
-                                                            fontSize: 14, fontWeight: 500, padding: "2px 6px",
-                                                            border: "1px solid #6366f1", borderRadius: 4,
-                                                            outline: "none", background: "#fff", color: "#333",
-                                                            width: "100%", maxWidth: 200, fontFamily: "inherit",
-                                                        }}
+                                                        className="h-6 text-sm font-medium max-w-[180px]"
                                                     />
                                                 ) : (
-                                                    <span
+                                                    <button
+                                                        onClick={() => onSelectCluster?.(cluster.id)}
                                                         onDoubleClick={(e) => {
                                                             e.stopPropagation();
                                                             setEditingClusterId(cluster.id);
                                                             setEditingName(cluster.name);
                                                         }}
-                                                        title="Double-click to rename"
-                                                        style={{ cursor: "text" }}
+                                                        className="font-medium cursor-pointer flex items-center gap-1.5 flex-1 min-w-0 text-left"
+                                                        title="Click to view · Double-click to rename"
                                                     >
-                                                        🔗 {cluster.name}
-                                                    </span>
+                                                        <Network className="h-3.5 w-3.5 text-primary shrink-0" />
+                                                        <span className="truncate">{cluster.name}</span>
+                                                    </button>
                                                 )}
-                                                <span style={{
-                                                    padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 500,
-                                                    background: statusStyle.bg, color: statusStyle.fg,
-                                                }}>
+                                                <Badge variant={
+                                                    cluster.status === "complete" ? "default" :
+                                                    cluster.status === "in_progress" ? "secondary" : "outline"
+                                                } className="text-[10px] px-1.5 py-0 h-4 shrink-0">
                                                     {cluster.status}
+                                                </Badge>
+                                                <span className="text-xs text-muted-foreground shrink-0">
+                                                    {clusterArticleCount}
                                                 </span>
-                                                <span style={{ fontSize: 11, color: "#888", fontWeight: 400, marginLeft: "auto" }}>
-                                                    {clusterArticleCount} article{clusterArticleCount !== 1 ? "s" : ""}
-                                                </span>
-                                            </button>
+                                                {/* Delete cluster action */}
+                                                {onDeleteCluster && (
+                                                    confirmDeleteId === cluster.id ? (
+                                                        <div className="flex gap-0.5 shrink-0 opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
+                                                            <button onClick={() => { onDeleteCluster(cluster.id); setConfirmDeleteId(null); }}
+                                                                className="text-[10px] text-destructive font-semibold hover:underline">Yes</button>
+                                                            <span className="text-[10px] text-muted-foreground">/</span>
+                                                            <button onClick={() => setConfirmDeleteId(null)}
+                                                                className="text-[10px] text-muted-foreground hover:underline">No</button>
+                                                        </div>
+                                                    ) : (
+                                                        <button onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(cluster.id); }}
+                                                            className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 text-muted-foreground hover:text-destructive">
+                                                            <Trash2 className="h-3 w-3" />
+                                                        </button>
+                                                    )
+                                                )}
+                                            </div>
 
                                             {!isClusterCollapsed && (
-                                                <div style={{ paddingLeft: 20, marginTop: 4 }}>
+                                                <div className="pl-5 mt-1 space-y-0.5">
                                                     {roles.map(({ role, articles: roleArticles }) => {
                                                         const roleKey = `role-${cluster.id}-${role}`;
                                                         const isRoleCollapsed = collapsed[roleKey];
-                                                        const roleColor = ROLE_COLORS[role] || { bg: "#f5f5f5", fg: "#666" };
+                                                        const meta = ROLE_META[role] || { label: role, icon: FileText };
+                                                        const Icon = meta.icon;
 
                                                         return (
-                                                            <div key={roleKey} style={{ marginBottom: 4 }}>
+                                                            <div key={roleKey}>
                                                                 <button
                                                                     onClick={() => toggle(roleKey)}
-                                                                    style={{
-                                                                        display: "flex", alignItems: "center", gap: 6, width: "100%",
-                                                                        padding: "5px 10px", border: "none", background: "transparent",
-                                                                        cursor: "pointer", fontSize: 13, fontWeight: 500,
-                                                                        color: roleColor.fg, textAlign: "left",
-                                                                    }}
+                                                                    className="flex items-center gap-1.5 w-full px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
                                                                 >
-                                                                    <span style={{ fontSize: 9, color: "#aaa", transition: "transform 0.15s", transform: isRoleCollapsed ? "rotate(-90deg)" : "rotate(0)" }}>▼</span>
-                                                                    {ROLE_LABELS[role] || role}
-                                                                    <span style={{ fontSize: 11, color: "#bbb", fontWeight: 400 }}>({roleArticles.length})</span>
+                                                                    <ChevronDown className={cn(
+                                                                        "h-2.5 w-2.5 transition-transform duration-200",
+                                                                        isRoleCollapsed && "-rotate-90"
+                                                                    )} />
+                                                                    <Icon className="h-3 w-3" />
+                                                                    {meta.label}
+                                                                    <span className="text-muted-foreground/60">({roleArticles.length})</span>
                                                                 </button>
 
                                                                 {!isRoleCollapsed && (
-                                                                    <div style={{ paddingLeft: 18 }}>
+                                                                    <div className="pl-4 space-y-px">
                                                                         {roleArticles.map((article) => (
                                                                             <button
                                                                                 key={article.id}
                                                                                 onClick={() => onSelectArticle(article.id)}
-                                                                                style={{
-                                                                                    display: "block", width: "100%", padding: "6px 10px",
-                                                                                    border: "none", borderLeft: selectedArticleId === article.id ? "3px solid #6366f1" : "3px solid transparent",
-                                                                                    background: selectedArticleId === article.id ? "#eef2ff" : "transparent",
-                                                                                    cursor: "pointer", fontSize: 13, color: "#333",
-                                                                                    textAlign: "left", borderRadius: 4, marginBottom: 1,
-                                                                                    transition: "all 0.1s",
-                                                                                }}
+                                                                                className={cn(
+                                                                                    "block w-full px-2.5 py-1.5 text-left rounded-md transition-colors text-sm",
+                                                                                    selectedArticleId === article.id
+                                                                                        ? "bg-primary/10 text-primary border-l-2 border-primary font-medium"
+                                                                                        : "text-foreground/80 hover:bg-accent border-l-2 border-transparent"
+                                                                                )}
                                                                             >
-                                                                                <div style={{ fontWeight: selectedArticleId === article.id ? 600 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                                                    {article.title}
-                                                                                </div>
-                                                                                <div style={{ fontSize: 11, color: "#999" }}>/{article.slug}</div>
+                                                                                <div className="truncate">{article.title}</div>
+                                                                                <div className="text-[11px] text-muted-foreground truncate">/{article.slug}</div>
                                                                             </button>
                                                                         ))}
                                                                     </div>
@@ -291,41 +381,35 @@ export default function OutlineView({ articles, clusters, companies, selectedArt
 
                                 {/* Unclustered articles */}
                                 {company.unclustered.length > 0 && (
-                                    <div style={{ marginBottom: 8 }}>
+                                    <div>
                                         <button
                                             onClick={() => toggle(`unclustered-${company.companyId}`)}
-                                            style={{
-                                                display: "flex", alignItems: "center", gap: 8, width: "100%",
-                                                padding: "8px 12px", border: "1px dashed #ddd", background: "#fafafa",
-                                                borderRadius: 6, cursor: "pointer", fontSize: 14, fontWeight: 500,
-                                                color: "#888", textAlign: "left",
-                                            }}
+                                            className="flex items-center gap-2 w-full px-3 py-2 rounded-md border border-dashed border-border bg-muted/30 hover:bg-muted/60 transition-colors text-left text-sm text-muted-foreground"
                                         >
-                                            <span style={{ fontSize: 10, color: "#aaa", transition: "transform 0.15s", transform: collapsed[`unclustered-${company.companyId}`] ? "rotate(-90deg)" : "rotate(0)" }}>▼</span>
-                                            📄 Unclustered Articles
-                                            <span style={{ fontSize: 11, color: "#bbb", fontWeight: 400, marginLeft: "auto" }}>
-                                                {company.unclustered.length}
-                                            </span>
+                                            <ChevronDown className={cn(
+                                                "h-3 w-3 transition-transform duration-200",
+                                                collapsed[`unclustered-${company.companyId}`] && "-rotate-90"
+                                            )} />
+                                            <FolderOpen className="h-3.5 w-3.5" />
+                                            Unclustered
+                                            <span className="text-xs ml-auto">{company.unclustered.length}</span>
                                         </button>
 
                                         {!collapsed[`unclustered-${company.companyId}`] && (
-                                            <div style={{ paddingLeft: 28, marginTop: 4 }}>
+                                            <div className="pl-7 mt-1 space-y-px">
                                                 {company.unclustered.map((article) => (
                                                     <button
                                                         key={article.id}
                                                         onClick={() => onSelectArticle(article.id)}
-                                                        style={{
-                                                            display: "block", width: "100%", padding: "6px 10px",
-                                                            border: "none", borderLeft: selectedArticleId === article.id ? "3px solid #6366f1" : "3px solid transparent",
-                                                            background: selectedArticleId === article.id ? "#eef2ff" : "transparent",
-                                                            cursor: "pointer", fontSize: 13, color: "#333",
-                                                            textAlign: "left", borderRadius: 4, marginBottom: 1,
-                                                        }}
+                                                        className={cn(
+                                                            "block w-full px-2.5 py-1.5 text-left rounded-md transition-colors text-sm",
+                                                            selectedArticleId === article.id
+                                                                ? "bg-primary/10 text-primary border-l-2 border-primary font-medium"
+                                                                : "text-foreground/80 hover:bg-accent border-l-2 border-transparent"
+                                                        )}
                                                     >
-                                                        <div style={{ fontWeight: selectedArticleId === article.id ? 600 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                            {article.title}
-                                                        </div>
-                                                        <div style={{ fontSize: 11, color: "#999" }}>/{article.slug}</div>
+                                                        <div className="truncate">{article.title}</div>
+                                                        <div className="text-[11px] text-muted-foreground truncate">/{article.slug}</div>
                                                     </button>
                                                 ))}
                                             </div>
@@ -338,10 +422,10 @@ export default function OutlineView({ articles, clusters, companies, selectedArt
                 );
             })}
 
-            {articles.length === 0 && (
-                <div style={{ textAlign: "center", padding: 40, color: "#888" }}>
-                    <div style={{ fontSize: 32, marginBottom: 8 }}>📝</div>
-                    <p>No articles yet. Create content to see your knowledge tree.</p>
+            {articles.length === 0 && clusters.length === 0 && (
+                <div className="text-center py-10 text-muted-foreground">
+                    <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">No articles yet. Create content to see your knowledge tree.</p>
                 </div>
             )}
         </div>

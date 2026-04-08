@@ -2,8 +2,17 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import type { GetServerSideProps } from "next";
 import dynamic from "next/dynamic";
+import AppLayout from "@/components/layout/AppLayout";
 import OutlineView from "@/components/articles/OutlineView";
 import PanelView from "@/components/articles/PanelView";
+import ClusterPanel from "@/components/articles/ClusterPanel";
+import { AiClusterModal, ManualClusterModal, AutoClusterModal } from "@/components/articles/ClusterModals";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { BarChart3, List, FileText, AlertCircle, Network } from "lucide-react";
 
 // Dynamic import for GraphView (uses canvas/ResizeObserver — SSR-incompatible)
 const GraphView = dynamic(() => import("@/components/articles/GraphView"), { ssr: false });
@@ -40,22 +49,23 @@ type Cluster = {
     company_id: string;
 };
 
-type ViewMode = "graph" | "outline" | "panel";
-
-const VIEW_TABS: { id: ViewMode; icon: string; label: string; subtitle: string }[] = [
-    { id: "graph", icon: "📊", label: "Graph", subtitle: "How Google/AI sees your content" },
-    { id: "outline", icon: "🗂", label: "Outline", subtitle: "How humans manage it" },
-    { id: "panel", icon: "🛠", label: "Panel", subtitle: "How you improve it" },
-];
+type ViewMode = "graph" | "outline";
 
 export default function ArticlesPage() {
     const [articles, setArticles] = useState<Article[]>([]);
     const [clusters, setClusters] = useState<Cluster[]>([]);
     const [companies, setCompanies] = useState<Record<string, string>>({});
+    const [companyList, setCompanyList] = useState<{ id: string; name: string }[]>([]);
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<ViewMode>("outline");
     const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
+    const [selectedClusterId, setSelectedClusterId] = useState<string | null>(null);
+
+    // Cluster modal state
+    const [showAiCluster, setShowAiCluster] = useState(false);
+    const [showManualCluster, setShowManualCluster] = useState(false);
+    const [showAutoCluster, setShowAutoCluster] = useState(false);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -78,6 +88,7 @@ export default function ArticlesPage() {
                 const map: Record<string, string> = {};
                 companiesData.forEach((c: any) => { map[c.id] = c.name; });
                 setCompanies(map);
+                setCompanyList(companiesData.map((c: any) => ({ id: c.id, name: c.name })));
             }
         } catch (e: any) {
             setErr(e.message);
@@ -90,7 +101,12 @@ export default function ArticlesPage() {
 
     function handleSelectArticle(id: string) {
         setSelectedArticleId(id);
-        setViewMode("panel");
+        setSelectedClusterId(null);
+    }
+
+    function handleSelectCluster(id: string) {
+        setSelectedClusterId(id);
+        setSelectedArticleId(null);
     }
 
     function handleUpdateArticle(updated: Article) {
@@ -100,141 +116,180 @@ export default function ArticlesPage() {
     function handleDeleteArticle(id: string) {
         setArticles((prev) => prev.filter((a) => a.id !== id));
         setSelectedArticleId(null);
-        setViewMode("outline");
     }
 
     function handleRenameCluster(id: string, newName: string) {
         setClusters((prev) => prev.map((c) => (c.id === id ? { ...c, name: newName } : c)));
     }
 
+    async function handleDeleteCluster(id: string) {
+        try {
+            const r = await fetch(`/api/clusters/${id}`, { method: "DELETE" });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || "Delete failed");
+            setClusters((prev) => prev.filter((c) => c.id !== id));
+            if (selectedClusterId === id) {
+                setSelectedClusterId(null);
+            }
+            // Refresh articles to clear cluster assignments
+            fetchData();
+        } catch (e: any) { alert(e.message); }
+    }
+
+    function handleClusterCreated() {
+        fetchData();
+    }
+
+    function handleClusterUpdate() {
+        fetchData();
+    }
+
+    function handleClusterPanelDelete(id: string) {
+        setClusters((prev) => prev.filter((c) => c.id !== id));
+        setSelectedClusterId(null);
+        fetchData();
+    }
+
     const selectedArticle = articles.find((a) => a.id === selectedArticleId) || null;
 
     return (
-        <main style={{ margin: "0 auto", padding: "24px 40px", fontFamily: "system-ui", height: "100vh", display: "flex", flexDirection: "column" }}>
-            {/* Header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexShrink: 0 }}>
-                <div>
-                    <h1 style={{ margin: "0 0 2px", fontSize: 22 }}>Content Architecture</h1>
-                    <p style={{ margin: 0, fontSize: 13, color: "#888" }}>
-                        {articles.length} article{articles.length !== 1 ? "s" : ""} · {clusters.length} cluster{clusters.length !== 1 ? "s" : ""}
-                    </p>
+        <AppLayout>
+            <div className="flex flex-col h-[calc(100vh-7rem)]">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4 shrink-0">
+                    <div>
+                        <h2 className="text-xl font-semibold tracking-tight">Content Architecture</h2>
+                        <p className="text-sm text-muted-foreground mt-0.5">
+                            {articles.length} article{articles.length !== 1 ? "s" : ""} · {clusters.length} cluster{clusters.length !== 1 ? "s" : ""}
+                        </p>
+                    </div>
                 </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                    <Link href="/" style={{ padding: "8px 16px", fontSize: 14, fontWeight: 500, borderRadius: 6, border: "1px solid #ccc", background: "#fff", textDecoration: "none", color: "#333" }}>
-                        ← Create New
-                    </Link>
-                    <Link href="/clusters" style={{ padding: "8px 16px", fontSize: 14, fontWeight: 500, borderRadius: 6, border: "1px solid #ccc", background: "#fff", textDecoration: "none", color: "#333" }}>
-                        🔗 Clusters
-                    </Link>
-                </div>
-            </div>
 
-            {/* Tab bar */}
-            <div style={{ display: "flex", gap: 4, marginBottom: 16, flexShrink: 0, borderBottom: "2px solid #e5e5e5", paddingBottom: 0 }}>
-                {VIEW_TABS.map((tab) => {
-                    const isActive = viewMode === tab.id;
-                    return (
-                        <button
-                            key={tab.id}
-                            onClick={() => setViewMode(tab.id)}
-                            style={{
-                                display: "flex", alignItems: "center", gap: 8, padding: "10px 20px",
-                                border: "none", borderBottom: isActive ? "2px solid #6366f1" : "2px solid transparent",
-                                background: "none", cursor: "pointer", marginBottom: -2,
-                                transition: "all 0.15s",
-                            }}
-                        >
-                            <span style={{ fontSize: 16 }}>{tab.icon}</span>
-                            <div style={{ textAlign: "left" }}>
-                                <div style={{ fontSize: 14, fontWeight: isActive ? 600 : 400, color: isActive ? "#191F1D" : "#888" }}>
-                                    {tab.label}
-                                </div>
-                                <div style={{ fontSize: 11, color: isActive ? "#6366f1" : "#bbb" }}>
-                                    {tab.subtitle}
-                                </div>
-                            </div>
-                        </button>
-                    );
-                })}
-            </div>
+                {/* View Tabs */}
+                <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)} className="shrink-0 mb-4">
+                    <TabsList className="grid w-full max-w-xs grid-cols-2">
+                        <TabsTrigger value="graph" className="gap-1.5">
+                            <BarChart3 className="h-3.5 w-3.5" />
+                            Graph
+                        </TabsTrigger>
+                        <TabsTrigger value="outline" className="gap-1.5">
+                            <List className="h-3.5 w-3.5" />
+                            Outline
+                        </TabsTrigger>
+                    </TabsList>
+                </Tabs>
 
-            {loading && <p style={{ color: "#888", padding: 20 }}>Loading articles…</p>}
-            {err && <p style={{ color: "crimson", padding: 20 }}>{err}</p>}
+                {loading && (
+                    <div className="space-y-3 p-4">
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-3/4" />
+                        <Skeleton className="h-10 w-1/2" />
+                    </div>
+                )}
 
-            {!loading && articles.length === 0 && (
-                <div style={{ textAlign: "center", padding: 60, color: "#888" }}>
-                    <div style={{ fontSize: 48, marginBottom: 12 }}>📝</div>
-                    <p style={{ fontSize: 16, marginBottom: 8 }}>No articles yet.</p>
-                    <Link href="/" style={{ color: "#6366f1", fontWeight: 500 }}>Create your first one →</Link>
-                </div>
-            )}
+                {err && (
+                    <Alert variant="destructive" className="mb-4">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{err}</AlertDescription>
+                    </Alert>
+                )}
 
-            {!loading && articles.length > 0 && (
-                <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-                    {/* Graph View */}
-                    {viewMode === "graph" && (
-                        <GraphView
-                            articles={articles}
-                            clusters={clusters}
-                            onSelectArticle={handleSelectArticle}
-                        />
-                    )}
+                {!loading && articles.length === 0 && clusters.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-20 text-center">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
+                            <FileText className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                        <p className="text-muted-foreground mb-2">No articles yet.</p>
+                        <Button asChild variant="link">
+                            <Link href="/">Create your first one →</Link>
+                        </Button>
+                    </div>
+                )}
 
-                    {/* Outline View */}
-                    {viewMode === "outline" && (
-                        <div style={{ height: "100%", overflowY: "auto", paddingRight: 8 }}>
-                            <OutlineView
+                {!loading && (articles.length > 0 || clusters.length > 0) && (
+                    <div className="flex-1 min-h-0 overflow-hidden">
+                        {/* Graph View */}
+                        {viewMode === "graph" && (
+                            <GraphView
                                 articles={articles}
                                 clusters={clusters}
-                                companies={companies}
-                                selectedArticleId={selectedArticleId}
                                 onSelectArticle={handleSelectArticle}
-                                onRenameCluster={handleRenameCluster}
                             />
-                        </div>
-                    )}
+                        )}
 
-                    {/* Panel View */}
-                    {viewMode === "panel" && (
-                        <div style={{ display: "flex", height: "100%", gap: 0 }}>
-                            {/* Sidebar tree */}
-                            <div style={{
-                                width: 280, flexShrink: 0, borderRight: "1px solid #e5e5e5",
-                                overflowY: "auto", paddingRight: 8, background: "#fafafa",
-                            }}>
-                                <OutlineView
-                                    articles={articles}
-                                    clusters={clusters}
-                                    companies={companies}
-                                    selectedArticleId={selectedArticleId}
-                                    onSelectArticle={(id) => setSelectedArticleId(id)}
-                                    onRenameCluster={handleRenameCluster}
-                                />
-                            </div>
-
-                            {/* Detail pane */}
-                            <div style={{ flex: 1, overflowY: "auto" }}>
-                                {selectedArticle ? (
-                                    <PanelView
-                                        article={selectedArticle}
+                        {/* Outline View — sidebar tree + detail pane */}
+                        {viewMode === "outline" && (
+                            <div className="flex h-full gap-0">
+                                {/* Sidebar tree */}
+                                <div className="w-72 shrink-0 border-r border-border overflow-y-auto pr-2 bg-muted/30">
+                                    <OutlineView
+                                        articles={articles}
+                                        clusters={clusters}
                                         companies={companies}
-                                        onUpdate={handleUpdateArticle}
-                                        onDelete={handleDeleteArticle}
-                                        onSelectArticle={(id) => setSelectedArticleId(id)}
+                                        selectedArticleId={selectedArticleId}
+                                        selectedClusterId={selectedClusterId}
+                                        onSelectArticle={handleSelectArticle}
+                                        onSelectCluster={handleSelectCluster}
+                                        onRenameCluster={handleRenameCluster}
+                                        onDeleteCluster={handleDeleteCluster}
+                                        onCreateAiCluster={() => setShowAiCluster(true)}
+                                        onCreateManualCluster={() => setShowManualCluster(true)}
+                                        onAutoCluster={() => setShowAutoCluster(true)}
                                     />
-                                ) : (
-                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#888" }}>
-                                        <div style={{ textAlign: "center" }}>
-                                            <div style={{ fontSize: 48, marginBottom: 12 }}>👈</div>
-                                            <p style={{ fontSize: 15 }}>Select an article from the tree to view details</p>
+                                </div>
+
+                                {/* Detail pane */}
+                                <div className="flex-1 overflow-y-auto">
+                                    {selectedClusterId ? (
+                                        <ClusterPanel
+                                            clusterId={selectedClusterId}
+                                            companies={companies}
+                                            onUpdate={handleClusterUpdate}
+                                            onDelete={handleClusterPanelDelete}
+                                            onSelectArticle={handleSelectArticle}
+                                        />
+                                    ) : selectedArticle ? (
+                                        <PanelView
+                                            article={selectedArticle}
+                                            companies={companies}
+                                            onUpdate={handleUpdateArticle}
+                                            onDelete={handleDeleteArticle}
+                                            onSelectArticle={handleSelectArticle}
+                                        />
+                                    ) : (
+                                        <div className="flex items-center justify-center h-full text-muted-foreground">
+                                            <div className="text-center">
+                                                <List className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                                                <p className="text-sm">Select an article or cluster from the tree</p>
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    )}
-                </div>
-            )}
-        </main>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Cluster Modals */}
+            <AiClusterModal
+                open={showAiCluster}
+                onOpenChange={setShowAiCluster}
+                companies={companyList}
+                onCreated={handleClusterCreated}
+            />
+            <ManualClusterModal
+                open={showManualCluster}
+                onOpenChange={setShowManualCluster}
+                companies={companyList}
+                onCreated={handleClusterCreated}
+            />
+            <AutoClusterModal
+                open={showAutoCluster}
+                onOpenChange={setShowAutoCluster}
+                companies={companyList}
+                onCreated={handleClusterCreated}
+            />
+        </AppLayout>
     );
 }

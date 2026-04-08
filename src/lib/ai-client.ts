@@ -4,7 +4,7 @@
  * Provides a unified interface for text generation across multiple providers
  * (OpenAI, Anthropic, Google) via the Vercel AI SDK.
  * 
- * Image generation stays on the direct OpenAI SDK.
+ * Image generation defaults to Gemini 3 Pro Image, with OpenAI as fallback.
  */
 
 import { generateText, Output, experimental_generateImage as generateImage } from "ai";
@@ -40,6 +40,7 @@ export const MODEL_REGISTRY: ModelOption[] = [
     { id: "gemini-2.5-pro-preview-05-06",   label: "Gemini 2.5 Pro",   provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true },
     { id: "gemini-3.1-flash-lite-preview",   label: "Gemini 3.1 Flash", provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true },
     { id: "gemini-2.5-flash-image",            label: "Gemini 2.5 Flash Image", provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true },
+    { id: "gemini-3-pro-image-preview",         label: "Gemini 3 Pro Image",     provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true },
 ];
 
 /**
@@ -151,13 +152,13 @@ export function getOpenAIClient(): OpenAI {
 
 /**
  * Default image generation model.
- * Uses Gemini 2.5 Flash Image when Google key is available, otherwise falls back to OpenAI.
+ * Uses Gemini 3 Pro Image when Google key is available, otherwise falls back to OpenAI.
  */
-const DEFAULT_IMAGE_MODEL = "gemini-2.5-flash-image";
+const DEFAULT_IMAGE_MODEL = "gemini-3-pro-image-preview";
 
 /**
  * Generate an image and return its base64-encoded data.
- * Defaults to Gemini 2.5 Flash Image; falls back to OpenAI gpt-image-1.
+ * Defaults to Gemini 3 Pro Image; falls back to OpenAI gpt-image-1.
  */
 export async function generateImageBase64(
     prompt: string,
@@ -184,9 +185,9 @@ export async function generateImageBase64(
                 return Buffer.from(result.image.uint8Array).toString("base64");
             }
 
-            console.warn("Gemini image generation returned no image, falling back to OpenAI");
+            console.warn("Gemini 3 Pro Image generation returned no image, falling back to OpenAI");
         } catch (err) {
-            console.warn("Gemini image generation failed, falling back to OpenAI:", err);
+            console.warn("Gemini 3 Pro Image generation failed, falling back to OpenAI:", err);
         }
     }
 
