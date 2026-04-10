@@ -178,6 +178,7 @@ export type BrandEngine = {
     image_style_categories?: ImageStyleCategory[];
     voice_profile?: VoiceProfile;
     editorial_guidelines?: string;
+    seo_content_guidelines?: string;
     reference_articles?: string[];
 };
 
@@ -600,6 +601,12 @@ export function compileBlogSystemPrompt(
     sections.push(`- **Link density**: Aim for 3-8 internal links per article depending on length. Pillar pages should link to all supporting pages. Supporting pages link to the pillar + 2-3 related spokes.`);
     sections.push(`- **Avoid keyword cannibalization**: When cluster context lists sibling keywords, do NOT try to rank for those keywords in this article. Mention them only as linking opportunities.`);
     sections.push(`- **Standalone articles**: If no cluster context is provided, still include 1-2 internal links to related content if logical slugs can be inferred from the topic. Use placeholder slugs and descriptive anchor text.`);
+
+    // ── COMPANY SEO CONTENT GUIDELINES (company-specific) ────────────────
+
+    if (engine.seo_content_guidelines) {
+        sections.push(`\n\n## Company SEO Content Guidelines (MANDATORY — FOLLOW CLOSELY)\nThe following SEO content guidelines are specific to ${brand}. These guidelines supplement and may override the base SEO rules above. When in conflict, these company-specific guidelines take precedence.\n\n${engine.seo_content_guidelines}`);
+    }
 
     // ── COMPANY EDITORIAL GUIDELINES (company-specific) ─────────────────
 

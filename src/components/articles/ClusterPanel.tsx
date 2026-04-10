@@ -15,7 +15,7 @@ import {
     Play, RefreshCw, Pencil, X, Trash2,
     AlertCircle, CheckCircle2, Link2, Network,
     Crown, BookOpen, Scroll, FileText, Sparkles,
-    Download,
+    Download, LinkIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -107,6 +107,10 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
     const [guideErr, setGuideErr] = useState<string | null>(null);
 
     const [guideSuccess, setGuideSuccess] = useState(false);
+
+    const [interlinking, setInterlinking] = useState(false);
+    const [interlinkErr, setInterlinkErr] = useState<string | null>(null);
+    const [interlinkResult, setInterlinkResult] = useState<{ succeeded: number; links: number } | null>(null);
 
     const [showArticleMgr, setShowArticleMgr] = useState(false);
     const [assignedArticles, setAssignedArticles] = useState<any[]>([]);
@@ -228,6 +232,26 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
         // Use direct navigation for reliable browser-native download
         // The Content-Disposition: attachment header tells the browser to download
         window.open(`/api/clusters/${clusterId}/download`, "_blank");
+    }
+
+    async function handleInterlink() {
+        setInterlinking(true); setInterlinkErr(null); setInterlinkResult(null);
+        try {
+            const r = await fetch(`/api/clusters/${clusterId}/interlink`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({}),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || "Interlinking failed");
+            setInterlinkResult({
+                succeeded: data.articles_succeeded ?? 0,
+                links: data.total_links_added ?? 0,
+            });
+            await loadCluster();
+            onUpdate();
+        } catch (e: any) { setInterlinkErr(e.message); }
+        finally { setInterlinking(false); }
     }
 
     async function loadArticleManager() {
@@ -370,6 +394,17 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                     className={cn("gap-1.5", showArticleMgr && "bg-primary/10")}>
                     <Link2 className="h-3.5 w-3.5" /> {showArticleMgr ? "Close" : "Manage Articles"}
                 </Button>
+                <Button variant="outline" size="sm" onClick={handleInterlink}
+                    disabled={interlinking || generatedCount < 2}
+                    className={cn("gap-1.5", interlinkResult && "text-success border-success")}>
+                    {interlinking ? (
+                        <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Interlinking…</>
+                    ) : interlinkResult ? (
+                        <><CheckCircle2 className="h-3.5 w-3.5" /> +{interlinkResult.links} Links</>
+                    ) : (
+                        <><LinkIcon className="h-3.5 w-3.5" /> Interlink Articles</>
+                    )}
+                </Button>
                 <Button variant="outline" size="sm" onClick={handleDownloadAll}
                     disabled={generatedCount === 0}
                     className="gap-1.5">
@@ -403,6 +438,22 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                 <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>Guide generation failed: {guideErr}</AlertDescription>
+                </Alert>
+            )}
+
+            {interlinkErr && (
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>Interlinking failed: {interlinkErr}</AlertDescription>
+                </Alert>
+            )}
+
+            {interlinkResult && (
+                <Alert className="border-green-500/50 bg-green-500/5">
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <AlertDescription>
+                        Interlinked {interlinkResult.succeeded} articles — {interlinkResult.links} internal links added across the cluster.
+                    </AlertDescription>
                 </Alert>
             )}
 

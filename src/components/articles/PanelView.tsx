@@ -22,7 +22,9 @@ import {
     Search, Sparkles, Upload, AlertCircle, CheckCircle2,
     Crown, BookOpen, Scroll, Eye, Code, Layers, ArrowLeft,
     ChevronDown, FileText, ClipboardCopy, Scissors,
+    Scale, ExternalLink, ShieldCheck, Wand2, ChevronRight,
 } from "lucide-react";
+import type { ConsulResult, ConsulClaimReview } from "@/lib/consulPrompts";
 import { cn } from "@/lib/utils";
 
 type SearchImage = {
@@ -93,6 +95,13 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     const [shortenErr, setShortenErr] = useState<string | null>(null);
     const [shortenInfo, setShortenInfo] = useState<{ original: number; shortened: number } | null>(null);
 
+    // Consul fact-check
+    const [consulChecking, setConsulChecking] = useState(false);
+    const [consulResult, setConsulResult] = useState<ConsulResult | null>(null);
+    const [consulErr, setConsulErr] = useState<string | null>(null);
+    const [expandedClaims, setExpandedClaims] = useState<Set<number>>(new Set());
+    const [applyingRewrite, setApplyingRewrite] = useState<number | null>(null);
+
     const [refreshingImage, setRefreshingImage] = useState(false);
     const [imagePromptInput, setImagePromptInput] = useState("");
     const [imageStyles, setImageStyles] = useState<{ id: string; label: string; narrative?: string }[]>([]);
@@ -117,17 +126,30 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     const [insertSaving, setInsertSaving] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Composite tab state
-    const [compositeStep, setCompositeStep] = useState<"search" | "confirm" | "generating" | "preview">("search");
+    // Composite tab state — two-slot workflow: product + background
+    const [compositeStep, setCompositeStep] = useState<"product" | "background" | "generating" | "preview">("product");
+    // Product slot
     const [compositeProductUrl, setCompositeProductUrl] = useState<string | null>(null);
     const [compositeProductThumb, setCompositeProductThumb] = useState<string | null>(null);
+    const [compositeProductBase64, setCompositeProductBase64] = useState<string | null>(null);
     const [compositeSearchQuery, setCompositeSearchQuery] = useState("");
     const [compositeSearchResults, setCompositeSearchResults] = useState<SearchImage[]>([]);
     const [compositeSearching, setCompositeSearching] = useState(false);
+    // Background slot
+    const [compositeBgSource, setCompositeBgSource] = useState<"generate" | "search" | "upload">("generate");
     const [compositeBgPrompt, setCompositeBgPrompt] = useState("");
+    const [compositeBgUrl, setCompositeBgUrl] = useState<string | null>(null);
+    const [compositeBgThumb, setCompositeBgThumb] = useState<string | null>(null);
+    const [compositeBgBase64, setCompositeBgBase64] = useState<string | null>(null);
+    const [compositeBgSearchQuery, setCompositeBgSearchQuery] = useState("");
+    const [compositeBgSearchResults, setCompositeBgSearchResults] = useState<SearchImage[]>([]);
+    const [compositeBgSearching, setCompositeBgSearching] = useState(false);
+    // Shared composite state
     const [compositeGenerating, setCompositeGenerating] = useState(false);
     const [compositeResult, setCompositeResult] = useState<string | null>(null);
     const [compositeErr, setCompositeErr] = useState<string | null>(null);
+    const compositeProductFileRef = useRef<HTMLInputElement>(null);
+    const compositeBgFileRef = useRef<HTMLInputElement>(null);
     const savedRangeRef = useRef<Range | null>(null);
 
     const [fullArticle, setFullArticle] = useState<Article | null>(null);
@@ -368,6 +390,56 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
         finally { setShortening(false); }
     }
 
+    async function handleConsulCheck() {
+        if (!displayArticle.html) return;
+        setConsulChecking(true); setConsulErr(null); setConsulResult(null); setExpandedClaims(new Set());
+        try {
+            const r = await fetch("/api/fact-check-consul", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ title: article.title, excerpt: article.excerpt, html: displayArticle.html }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data?.error || "Consul check failed");
+            setConsulResult(data);
+        } catch (e: any) { setConsulErr(e.message); }
+        finally { setConsulChecking(false); }
+    }
+
+    function toggleConsulClaim(index: number) {
+        setExpandedClaims((prev) => {
+            const next = new Set(prev);
+            if (next.has(index)) next.delete(index); else next.add(index);
+            return next;
+        });
+    }
+
+    async function handleApplyRewrite(claimIndex: number) {
+        if (!displayArticle.html || !consulResult) return;
+        const claim = consulResult.claims[claimIndex];
+        if (!claim?.suggested_rewrite) return;
+        setApplyingRewrite(claimIndex);
+        try {
+            const r = await fetch("/api/apply-rewrite", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ html: displayArticle.html, claim: claim.claim, suggested_rewrite: claim.suggested_rewrite }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data?.error || "Apply rewrite failed");
+            // Save the corrected HTML
+            const saveResp = await fetch(`/api/articles/${article.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ html: data.html }),
+            });
+            const saveData = await saveResp.json();
+            if (!saveResp.ok) throw new Error(saveData.error || "Save failed");
+            onUpdate({ ...article, ...saveData });
+        } catch (e: any) { alert(`Rewrite failed: ${e.message}`); }
+        finally { setApplyingRewrite(null); }
+    }
+
     async function refreshImage() {
         if (!article.image_prompt) return;
         setRefreshingImage(true); setRefreshErr(null);
@@ -382,11 +454,11 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
             const saveResp = await fetch(`/api/articles/${article.id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ image_base64: data.image_base64, image_prompt: data.final_prompt, image_style: selectedStyle }),
+                body: JSON.stringify({ image_base64: data.image_base64, image_prompt: data.base_prompt || data.final_prompt, image_style: selectedStyle }),
             });
             const saveData = await saveResp.json();
             if (!saveResp.ok) throw new Error(saveData.error || "Failed to save");
-            onUpdate({ ...article, image_base64: data.image_base64, image_prompt: data.final_prompt, image_style: selectedStyle });
+            onUpdate({ ...article, image_base64: data.image_base64, image_prompt: data.base_prompt || data.final_prompt, image_style: selectedStyle });
             setImagePromptInput("");
         } catch (e: any) { setRefreshErr(e.message); }
         finally { setRefreshingImage(false); }
@@ -432,27 +504,56 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
         finally { setCompositeSearching(false); }
     }
 
+    async function onCompositeBgSearch() {
+        if (!compositeBgSearchQuery.trim()) return;
+        setCompositeBgSearching(true); setCompositeErr(null);
+        try {
+            const r = await fetch("/api/image-search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: compositeBgSearchQuery.trim(), num: 12 }) });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data?.error || "Search failed");
+            setCompositeBgSearchResults(data.images ?? []);
+        } catch (e: any) { setCompositeErr(e.message); }
+        finally { setCompositeBgSearching(false); }
+    }
+
     async function onCompositeGenerate() {
-        if (!compositeProductUrl) return;
+        if (!compositeProductUrl && !compositeProductBase64) return;
         setCompositeGenerating(true); setCompositeErr(null); setCompositeStep("generating");
         try {
+            const payload: Record<string, unknown> = {
+                article_title: article.title,
+                article_excerpt: article.excerpt || "",
+                image_style: selectedStyle,
+                company_id: article.company_id ?? undefined,
+            };
+
+            // Product source
+            if (compositeProductBase64) {
+                payload.product_image_base64 = compositeProductBase64;
+            } else {
+                payload.product_image_url = compositeProductUrl;
+            }
+
+            // Background source
+            if (compositeBgSource === "search" && compositeBgUrl) {
+                payload.background_image_url = compositeBgUrl;
+            } else if (compositeBgSource === "upload" && compositeBgBase64) {
+                payload.background_image_base64 = compositeBgBase64;
+            } else {
+                // AI-generate background
+                payload.custom_bg_prompt = compositeBgPrompt.trim() || undefined;
+            }
+
             const r = await fetch("/api/composite-image", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    product_image_url: compositeProductUrl,
-                    article_title: article.title,
-                    article_excerpt: article.excerpt || "",
-                    custom_bg_prompt: compositeBgPrompt.trim() || undefined,
-                    image_style: selectedStyle,
-                    company_id: article.company_id ?? undefined,
-                }),
+                body: JSON.stringify(payload),
             });
             const data = await r.json();
             if (!r.ok) throw new Error(data?.error || "Composite generation failed");
             setCompositeResult(data.image_base64);
             setCompositeStep("preview");
-        } catch (e: any) { setCompositeErr(e.message); setCompositeStep("confirm"); }
+        } catch (e: any) { setCompositeErr(e.message); setCompositeStep("background"); }
         finally { setCompositeGenerating(false); }
     }
 
@@ -474,12 +575,19 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     }
 
     function resetComposite() {
-        setCompositeStep("search");
+        setCompositeStep("product");
         setCompositeProductUrl(null);
         setCompositeProductThumb(null);
+        setCompositeProductBase64(null);
         setCompositeSearchQuery("");
         setCompositeSearchResults([]);
+        setCompositeBgSource("generate");
         setCompositeBgPrompt("");
+        setCompositeBgUrl(null);
+        setCompositeBgThumb(null);
+        setCompositeBgBase64(null);
+        setCompositeBgSearchQuery("");
+        setCompositeBgSearchResults([]);
         setCompositeResult(null);
         setCompositeErr(null);
     }
@@ -587,7 +695,7 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     // ======= INSERT IMAGE MODAL =======
     const insertImageModal = (
         <Dialog open={showInsertModal} onOpenChange={setShowInsertModal}>
-            <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
+            <DialogContent className="max-w-7xl w-[95vw] max-h-[95vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <ImageIcon className="h-5 w-5" />
@@ -649,11 +757,36 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                     </TabsContent>
 
                     <TabsContent value="composite" className="space-y-3">
-                        {/* Step 1: Search for product */}
-                        {compositeStep === "search" && (
+                        {/* Hidden file inputs for composite uploads */}
+                        <input ref={compositeProductFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
+                            const file = e.target.files?.[0]; if (!file) return;
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                                const base64 = (reader.result as string).split(",")[1];
+                                setCompositeProductBase64(base64);
+                                setCompositeProductThumb(`data:image/png;base64,${base64}`);
+                                setCompositeProductUrl(null);
+                                setCompositeStep("background");
+                            };
+                            reader.readAsDataURL(file); e.target.value = "";
+                        }} />
+                        <input ref={compositeBgFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
+                            const file = e.target.files?.[0]; if (!file) return;
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                                const base64 = (reader.result as string).split(",")[1];
+                                setCompositeBgBase64(base64);
+                                setCompositeBgThumb(`data:image/png;base64,${base64}`);
+                                setCompositeBgUrl(null);
+                            };
+                            reader.readAsDataURL(file); e.target.value = "";
+                        }} />
+
+                        {/* ───── Step 1: Select Product Image ───── */}
+                        {compositeStep === "product" && (
                             <>
                                 <div className="text-sm text-muted-foreground mb-1">
-                                    <strong>Step 1:</strong> Search for your product image
+                                    <strong>Step 1:</strong> Select your product image
                                 </div>
                                 <div className="flex gap-2">
                                     <Input placeholder="e.g. Nike Air Max 90 product photo" value={compositeSearchQuery} onChange={(e) => setCompositeSearchQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onCompositeSearch(); }} />
@@ -667,7 +800,8 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                                             <button key={i} onClick={() => {
                                                 setCompositeProductUrl(img.imageUrl);
                                                 setCompositeProductThumb(img.thumbnailUrl || img.imageUrl);
-                                                setCompositeStep("confirm");
+                                                setCompositeProductBase64(null);
+                                                setCompositeStep("background");
                                             }}
                                                 className={cn("p-0 rounded-lg overflow-hidden cursor-pointer border-2 transition-colors border-border hover:border-primary/50")}>
                                                 <img src={img.thumbnailUrl || img.imageUrl} alt={img.title} className="w-full h-24 object-cover" />
@@ -676,25 +810,68 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                                         ))}
                                     </div>
                                 )}
+                                <div className="flex items-center gap-3 pt-2">
+                                    <Separator className="flex-1" />
+                                    <span className="text-xs text-muted-foreground">or</span>
+                                    <Separator className="flex-1" />
+                                </div>
+                                <Button variant="outline" onClick={() => compositeProductFileRef.current?.click()} className="w-full gap-1.5">
+                                    <Upload className="h-3.5 w-3.5" /> Upload Product Image
+                                </Button>
                             </>
                         )}
 
-                        {/* Step 2: Confirm product selection */}
-                        {compositeStep === "confirm" && compositeProductUrl && (
+                        {/* ───── Step 2: Choose Background ───── */}
+                        {compositeStep === "background" && (compositeProductUrl || compositeProductBase64) && (
                             <>
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                                    <button onClick={() => setCompositeStep("search")} className="flex items-center gap-1 hover:text-foreground transition-colors">
+                                    <button onClick={() => setCompositeStep("product")} className="flex items-center gap-1 hover:text-foreground transition-colors">
                                         <ArrowLeft className="h-3.5 w-3.5" /> Back
                                     </button>
                                     <span>·</span>
-                                    <strong>Step 2:</strong> Confirm product & set background
+                                    <strong>Step 2:</strong> Choose background
                                 </div>
-                                <div className="flex gap-4">
-                                    <div className="shrink-0 w-32">
-                                        <img src={compositeProductThumb || compositeProductUrl} alt="Selected product" className="w-full rounded-lg border border-border object-contain bg-white" />
-                                        <div className="text-[10px] text-muted-foreground text-center mt-1">Selected product</div>
+
+                                {/* Product thumbnail */}
+                                <div className="flex items-center gap-3 p-2.5 rounded-lg border border-border bg-muted/30">
+                                    <img
+                                        src={compositeProductThumb || compositeProductUrl || `data:image/png;base64,${compositeProductBase64}`}
+                                        alt="Selected product"
+                                        className="w-16 h-16 rounded-md border border-border object-contain bg-white shrink-0"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-xs font-medium">Product selected ✓</div>
+                                        <div className="text-[10px] text-muted-foreground truncate">
+                                            {compositeProductBase64 ? "Uploaded image" : compositeProductUrl}
+                                        </div>
                                     </div>
-                                    <div className="flex-1 space-y-3">
+                                </div>
+
+                                {/* Background source tabs */}
+                                <div className="flex gap-1 bg-muted rounded-lg p-1">
+                                    {([
+                                        { id: "generate" as const, label: "AI Generate", icon: <Sparkles className="h-3 w-3" /> },
+                                        { id: "search" as const, label: "Search", icon: <Search className="h-3 w-3" /> },
+                                        { id: "upload" as const, label: "Upload", icon: <Upload className="h-3 w-3" /> },
+                                    ]).map((tab) => (
+                                        <button
+                                            key={tab.id}
+                                            onClick={() => setCompositeBgSource(tab.id)}
+                                            className={cn(
+                                                "flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors",
+                                                compositeBgSource === tab.id
+                                                    ? "bg-background text-foreground shadow-sm"
+                                                    : "text-muted-foreground hover:text-foreground"
+                                            )}
+                                        >
+                                            {tab.icon} {tab.label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Background: AI Generate */}
+                                {compositeBgSource === "generate" && (
+                                    <div className="space-y-3">
                                         {imageStyles.length > 0 && (
                                             <div>
                                                 <Label className="text-xs">Image Style</Label>
@@ -716,15 +893,88 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                                                 className="mt-1 text-sm"
                                             />
                                         </div>
-                                        <Button onClick={onCompositeGenerate} className="w-full gap-1.5">
-                                            <Sparkles className="h-3.5 w-3.5" /> Generate Background & Composite
-                                        </Button>
                                     </div>
-                                </div>
+                                )}
+
+                                {/* Background: Search */}
+                                {compositeBgSource === "search" && (
+                                    <div className="space-y-3">
+                                        <div className="flex gap-2">
+                                            <Input placeholder="e.g. mountain landscape sunset" value={compositeBgSearchQuery} onChange={(e) => setCompositeBgSearchQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onCompositeBgSearch(); }} />
+                                            <Button onClick={onCompositeBgSearch} disabled={compositeBgSearching || !compositeBgSearchQuery.trim()} size="sm">
+                                                {compositeBgSearching ? "…" : "Search"}
+                                            </Button>
+                                        </div>
+                                        {compositeBgSearchResults.length > 0 && (
+                                            <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-2 max-h-56 overflow-y-auto">
+                                                {compositeBgSearchResults.map((img, i) => (
+                                                    <button key={i} onClick={() => {
+                                                        setCompositeBgUrl(img.imageUrl);
+                                                        setCompositeBgThumb(img.thumbnailUrl || img.imageUrl);
+                                                        setCompositeBgBase64(null);
+                                                    }}
+                                                        className={cn("p-0 rounded-lg overflow-hidden cursor-pointer border-2 transition-colors",
+                                                            compositeBgUrl === img.imageUrl ? "border-primary" : "border-border hover:border-primary/50"
+                                                        )}>
+                                                        <img src={img.thumbnailUrl || img.imageUrl} alt={img.title} className="w-full h-24 object-cover" />
+                                                        <div className="px-1.5 py-1 text-[10px] text-muted-foreground truncate">{img.domain}</div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {compositeBgUrl && (
+                                            <div className="flex items-center gap-2 p-2 rounded-md border border-primary/30 bg-primary/5">
+                                                <img src={compositeBgThumb || compositeBgUrl} alt="Selected background" className="w-12 h-8 rounded object-cover" />
+                                                <span className="text-xs font-medium text-foreground">Background selected ✓</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Background: Upload */}
+                                {compositeBgSource === "upload" && (
+                                    <div className="space-y-3">
+                                        <div onClick={() => compositeBgFileRef.current?.click()} onDragOver={(e) => e.preventDefault()} onDrop={(e) => {
+                                            e.preventDefault(); const file = e.dataTransfer.files?.[0]; if (!file?.type.startsWith("image/")) return;
+                                            const reader = new FileReader(); reader.onloadend = () => {
+                                                const base64 = (reader.result as string).split(",")[1];
+                                                setCompositeBgBase64(base64);
+                                                setCompositeBgThumb(`data:image/png;base64,${base64}`);
+                                                setCompositeBgUrl(null);
+                                            }; reader.readAsDataURL(file);
+                                        }} className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-primary/50 transition-colors">
+                                            <Upload className="h-6 w-6 mx-auto mb-1.5 text-muted-foreground" />
+                                            <div className="text-xs font-medium">Click to browse or drag & drop</div>
+                                            <div className="text-[10px] text-muted-foreground mt-0.5">Background image</div>
+                                        </div>
+                                        {compositeBgBase64 && (
+                                            <div className="flex items-center gap-2 p-2 rounded-md border border-primary/30 bg-primary/5">
+                                                <img src={compositeBgThumb || `data:image/png;base64,${compositeBgBase64}`} alt="Uploaded background" className="w-12 h-8 rounded object-cover" />
+                                                <span className="text-xs font-medium text-foreground">Background uploaded ✓</span>
+                                                <button onClick={() => { setCompositeBgBase64(null); setCompositeBgThumb(null); }} className="ml-auto text-xs text-muted-foreground hover:text-destructive">Remove</button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Generate composite button */}
+                                <Button
+                                    onClick={onCompositeGenerate}
+                                    className="w-full gap-1.5"
+                                    disabled={
+                                        (compositeBgSource === "search" && !compositeBgUrl) ||
+                                        (compositeBgSource === "upload" && !compositeBgBase64)
+                                    }
+                                >
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                    {compositeBgSource === "generate"
+                                        ? "Generate Background & Composite"
+                                        : "Remove Product Background & Composite"}
+                                </Button>
                             </>
                         )}
 
-                        {/* Step 3: Generating */}
+                        {/* ───── Step 3: Generating ───── */}
                         {compositeStep === "generating" && (
                             <div className="py-10 text-center space-y-4">
                                 <div className="relative mx-auto w-16 h-16">
@@ -733,16 +983,20 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                                 </div>
                                 <div>
                                     <div className="text-sm font-medium">Creating your composite…</div>
-                                    <div className="text-xs text-muted-foreground mt-1">Generating contextual background → Removing product background → Compositing</div>
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                        {compositeBgSource === "generate"
+                                            ? "Generating background → Removing product background → Compositing"
+                                            : "Removing product background → Compositing on selected background"}
+                                    </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* Step 4: Preview composite result */}
+                        {/* ───── Step 4: Preview composite result ───── */}
                         {compositeStep === "preview" && compositeResult && (
                             <>
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                                    <button onClick={() => setCompositeStep("confirm")} className="flex items-center gap-1 hover:text-foreground transition-colors">
+                                    <button onClick={() => setCompositeStep("background")} className="flex items-center gap-1 hover:text-foreground transition-colors">
                                         <ArrowLeft className="h-3.5 w-3.5" /> Adjust
                                     </button>
                                     <span>·</span>
@@ -752,7 +1006,7 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                                 <div className="flex gap-2 justify-end pt-2">
                                     <Button variant="outline" onClick={() => {
                                         setCompositeResult(null);
-                                        setCompositeStep("confirm");
+                                        setCompositeStep("background");
                                     }}>
                                         Regenerate
                                     </Button>
@@ -976,6 +1230,10 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                 <Button variant="outline" size="sm" onClick={() => { setShowInsertModal(true); setInsertMode("inline"); }} className="gap-1.5">
                     <ImageIcon className="h-3.5 w-3.5" /> Image
                 </Button>
+                <Button variant="outline" size="sm" onClick={handleConsulCheck} disabled={consulChecking || !displayArticle.html}
+                    className="gap-1.5 border-primary/30">
+                    {consulChecking ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Consulting…</> : consulResult ? <><Scale className="h-3.5 w-3.5" /> Re-check</> : <><Scale className="h-3.5 w-3.5" /> Fact-Check Consul</>}
+                </Button>
                 {confirmDelete ? (
                     <div className="flex gap-1.5">
                         <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
@@ -1043,6 +1301,146 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                 </CardContent>
             </Card>
 
+            {/* Fact-Check Consul */}
+            {consulErr && (
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>Consul check failed: {consulErr}</AlertDescription>
+                </Alert>
+            )}
+            {consulResult && (() => {
+                const VERDICT_COLORS: Record<string, string> = {
+                    pass: "#22c55e", needs_review: "#f59e0b", fail: "#ef4444",
+                    accurate: "#22c55e", unverifiable: "#a3a3a3", misleading: "#f59e0b", inaccurate: "#ef4444",
+                    disputed: "#8b5cf6",
+                };
+                const AGREEMENT_LABELS: Record<string, { label: string; icon: string; color: string }> = {
+                    full: { label: "Full Agreement", icon: "✓", color: "#22c55e" },
+                    partial: { label: "Partial Agreement", icon: "~", color: "#f59e0b" },
+                    split: { label: "Models Disagree", icon: "✗", color: "#ef4444" },
+                    single_source: { label: "Single Source", icon: "1", color: "#a3a3a3" },
+                };
+                return (
+                    <Card className="border-primary/20">
+                        <CardContent className="p-4 space-y-4">
+                            {/* Header with model status */}
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                                <div className="flex items-center gap-2">
+                                    <Scale className="h-4 w-4 text-primary" />
+                                    <span className="text-xs font-semibold uppercase tracking-wider text-primary">Fact-Check Consul</span>
+                                    <Badge style={{ backgroundColor: VERDICT_COLORS[consulResult.overall_verdict] }} className="text-white ml-2">
+                                        {consulResult.overall_verdict === "pass" ? "✓ Pass" : consulResult.overall_verdict === "needs_review" ? "⚠ Needs Review" : "✗ Fail"}
+                                    </Badge>
+                                    <span className="text-xs text-muted-foreground">Confidence: {Math.round(consulResult.overall_confidence * 100)}%</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className={cn("h-2 w-2 rounded-full", consulResult.models_used.gemini.status === "success" ? "bg-green-500" : "bg-red-500")} />
+                                        <span className="text-[11px] text-muted-foreground">Gemini</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className={cn("h-2 w-2 rounded-full", consulResult.models_used.grok.status === "success" ? "bg-green-500" : "bg-red-500")} />
+                                        <span className="text-[11px] text-muted-foreground">Grok</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {consulResult.summary && <p className="text-sm leading-relaxed">{consulResult.summary}</p>}
+
+                            <h4 className="text-sm font-medium">Claims Reviewed ({consulResult.claims.length})</h4>
+
+                            {consulResult.claims.map((claim, i) => {
+                                const agr = AGREEMENT_LABELS[claim.agreement] ?? AGREEMENT_LABELS.single_source;
+                                const isExp = expandedClaims.has(i);
+                                return (
+                                    <div key={i} className="p-3 rounded-md border" style={{ borderColor: `${VERDICT_COLORS[claim.consensus_verdict]}33`, backgroundColor: `${VERDICT_COLORS[claim.consensus_verdict]}08` }}>
+                                        <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                                            <Badge className="text-[11px] uppercase" style={{ color: VERDICT_COLORS[claim.consensus_verdict], backgroundColor: `${VERDICT_COLORS[claim.consensus_verdict]}18` }}>
+                                                {claim.consensus_verdict}
+                                            </Badge>
+                                            <Badge variant="outline" className="text-[10px] gap-1" style={{ borderColor: agr.color, color: agr.color }}>
+                                                {agr.icon} {agr.label}
+                                            </Badge>
+                                            <span className="text-[10px] text-muted-foreground ml-auto">
+                                                {Math.round(claim.confidence * 100)}% confidence
+                                            </span>
+                                        </div>
+
+                                        <p className="text-sm font-medium">&ldquo;{claim.claim}&rdquo;</p>
+                                        <p className="text-sm text-muted-foreground mt-1">{claim.explanation}</p>
+
+                                        {(claim.gemini_explanation || claim.grok_explanation) && claim.agreement !== "full" && (
+                                            <div className="mt-2">
+                                                <button onClick={() => toggleConsulClaim(i)} className="flex items-center gap-1 text-xs text-primary hover:underline">
+                                                    {isExp ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                                    {isExp ? "Hide" : "Show"} individual model reasoning
+                                                </button>
+                                                {isExp && (
+                                                    <div className="mt-2 space-y-2">
+                                                        {claim.gemini_explanation && (
+                                                            <div className="p-2 rounded border border-border bg-card">
+                                                                <div className="flex items-center gap-1.5 mb-1">
+                                                                    <span className="h-2 w-2 rounded-full bg-blue-500" />
+                                                                    <span className="text-[11px] font-semibold">Gemini</span>
+                                                                    {claim.gemini_verdict && (
+                                                                        <Badge className="text-[9px] uppercase ml-1" style={{ color: VERDICT_COLORS[claim.gemini_verdict], backgroundColor: `${VERDICT_COLORS[claim.gemini_verdict]}18` }}>
+                                                                            {claim.gemini_verdict}
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+                                                                <p className="text-xs text-muted-foreground">{claim.gemini_explanation}</p>
+                                                            </div>
+                                                        )}
+                                                        {claim.grok_explanation && (
+                                                            <div className="p-2 rounded border border-border bg-card">
+                                                                <div className="flex items-center gap-1.5 mb-1">
+                                                                    <span className="h-2 w-2 rounded-full bg-orange-500" />
+                                                                    <span className="text-[11px] font-semibold">Grok</span>
+                                                                    {claim.grok_verdict && (
+                                                                        <Badge className="text-[9px] uppercase ml-1" style={{ color: VERDICT_COLORS[claim.grok_verdict], backgroundColor: `${VERDICT_COLORS[claim.grok_verdict]}18` }}>
+                                                                            {claim.grok_verdict}
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+                                                                <p className="text-xs text-muted-foreground">{claim.grok_explanation}</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {claim.sources.length > 0 && (
+                                            <div className="mt-2 flex flex-wrap gap-1.5">
+                                                {claim.sources.map((src, si) => (
+                                                    <a key={si} href={src.url} target="_blank" rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline px-1.5 py-0.5 rounded bg-primary/5 border border-primary/10">
+                                                        <ExternalLink className="h-2.5 w-2.5" />
+                                                        {src.title ? src.title.slice(0, 40) : (() => { try { return new URL(src.url).hostname; } catch { return src.url.slice(0, 30); } })()}
+                                                        <span className="text-muted-foreground">({src.from})</span>
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {claim.suggested_rewrite && (
+                                            <div className="mt-2 p-2 bg-card border border-dashed border-border rounded-md">
+                                                <p className="text-sm">✏️ <strong>Suggested rewrite:</strong> {claim.suggested_rewrite}</p>
+                                                <Button variant="outline" size="sm" className="mt-2 gap-1.5 text-xs h-7"
+                                                    disabled={applyingRewrite === i}
+                                                    onClick={() => handleApplyRewrite(i)}>
+                                                    {applyingRewrite === i ? <><RefreshCw className="h-3 w-3 animate-spin" /> Applying…</> : <><Wand2 className="h-3 w-3" /> Apply Rewrite</>}
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </CardContent>
+                    </Card>
+                );
+            })()}
+
             {/* SEO Data */}
             {seo && (
                 <details className="group">
@@ -1100,11 +1498,11 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                                                         const saveResp = await fetch(`/api/articles/${article.id}`, {
                                                             method: "PUT",
                                                             headers: { "Content-Type": "application/json" },
-                                                            body: JSON.stringify({ image_base64: data.image_base64, image_prompt: data.final_prompt, image_style: newStyle }),
+                                                            body: JSON.stringify({ image_base64: data.image_base64, image_prompt: data.base_prompt || data.final_prompt, image_style: newStyle }),
                                                         });
                                                         const saveData = await saveResp.json();
                                                         if (!saveResp.ok) throw new Error(saveData.error || "Failed to save");
-                                                        onUpdate({ ...article, image_base64: data.image_base64, image_prompt: data.final_prompt, image_style: newStyle });
+                                                        onUpdate({ ...article, image_base64: data.image_base64, image_prompt: data.base_prompt || data.final_prompt, image_style: newStyle });
                                                     })
                                                     .catch((err: any) => setRefreshErr(err.message))
                                                     .finally(() => setRefreshingImage(false));

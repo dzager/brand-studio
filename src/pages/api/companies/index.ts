@@ -33,6 +33,7 @@ export default async function handler(
                 image_style_categories,
                 voice_profile,
                 editorial_guidelines,
+                seo_content_guidelines,
                 reference_articles,
                 evals,
                 auto_humanize,
@@ -62,6 +63,9 @@ export default async function handler(
             }
             if (editorial_guidelines !== undefined) {
                 insertPayload.editorial_guidelines = editorial_guidelines?.trim() || null;
+            }
+            if (seo_content_guidelines !== undefined) {
+                insertPayload.seo_content_guidelines = seo_content_guidelines?.trim() || null;
             }
             if (reference_articles !== undefined) {
                 insertPayload.reference_articles = reference_articles ?? null;

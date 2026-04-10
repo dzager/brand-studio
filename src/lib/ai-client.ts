@@ -30,6 +30,9 @@ export const MODEL_REGISTRY: ModelOption[] = [
     { id: "gpt-4.1",        label: "GPT-4.1",             provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true },
     { id: "gpt-4.1-mini",   label: "GPT-4.1 Mini",        provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true },
     { id: "gpt-5.1",        label: "GPT-5.1",             provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true },
+    { id: "gpt-5.2",        label: "GPT-5.2",             provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true },
+    { id: "gpt-5.3-chat-latest", label: "GPT-5.3",        provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true },
+    { id: "gpt-5.4",        label: "GPT-5.4",             provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true },
 
     // Anthropic
     { id: "claude-sonnet-4-20250514",    label: "Claude Sonnet 4",     provider: "anthropic", envKey: "ANTHROPIC_API_KEY",            supportsStructured: true },
@@ -77,7 +80,7 @@ export function getModel(modelId: string): LanguageModel {
  * Validates and resolves a model ID from user input.
  * Returns the model ID if available, or fallback.
  */
-export function resolveModelId(requestedModel: string | undefined, fallback = "gpt-5.1"): string {
+export function resolveModelId(requestedModel: string | undefined, fallback = "gpt-5.3-chat-latest"): string {
     const available = getAvailableModels();
     if (typeof requestedModel === "string" && available.some((m) => m.id === requestedModel)) {
         return requestedModel;
@@ -87,7 +90,7 @@ export function resolveModelId(requestedModel: string | undefined, fallback = "g
         return fallback;
     }
     // Use first available
-    return available[0]?.id ?? "gpt-5.1";
+    return available[0]?.id ?? "gpt-5.3-chat-latest";
 }
 
 // ── Text Generation Helpers ─────────────────────────────────────────────

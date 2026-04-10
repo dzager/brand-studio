@@ -252,7 +252,7 @@ export default async function handler(
             console.log("Auto-humanizing pillar guide...");
 
             const bodyPrompt = buildBlogHumanizePrompt(guide.html, guide.title, brand);
-            const humanizedHtml = await getTextResponse("gpt-4.1", "", bodyPrompt, { temperature: 0.5 });
+            const humanizedHtml = await getTextResponse("gpt-5.3-chat-latest", "", bodyPrompt, { temperature: 0.5 });
             if (humanizedHtml && humanizedHtml.length > 100) {
                 guide.html = humanizedHtml;
             }
@@ -262,7 +262,7 @@ export default async function handler(
                 "This is a comprehensive guide title. Keep it authoritative, specific, and compelling.",
                 brand
             );
-            const humanizedTitle = await getTextResponse("gpt-4.1", "", titlePrompt, { temperature: 0.5 });
+            const humanizedTitle = await getTextResponse("gpt-5.3-chat-latest", "", titlePrompt, { temperature: 0.5 });
             if (humanizedTitle && humanizedTitle.length > 5) {
                 guide.title = humanizedTitle;
             }
@@ -272,7 +272,7 @@ export default async function handler(
                 "This is a pillar guide excerpt. Keep it to 1-2 sentences, authoritative and comprehensive.",
                 brand
             );
-            const humanizedExcerpt = await getTextResponse("gpt-4.1", "", excerptPrompt, { temperature: 0.5 });
+            const humanizedExcerpt = await getTextResponse("gpt-5.3-chat-latest", "", excerptPrompt, { temperature: 0.5 });
             if (humanizedExcerpt && humanizedExcerpt.length > 10) {
                 guide.excerpt = humanizedExcerpt;
             }

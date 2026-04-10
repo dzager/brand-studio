@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import type { GetServerSideProps } from "next";
 import { IMAGE_STYLE_CATEGORIES, type ImageStyleCategory } from "@/brand/engine";
@@ -15,8 +15,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import {
     Sparkles, Eye, Search, RefreshCw, Copy, CheckCircle2,
     AlertCircle, AlertTriangle, X, Play, Download,
-    Wand2, ShieldCheck, ImageIcon, Video,
+    Wand2, ShieldCheck, ImageIcon, Video, Layers, Scale,
+    ExternalLink, ChevronDown, ChevronRight,
 } from "lucide-react";
+import type { ConsulResult, ConsulClaimReview } from "@/lib/consulPrompts";
 import { cn } from "@/lib/utils";
 
 export const getServerSideProps: GetServerSideProps = async () => {
@@ -68,6 +70,14 @@ type GalleryImage = {
 const VERDICT_COLORS: Record<string, string> = {
     pass: "#22c55e", needs_review: "#f59e0b", fail: "#ef4444",
     accurate: "#22c55e", unverifiable: "#a3a3a3", misleading: "#f59e0b", inaccurate: "#ef4444",
+    disputed: "#8b5cf6",
+};
+
+const AGREEMENT_LABELS: Record<string, { label: string; icon: string; color: string }> = {
+    full: { label: "Full Agreement", icon: "✓", color: "#22c55e" },
+    partial: { label: "Partial Agreement", icon: "~", color: "#f59e0b" },
+    split: { label: "Models Disagree", icon: "✗", color: "#ef4444" },
+    single_source: { label: "Single Source", icon: "1", color: "#a3a3a3" },
 };
 
 let _imgId = 0;
@@ -75,7 +85,7 @@ let _imgId = 0;
 export default function Home() {
     const [prompt, setPrompt] = useState("please make an image of a family in a major city");
     const [imageStyle, setImageStyle] = useState("default");
-    const [model, setModel] = useState("gpt-4.1-nano");
+    const [model, setModel] = useState("gpt-5.3-chat-latest");
     const [availableModels, setAvailableModels] = useState<{ id: string; label: string; provider: string }[]>([]);
     const [wordCount, setWordCount] = useState("1500-2500");
     const [companyId, setCompanyId] = useState<string>("");
@@ -87,6 +97,13 @@ export default function Home() {
     const [factChecking, setFactChecking] = useState(false);
     const [factCheck, setFactCheck] = useState<FactCheckResult | null>(null);
     const [factCheckErr, setFactCheckErr] = useState<string | null>(null);
+
+    // Consul (deep multi-model) fact-check
+    const [consulChecking, setConsulChecking] = useState(false);
+    const [consulResult, setConsulResult] = useState<ConsulResult | null>(null);
+    const [consulErr, setConsulErr] = useState<string | null>(null);
+    const [expandedClaims, setExpandedClaims] = useState<Set<number>>(new Set());
+    const [applyingRewrite, setApplyingRewrite] = useState<number | null>(null);
 
     const [gallery, setGallery] = useState<GalleryImage[]>([]);
     const [selectedImgId, setSelectedImgId] = useState<number | null>(null);
@@ -125,6 +142,13 @@ export default function Home() {
     const [overlapResults, setOverlapResults] = useState<{ id: string; title: string; slug: string; similarity: number; cluster_id: string | null }[] | null>(null);
     const [overlapErr, setOverlapErr] = useState<string | null>(null);
 
+    // Composite state
+    const [compositeProductImg, setCompositeProductImg] = useState<SearchImage | null>(null);
+    const [compositeBgPrompt, setCompositeBgPrompt] = useState("");
+    const [compositeGenerating, setCompositeGenerating] = useState(false);
+    const [compositeResult, setCompositeResult] = useState<string | null>(null);
+    const [compositeErr, setCompositeErr] = useState<string | null>(null);
+
     // Fetch companies + models
     useEffect(() => {
         fetch("/api/companies").then((r) => r.json()).then((data) => { if (Array.isArray(data)) setCompanies(data); }).catch(() => {});
@@ -154,6 +178,7 @@ export default function Home() {
 
     async function onCreate() {
         setLoading(true); setErr(null); setResult(null); setFactCheck(null); setFactCheckErr(null);
+        setConsulResult(null); setConsulErr(null); setExpandedClaims(new Set());
         setGallery([]); setSelectedImgId(null); setCustomImagePrompt(""); setRefreshErr(null); setHumanized(false); setHumanizeErr(null);
         try {
             const r = await fetch("/api/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ creation_prompt: prompt, image_style: imageStyle, model, word_count: wordCount, company_id: companyId || undefined }) });
@@ -210,6 +235,43 @@ export default function Home() {
         } catch (e: any) { setFactCheckErr(e.message); } finally { setFactChecking(false); }
     }
 
+    async function onConsulCheck() {
+        if (!result) return;
+        setConsulChecking(true); setConsulErr(null); setConsulResult(null); setExpandedClaims(new Set());
+        try {
+            const r = await fetch("/api/fact-check-consul", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: result.title, excerpt: result.excerpt, html: result.html }) });
+            const text = await r.text(); const data = text ? JSON.parse(text) : null;
+            if (!r.ok) throw new Error(data?.error || `Consul check failed with status ${r.status}`);
+            setConsulResult(data);
+        } catch (e: any) { setConsulErr(e.message); } finally { setConsulChecking(false); }
+    }
+
+    function toggleClaimExpanded(index: number) {
+        setExpandedClaims((prev) => {
+            const next = new Set(prev);
+            if (next.has(index)) next.delete(index); else next.add(index);
+            return next;
+        });
+    }
+
+    async function onApplyRewrite(claimIndex: number) {
+        if (!result || !consulResult) return;
+        const claim = consulResult.claims[claimIndex];
+        if (!claim?.suggested_rewrite) return;
+        setApplyingRewrite(claimIndex);
+        try {
+            const r = await fetch("/api/apply-rewrite", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ html: result.html, claim: claim.claim, suggested_rewrite: claim.suggested_rewrite }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data?.error || "Apply rewrite failed");
+            setResult((prev: any) => ({ ...prev, html: data.html }));
+        } catch (e: any) { alert(`Rewrite failed: ${e.message}`); }
+        finally { setApplyingRewrite(null); }
+    }
+
     async function onHumanize() {
         if (!result) return;
         setHumanizing(true); setHumanizeErr(null);
@@ -236,6 +298,54 @@ export default function Home() {
     function selectSearchImage(img: SearchImage) {
         const newImg: GalleryImage = { id: ++_imgId, url: img.imageUrl, prompt: `Web search: ${img.title}`, label: img.title.slice(0, 40) || "Web Image" };
         setGallery((prev) => [...prev, newImg]); setSelectedImgId(newImg.id);
+    }
+
+    const compositeRef = useRef<HTMLDivElement>(null);
+
+    function startComposite(img: SearchImage) {
+        setCompositeProductImg(img);
+        setCompositeBgPrompt("");
+        setCompositeResult(null);
+        setCompositeErr(null);
+        // Scroll to the composite panel after React renders it
+        setTimeout(() => compositeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
+    }
+
+    async function onCompositeGenerate() {
+        if (!compositeProductImg) return;
+        setCompositeGenerating(true); setCompositeErr(null);
+        try {
+            const r = await fetch("/api/composite-image", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    product_image_url: compositeProductImg.imageUrl,
+                    article_title: result?.title ?? compositeProductImg.title ?? "Product",
+                    article_excerpt: result?.excerpt ?? "",
+                    custom_bg_prompt: compositeBgPrompt.trim() || undefined,
+                    image_style: imageStyle !== "default" ? imageStyle : undefined,
+                    company_id: companyId || undefined,
+                }),
+            });
+            const text = await r.text(); const data = text ? JSON.parse(text) : null;
+            if (!r.ok) throw new Error(data?.error || "Composite generation failed");
+            setCompositeResult(data.image_base64);
+        } catch (e: any) { setCompositeErr(e.message); }
+        finally { setCompositeGenerating(false); }
+    }
+
+    function useCompositeResult() {
+        if (!compositeResult) return;
+        const newImg: GalleryImage = {
+            id: ++_imgId,
+            base64: compositeResult,
+            prompt: `Composite: ${compositeProductImg?.title ?? "product"}`,
+            label: `Composite${gallery.length > 0 ? ` ${gallery.length + 1}` : ""}`,
+        };
+        setGallery((prev) => [...prev, newImg]);
+        setSelectedImgId(newImg.id);
+        setCompositeProductImg(null);
+        setCompositeResult(null);
     }
 
     async function onSearchYouTube() {
@@ -294,7 +404,21 @@ export default function Home() {
                     <div className="space-y-1">
                         <Label htmlFor="image-style" className="text-xs">Image Style</Label>
                         <div className="flex gap-2 items-center">
-                            <select id="image-style" value={imageStyle} onChange={(e) => setImageStyle(e.target.value)}
+                            <select id="image-style" value={imageStyle} onChange={(e) => {
+                                    const newStyleId = e.target.value;
+                                    setImageStyle(newStyleId);
+                                    // Clear previous prompt and pre-fill from the selected style's data
+                                    const style = activeStyles.find((s) => s.id === newStyleId);
+                                    if (style && newStyleId !== "default") {
+                                        const parts: string[] = [];
+                                        if (style.image_prompt_style) parts.push(style.image_prompt_style);
+                                        else if (style.narrative) parts.push(style.narrative);
+                                        if (style.storytelling_cues.length) parts.push(`Cues: ${style.storytelling_cues.join("; ")}`);
+                                        setCustomImagePrompt(parts.join(". ").trim());
+                                    } else {
+                                        setCustomImagePrompt("");
+                                    }
+                                }}
                                 className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm">
                                 {activeStyles.map((cat) => <option key={cat.id} value={cat.id}>{cat.label}</option>)}
                             </select>
@@ -305,6 +429,17 @@ export default function Home() {
                                         const r = await fetch("/api/recommend-style", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: prompt.trim(), styles: activeStyles }) });
                                         const data = await r.json(); if (!r.ok) throw new Error(data.error || "Recommendation failed");
                                         setRecommendation(data); setImageStyle(data.id);
+                                        // Pre-fill prompt from recommended style's data
+                                        const style = activeStyles.find((s) => s.id === data.id);
+                                        if (style && data.id !== "default") {
+                                            const parts: string[] = [];
+                                            if (style.image_prompt_style) parts.push(style.image_prompt_style);
+                                            else if (style.narrative) parts.push(style.narrative);
+                                            if (style.storytelling_cues.length) parts.push(`Cues: ${style.storytelling_cues.join("; ")}`);
+                                            setCustomImagePrompt(parts.join(". ").trim());
+                                        } else {
+                                            setCustomImagePrompt("");
+                                        }
                                     } catch (e: any) { setRecommendErr(e.message); } finally { setRecommending(false); }
                                 }} className="gap-1 whitespace-nowrap">
                                     <Sparkles className="h-3.5 w-3.5" />
@@ -320,7 +455,7 @@ export default function Home() {
                         <select id="model-select" value={model} onChange={(e) => setModel(e.target.value)}
                             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                             {availableModels.length > 0 ? availableModels.map((m) => <option key={m.id} value={m.id}>{m.label}{m.provider !== "openai" ? ` (${m.provider})` : ""}</option>)
-                                : <><option value="gpt-4.1-nano">GPT-4.1 Nano</option><option value="gpt-5.1">GPT-5.1</option></>}
+                                : <><option value="gpt-5.3-chat-latest">GPT-5.3</option><option value="gpt-5.1">GPT-5.1</option><option value="gpt-4.1-nano">GPT-4.1 Nano</option></>}
                         </select>
                     </div>
 
@@ -478,10 +613,13 @@ export default function Home() {
 
                         <Separator />
 
-                        {/* Fact Check */}
+                        {/* Fact Check — Quick + Consul */}
                         <div className="flex items-center gap-3 flex-wrap">
-                            <Button variant="outline" onClick={onFactCheck} disabled={factChecking} className="gap-1.5">
-                                {factChecking ? <><RefreshCw className="h-4 w-4 animate-spin" /> Fact-checking…</> : factCheck ? <><ShieldCheck className="h-4 w-4" /> Re-check</> : <><ShieldCheck className="h-4 w-4" /> Fact-Check</>}
+                            <Button variant="outline" onClick={onFactCheck} disabled={factChecking || consulChecking} className="gap-1.5">
+                                {factChecking ? <><RefreshCw className="h-4 w-4 animate-spin" /> Quick checking…</> : factCheck ? <><ShieldCheck className="h-4 w-4" /> Re-check (Quick)</> : <><ShieldCheck className="h-4 w-4" /> Quick Check</>}
+                            </Button>
+                            <Button variant="outline" onClick={onConsulCheck} disabled={consulChecking || factChecking} className="gap-1.5 border-primary/30">
+                                {consulChecking ? <><RefreshCw className="h-4 w-4 animate-spin" /> Consulting…</> : consulResult ? <><Scale className="h-4 w-4" /> Re-check (Consul)</> : <><Scale className="h-4 w-4" /> Deep Consul</>}
                             </Button>
                             {factCheck && (
                                 <Badge style={{ backgroundColor: VERDICT_COLORS[factCheck.overall_verdict] }} className="text-white">
@@ -491,10 +629,16 @@ export default function Home() {
                             {factCheck && <span className="text-sm text-muted-foreground">Confidence: {Math.round(factCheck.confidence * 100)}%</span>}
                         </div>
                         {factCheckErr && <p className="text-sm text-destructive">{factCheckErr}</p>}
+                        {consulErr && <p className="text-sm text-destructive">{consulErr}</p>}
 
+                        {/* Quick Check Results (existing) */}
                         {factCheck && (
                             <Card>
                                 <CardContent className="p-4 space-y-3">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quick Check (Single Model)</span>
+                                    </div>
                                     {factCheck.summary && <p className="text-sm leading-relaxed">{factCheck.summary}</p>}
                                     <h4 className="text-sm font-medium">Claims Reviewed ({factCheck.claims.length})</h4>
                                     {factCheck.claims.map((claim, i) => (
@@ -511,6 +655,131 @@ export default function Home() {
                                             )}
                                         </div>
                                     ))}
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Consul Results (multi-model) */}
+                        {consulResult && (
+                            <Card className="border-primary/20">
+                                <CardContent className="p-4 space-y-4">
+                                    {/* Header with model status */}
+                                    <div className="flex items-center justify-between flex-wrap gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <Scale className="h-4 w-4 text-primary" />
+                                            <span className="text-xs font-semibold uppercase tracking-wider text-primary">Fact-Check Consul</span>
+                                            <Badge style={{ backgroundColor: VERDICT_COLORS[consulResult.overall_verdict] }} className="text-white ml-2">
+                                                {consulResult.overall_verdict === "pass" ? "✓ Pass" : consulResult.overall_verdict === "needs_review" ? "⚠ Needs Review" : "✗ Fail"}
+                                            </Badge>
+                                            <span className="text-xs text-muted-foreground">Confidence: {Math.round(consulResult.overall_confidence * 100)}%</span>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className={cn("h-2 w-2 rounded-full", consulResult.models_used.gemini.status === "success" ? "bg-green-500" : "bg-red-500")} />
+                                                <span className="text-[11px] text-muted-foreground">Gemini</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className={cn("h-2 w-2 rounded-full", consulResult.models_used.grok.status === "success" ? "bg-green-500" : "bg-red-500")} />
+                                                <span className="text-[11px] text-muted-foreground">Grok</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {consulResult.summary && <p className="text-sm leading-relaxed">{consulResult.summary}</p>}
+
+                                    <h4 className="text-sm font-medium">Claims Reviewed ({consulResult.claims.length})</h4>
+
+                                    {consulResult.claims.map((claim, i) => {
+                                        const agr = AGREEMENT_LABELS[claim.agreement] ?? AGREEMENT_LABELS.single_source;
+                                        const isExpanded = expandedClaims.has(i);
+                                        return (
+                                            <div key={i} className="p-3 rounded-md border" style={{ borderColor: `${VERDICT_COLORS[claim.consensus_verdict]}33`, backgroundColor: `${VERDICT_COLORS[claim.consensus_verdict]}08` }}>
+                                                {/* Verdict + Agreement row */}
+                                                <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                                                    <Badge className="text-[11px] uppercase" style={{ color: VERDICT_COLORS[claim.consensus_verdict], backgroundColor: `${VERDICT_COLORS[claim.consensus_verdict]}18` }}>
+                                                        {claim.consensus_verdict}
+                                                    </Badge>
+                                                    <Badge variant="outline" className="text-[10px] gap-1" style={{ borderColor: agr.color, color: agr.color }}>
+                                                        {agr.icon} {agr.label}
+                                                    </Badge>
+                                                    <span className="text-[10px] text-muted-foreground ml-auto">
+                                                        {Math.round(claim.confidence * 100)}% confidence
+                                                    </span>
+                                                </div>
+
+                                                <p className="text-sm font-medium">&ldquo;{claim.claim}&rdquo;</p>
+                                                <p className="text-sm text-muted-foreground mt-1">{claim.explanation}</p>
+
+                                                {/* Per-model verdicts (collapsed by default) */}
+                                                {(claim.gemini_explanation || claim.grok_explanation) && claim.agreement !== "full" && (
+                                                    <div className="mt-2">
+                                                        <button onClick={() => toggleClaimExpanded(i)} className="flex items-center gap-1 text-xs text-primary hover:underline">
+                                                            {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                                            {isExpanded ? "Hide" : "Show"} individual model reasoning
+                                                        </button>
+                                                        {isExpanded && (
+                                                            <div className="mt-2 space-y-2">
+                                                                {claim.gemini_explanation && (
+                                                                    <div className="p-2 rounded border border-border bg-card">
+                                                                        <div className="flex items-center gap-1.5 mb-1">
+                                                                            <span className="h-2 w-2 rounded-full bg-blue-500" />
+                                                                            <span className="text-[11px] font-semibold">Gemini</span>
+                                                                            {claim.gemini_verdict && (
+                                                                                <Badge className="text-[9px] uppercase ml-1" style={{ color: VERDICT_COLORS[claim.gemini_verdict], backgroundColor: `${VERDICT_COLORS[claim.gemini_verdict]}18` }}>
+                                                                                    {claim.gemini_verdict}
+                                                                                </Badge>
+                                                                            )}
+                                                                        </div>
+                                                                        <p className="text-xs text-muted-foreground">{claim.gemini_explanation}</p>
+                                                                    </div>
+                                                                )}
+                                                                {claim.grok_explanation && (
+                                                                    <div className="p-2 rounded border border-border bg-card">
+                                                                        <div className="flex items-center gap-1.5 mb-1">
+                                                                            <span className="h-2 w-2 rounded-full bg-orange-500" />
+                                                                            <span className="text-[11px] font-semibold">Grok</span>
+                                                                            {claim.grok_verdict && (
+                                                                                <Badge className="text-[9px] uppercase ml-1" style={{ color: VERDICT_COLORS[claim.grok_verdict], backgroundColor: `${VERDICT_COLORS[claim.grok_verdict]}18` }}>
+                                                                                    {claim.grok_verdict}
+                                                                                </Badge>
+                                                                            )}
+                                                                        </div>
+                                                                        <p className="text-xs text-muted-foreground">{claim.grok_explanation}</p>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Sources */}
+                                                {claim.sources.length > 0 && (
+                                                    <div className="mt-2 flex flex-wrap gap-1.5">
+                                                        {claim.sources.map((src, si) => (
+                                                            <a key={si} href={src.url} target="_blank" rel="noopener noreferrer"
+                                                                className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline px-1.5 py-0.5 rounded bg-primary/5 border border-primary/10">
+                                                                <ExternalLink className="h-2.5 w-2.5" />
+                                                                {src.title ? src.title.slice(0, 40) : new URL(src.url).hostname}
+                                                                <span className="text-muted-foreground">({src.from})</span>
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {/* Suggested rewrite + Apply button */}
+                                                {claim.suggested_rewrite && (
+                                                    <div className="mt-2 p-2 bg-card border border-dashed border-border rounded-md">
+                                                        <p className="text-sm">✏️ <strong>Suggested rewrite:</strong> {claim.suggested_rewrite}</p>
+                                                        <Button variant="outline" size="sm" className="mt-2 gap-1.5 text-xs h-7"
+                                                            disabled={applyingRewrite === i}
+                                                            onClick={() => onApplyRewrite(i)}>
+                                                            {applyingRewrite === i ? <><RefreshCw className="h-3 w-3 animate-spin" /> Applying…</> : <><Wand2 className="h-3 w-3" /> Apply Rewrite</>}
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </CardContent>
                             </Card>
                         )}
@@ -544,11 +813,81 @@ export default function Home() {
                                         <div className="flex gap-3 text-xs">
                                             <a href={`/api/image-proxy?url=${encodeURIComponent(img.imageUrl)}`} download className="text-primary font-medium flex items-center gap-1"><Download className="h-3 w-3" /> Download</a>
                                             <button onClick={() => selectSearchImage(img)} className="text-primary font-medium">▲ Use</button>
+                                            <button onClick={() => startComposite(img)} className="text-primary font-medium flex items-center gap-1"><Layers className="h-3 w-3" /> Composite</button>
                                         </div>
                                     </CardContent>
                                 </Card>
                             ))}
                         </div>
+                    )}
+
+                    {/* Composite Panel */}
+                    {compositeProductImg && (
+                        <Card ref={compositeRef} className="mt-4 overflow-hidden">
+                            <CardContent className="p-4 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                                        <Layers className="h-4 w-4" /> Composite Image
+                                    </h4>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setCompositeProductImg(null); setCompositeResult(null); }}>
+                                        <X className="h-3.5 w-3.5" />
+                                    </Button>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {/* Product preview */}
+                                    <div>
+                                        <p className="text-xs text-muted-foreground mb-1.5">Product Image</p>
+                                        <div className="rounded-lg overflow-hidden border border-border bg-muted aspect-[4/3]">
+                                            <img src={compositeProductImg.thumbnailUrl || compositeProductImg.imageUrl} alt={compositeProductImg.title} className="w-full h-full object-contain" />
+                                        </div>
+                                        <p className="text-xs text-muted-foreground mt-1 truncate">{compositeProductImg.title}</p>
+                                    </div>
+
+                                    {/* Result preview */}
+                                    <div>
+                                        <p className="text-xs text-muted-foreground mb-1.5">
+                                            {compositeResult ? "Result" : "Background will be AI-generated"}
+                                        </p>
+                                        {compositeResult ? (
+                                            <div className="rounded-lg overflow-hidden border border-primary/30 bg-muted aspect-[4/3]">
+                                                <img src={`data:image/png;base64,${compositeResult}`} alt="Composite result" className="w-full h-full object-cover" />
+                                            </div>
+                                        ) : (
+                                            <div className="rounded-lg border border-dashed border-border bg-muted/50 aspect-[4/3] flex items-center justify-center">
+                                                <span className="text-xs text-muted-foreground">Preview will appear here</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Background prompt + actions */}
+                                <div className="flex gap-2 items-stretch flex-wrap">
+                                    <Input
+                                        placeholder="Optional: describe the background (e.g. 'modern kitchen countertop')…"
+                                        value={compositeBgPrompt}
+                                        onChange={(e) => setCompositeBgPrompt(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === "Enter" && !compositeGenerating) onCompositeGenerate(); }}
+                                        className="flex-1 min-w-[200px]"
+                                    />
+                                    <Button
+                                        onClick={onCompositeGenerate}
+                                        disabled={compositeGenerating}
+                                        className="gap-1.5 whitespace-nowrap"
+                                    >
+                                        {compositeGenerating
+                                            ? <><RefreshCw className="h-4 w-4 animate-spin" /> Generating…</>
+                                            : <><Layers className="h-4 w-4" /> {compositeResult ? "Regenerate" : "Generate Composite"}</>}
+                                    </Button>
+                                    {compositeResult && (
+                                        <Button variant="outline" onClick={useCompositeResult} className="gap-1.5 whitespace-nowrap">
+                                            <CheckCircle2 className="h-4 w-4" /> Use in Article
+                                        </Button>
+                                    )}
+                                </div>
+                                {compositeErr && <p className="text-sm text-destructive">{compositeErr}</p>}
+                            </CardContent>
+                        </Card>
                     )}
                 </section>
 

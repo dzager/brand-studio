@@ -7,6 +7,7 @@ import { generateImageBase64 } from "@/lib/ai-client";
 type SuccessResponse = {
     image_base64: string;
     final_prompt: string;
+    base_prompt: string;
 };
 
 type ErrorResponse = {
@@ -51,6 +52,16 @@ export default async function handler(
 
         const categories = getImageStyleCategories(brand);
 
+        // Strip any previously-embedded style directives from the incoming base_prompt
+        // so that old styles don't contaminate the new generation.
+        const cleanBasePrompt = base_prompt
+            .replace(/^MANDATORY VISUAL STYLE[^\n]*\n?/gm, "")
+            .replace(/^Context:[^\n]*\n?/gm, "")
+            .replace(/^Visual cues the image MUST convey:[^\n]*\n?/gm, "")
+            .replace(/^\nAdditional direction:[^\n]*$/gm, "")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim();
+
         // Build the final prompt: style (dominant) + base + optional custom augmentation
         const styleId =
             typeof image_style === "string" &&
@@ -81,7 +92,7 @@ export default async function handler(
             }
         }
 
-        parts.push(base_prompt.trim());
+        parts.push(cleanBasePrompt);
 
         if (typeof custom_prompt === "string" && custom_prompt.trim()) {
             parts.push(`\nAdditional direction: ${custom_prompt.trim()}`);
@@ -98,6 +109,7 @@ export default async function handler(
         return res.status(200).json({
             image_base64,
             final_prompt: finalPrompt,
+            base_prompt: cleanBasePrompt,
         });
     } catch (err) {
         console.error("API /api/regenerate-image error:", err);

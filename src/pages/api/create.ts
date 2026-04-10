@@ -256,7 +256,7 @@ Which style best fits this article? Respond with JSON only.`;
 
             // Humanize body HTML
             const bodyPrompt = buildBlogHumanizePrompt(blog.html, blog.title, brand);
-            const humanizedHtml = await getTextResponse("gpt-4.1", "", bodyPrompt, { temperature: 0.5 });
+            const humanizedHtml = await getTextResponse("gpt-5.3-chat-latest", "", bodyPrompt, { temperature: 0.5 });
             if (humanizedHtml && humanizedHtml.length > 100) {
                 blog.html = humanizedHtml;
             }
@@ -267,7 +267,7 @@ Which style best fits this article? Respond with JSON only.`;
                 "This is a blog post title. Keep it concise, specific, and punchy. Do not use generic framing.",
                 brand
             );
-            const humanizedTitle = await getTextResponse("gpt-4.1", "", titlePrompt, { temperature: 0.5 });
+            const humanizedTitle = await getTextResponse("gpt-5.3-chat-latest", "", titlePrompt, { temperature: 0.5 });
             if (humanizedTitle && humanizedTitle.length > 5) {
                 blog.title = humanizedTitle;
             }
@@ -278,7 +278,7 @@ Which style best fits this article? Respond with JSON only.`;
                 "This is a blog post excerpt/summary. Keep it to 1-2 sentences, factual and direct. No generic framing.",
                 brand
             );
-            const humanizedExcerpt = await getTextResponse("gpt-4.1", "", excerptPrompt, { temperature: 0.5 });
+            const humanizedExcerpt = await getTextResponse("gpt-5.3-chat-latest", "", excerptPrompt, { temperature: 0.5 });
             if (humanizedExcerpt && humanizedExcerpt.length > 10) {
                 blog.excerpt = humanizedExcerpt;
             }

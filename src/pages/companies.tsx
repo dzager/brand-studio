@@ -28,6 +28,7 @@ type Company = {
     photography_style: string | null; color_primary: string | null; color_secondary: string | null;
     avoid_phrases: string | null; image_style_categories: ImageStyleCategory[] | null;
     voice_profile: VoiceProfile | null; editorial_guidelines: string | null;
+    seo_content_guidelines: string | null;
     reference_articles: string[] | null; evals: BrandEngine["evals"] | null;
     auto_humanize: boolean | null; created_at: string;
 };
@@ -37,7 +38,7 @@ type CompanyPrompt = { id: string; company_id: string; name: string; body: strin
 const EMPTY_FORM = {
     name: "", tagline: "", mission: "", archetype: "guide", tone: "confident, clear, modern",
     target_audiences: "", photography_style: "", color_primary: "#000000", color_secondary: "#FFFFFF",
-    avoid_phrases: "", editorial_guidelines: "", reference_articles: [] as string[],
+    avoid_phrases: "", editorial_guidelines: "", seo_content_guidelines: "", reference_articles: [] as string[],
     useCustomStyles: false, image_style_categories: [] as ImageStyleCategory[], auto_humanize: true,
 };
 
@@ -163,7 +164,7 @@ export default function CompaniesPage() {
             tone: c.tone ?? "confident, clear, modern", target_audiences: (c.target_audiences ?? []).join(", "),
             photography_style: c.photography_style ?? "", color_primary: c.color_primary ?? "#000000",
             color_secondary: c.color_secondary ?? "#FFFFFF", avoid_phrases: c.avoid_phrases ?? "",
-            editorial_guidelines: c.editorial_guidelines ?? "", reference_articles: c.reference_articles ?? [],
+            editorial_guidelines: c.editorial_guidelines ?? "", seo_content_guidelines: c.seo_content_guidelines ?? "", reference_articles: c.reference_articles ?? [],
             useCustomStyles: hasCustomStyles, image_style_categories: hasCustomStyles ? c.image_style_categories! : [],
             auto_humanize: c.auto_humanize !== false,
         });
@@ -259,6 +260,8 @@ export default function CompaniesPage() {
                             </div>
 
                             <div className="space-y-1.5"><Label>Editorial Guidelines</Label><Textarea value={form.editorial_guidelines} onChange={(e) => setField("editorial_guidelines", e.target.value)} placeholder="Company-specific voice, tone, citation rules..." rows={10} /></div>
+
+                            <div className="space-y-1.5"><Label>SEO Content Guidelines</Label><p className="text-xs text-muted-foreground">Company-specific SEO rules injected into every article prompt. Supplements the built-in SEO framework.</p><Textarea value={form.seo_content_guidelines} onChange={(e) => setField("seo_content_guidelines", e.target.value)} placeholder="e.g. Target keywords must include city + service format. Always include a local comparison table. Minimum 3 external authority links per article..." rows={8} /></div>
 
                             {/* Auto-Humanize */}
                             <Separator />

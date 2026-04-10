@@ -96,7 +96,7 @@ export default async function handler(
         }
 
         const prompt = buildShortenPrompt(html, title, brand);
-        const shortenedHtml = await getTextResponse("gpt-4.1", "", prompt, { temperature: 0.3 });
+        const shortenedHtml = await getTextResponse("gpt-5.3-chat-latest", "", prompt, { temperature: 0.3 });
 
         if (!shortenedHtml || shortenedHtml.length < 100) {
             throw new Error("Shortener returned an insufficient response.");

@@ -17,6 +17,7 @@ type EngineSummary = {
     tone: string[];
     has_voice_profile: boolean;
     has_editorial_guidelines: boolean;
+    has_seo_content_guidelines: boolean;
     banned_phrase_count: number;
     reference_article_count: number;
 };
@@ -128,6 +129,7 @@ export default async function handler(
             tone: brand.latent_brand_profile.tone_axes,
             has_voice_profile: !!brand.voice_profile,
             has_editorial_guidelines: !!brand.editorial_guidelines,
+            has_seo_content_guidelines: !!brand.seo_content_guidelines,
             banned_phrase_count: brand.rewrite_policy.banned_phrasing.length,
             reference_article_count: brand.reference_articles?.length ?? 0,
         };

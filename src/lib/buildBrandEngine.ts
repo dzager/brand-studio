@@ -23,6 +23,7 @@ export type CompanyRecord = {
     image_style_categories: ImageStyleCategory[] | null;
     voice_profile: VoiceProfile | null;
     editorial_guidelines: string | null;
+    seo_content_guidelines: string | null;
     reference_articles: string[] | null;
     evals: BrandEngine["evals"] | null;
     auto_humanize: boolean | null;
@@ -100,6 +101,11 @@ export function buildBrandEngine(company: CompanyRecord): BrandEngine {
     // Editorial guidelines — company-specific editorial framework
     if (company.editorial_guidelines) {
         base.editorial_guidelines = company.editorial_guidelines;
+    }
+
+    // SEO content guidelines — company-specific SEO rules
+    if (company.seo_content_guidelines) {
+        base.seo_content_guidelines = company.seo_content_guidelines;
     }
 
     // Reference articles — gold-standard URLs to scrape and model against
