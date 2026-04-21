@@ -557,6 +557,9 @@
     .final-cta {
       padding: 160px 0;
       text-align: center;
+      background: var(--ink);
+      color: var(--bg);
+      border-top: none;
     }
     .final-cta-headline {
       font-family: var(--font-display);
@@ -566,12 +569,17 @@
       letter-spacing: -0.02em;
       max-width: 900px;
       margin: 0 auto 28px;
+      color: var(--bg);
     }
-    .final-cta-headline em { font-style: italic; color: var(--primary); }
+    .final-cta-headline em { font-style: italic; color: rgba(248, 248, 247, 0.5); }
     .final-cta-lede {
       font-size: 19px;
-      color: var(--muted);
+      color: rgba(248, 248, 247, 0.5);
       margin-bottom: 36px;
+    }
+    .final-cta .btn-primary {
+      background: var(--bg);
+      color: var(--ink);
     }
 
     /* ─── Footer ─── */
