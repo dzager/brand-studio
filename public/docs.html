@@ -412,6 +412,16 @@
           </ul>
         </div>
         <div class="docs-sidebar-section">
+          <div class="docs-sidebar-label">MCP Servers</div>
+          <ul class="docs-sidebar-list">
+            <li><a href="#mcp-overview">Overview</a></li>
+            <li><a href="#mcp-voice">Voice MCP</a></li>
+            <li><a href="#mcp-photo">Photo Style MCP</a></li>
+            <li><a href="#mcp-blog">Blog MCP</a></li>
+            <li><a href="#mcp-setup">Setup</a></li>
+          </ul>
+        </div>
+        <div class="docs-sidebar-section">
           <div class="docs-sidebar-label">Reference</div>
           <ul class="docs-sidebar-list">
             <li><a href="#supported-models">Supported Models</a></li>
@@ -697,6 +707,120 @@
           <li><strong>Utility Model</strong> — Used for SEO analysis, style recommendations, and other utility tasks (default: GPT-4.1 Nano).</li>
         </ul>
         <p>Settings are persisted in your browser's localStorage and applied automatically to all future generations.</p>
+
+        <!-- MCP Servers -->
+        <h2 id="mcp-overview">MCP <em>Servers</em></h2>
+        <p>
+          Organic exposes your brand configurations as <strong>Model Context Protocol (MCP)</strong> servers — an open standard that lets any compatible AI client (Claude, Cursor, ChatGPT, your own apps) access your brand's voice, photography style, and blog generation pipeline directly.
+        </p>
+        <p>
+          Instead of copy-pasting brand guidelines into every prompt, MCP servers give AI clients live access to your Supabase-stored brand profiles. Update a voice profile in Organic → every connected AI client sees the change instantly.
+        </p>
+
+        <h3>Three servers, 19 tools</h3>
+        <table>
+          <thead>
+            <tr><th>Server</th><th>Tools</th><th>Purpose</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Voice MCP</strong></td><td>6</td><td>Voice profiles, banned words, tone validation, compiled prompts</td></tr>
+            <tr><td><strong>Photo Style MCP</strong></td><td>6</td><td>Photography style, color palette, image categories, prompt generation</td></tr>
+            <tr><td><strong>Blog MCP</strong></td><td>7</td><td>System prompts, SEO rules, editorial guidelines, cluster strategy, articles</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="mcp-voice">Voice <em>MCP</em></h2>
+        <p>Exposes your brand's voice identity — tone, vocabulary, rhetorical devices, and the full banned phrases list.</p>
+        <table>
+          <thead><tr><th>Tool</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>list_companies</code></td><td>List all brands configured in Organic</td></tr>
+            <tr><td><code>get_voice_profile</code></td><td>Full voice profile — tone, rhythm, vocabulary, POV, sample phrases</td></tr>
+            <tr><td><code>get_banned_words</code></td><td>Merged banned phrases (base engine + company-specific)</td></tr>
+            <tr><td><code>get_style_rules</code></td><td>Editorial guidelines, SEO rules, structural dos/don'ts</td></tr>
+            <tr><td><code>validate_tone</code></td><td>Scan text for banned phrase violations</td></tr>
+            <tr><td><code>compile_voice_prompt</code></td><td>Generate a ready-to-inject system prompt clause for any LLM</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="mcp-photo">Photo Style <em>MCP</em></h2>
+        <p>Exposes your brand's visual identity — photography rules, color palette, and image prompt generation.</p>
+        <table>
+          <thead><tr><th>Tool</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>get_photography_style</code></td><td>Realism base, lighting, mood, composition, subjects, avoid list</td></tr>
+            <tr><td><code>get_color_palette</code></td><td>Full hex palette — primary, extended, secondary colors</td></tr>
+            <tr><td><code>list_image_styles</code></td><td>All image style categories for a brand</td></tr>
+            <tr><td><code>get_image_style</code></td><td>Full details of a specific style category</td></tr>
+            <tr><td><code>generate_image_prompt</code></td><td>Complete hero image prompt from brand style + article context</td></tr>
+            <tr><td><code>get_composite_config</code></td><td>Composite image settings (bg prompt, product query, bg image URL)</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="mcp-blog">Blog <em>MCP</em></h2>
+        <p>Exposes the full blog generation pipeline — the same system prompts, SEO rules, and cluster strategy that Organic uses internally.</p>
+        <table>
+          <thead><tr><th>Tool</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>get_blog_system_prompt</code></td><td>Full system prompt — editorial credibility, anti-AI rules, SEO, voice</td></tr>
+            <tr><td><code>get_editorial_guidelines</code></td><td>Company-specific writing framework</td></tr>
+            <tr><td><code>get_seo_guidelines</code></td><td>Company-specific SEO/GEO rules</td></tr>
+            <tr><td><code>get_blog_schema</code></td><td>JSON schema for structured blog output</td></tr>
+            <tr><td><code>get_user_prompt_template</code></td><td>User prompt with output requirements + JSON field mapping</td></tr>
+            <tr><td><code>build_cluster_context</code></td><td>Cluster context — keyword coordination, internal linking, role guidance</td></tr>
+            <tr><td><code>list_articles</code></td><td>Browse existing articles for linking and coverage</td></tr>
+            <tr><td><code>get_article</code></td><td>Get full article by slug (content, SEO, FAQ)</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="mcp-setup">MCP <em>Setup</em></h2>
+        <p>Each MCP server is a standalone Node.js process that communicates over <code>stdio</code>. Add them to any MCP-compatible client.</p>
+
+        <h3>1. Install dependencies</h3>
+        <pre><code>cd mcp/voice-mcp && npm install
+cd mcp/photo-style-mcp && npm install
+cd mcp/blog-mcp && npm install</code></pre>
+
+        <h3>2. Claude Desktop</h3>
+        <p>Edit <code>~/Library/Application Support/Claude/claude_desktop_config.json</code>:</p>
+        <pre><code>{
+  "mcpServers": {
+    "organic-voice": {
+      "command": "npx",
+      "args": ["tsx", "/path/to/mcp/voice-mcp/src/index.ts"],
+      "env": {
+        "SUPABASE_URL": "https://your-project.supabase.co",
+        "SUPABASE_ANON_KEY": "your-anon-key"
+      }
+    },
+    "organic-photo-style": {
+      "command": "npx",
+      "args": ["tsx", "/path/to/mcp/photo-style-mcp/src/index.ts"],
+      "env": {
+        "SUPABASE_URL": "https://your-project.supabase.co",
+        "SUPABASE_ANON_KEY": "your-anon-key"
+      }
+    },
+    "organic-blog": {
+      "command": "npx",
+      "args": ["tsx", "/path/to/mcp/blog-mcp/src/index.ts"],
+      "env": {
+        "SUPABASE_URL": "https://your-project.supabase.co",
+        "SUPABASE_ANON_KEY": "your-anon-key"
+      }
+    }
+  }
+}</code></pre>
+
+        <h3>3. Cursor</h3>
+        <p>Add to <code>.cursor/mcp.json</code> in your project with the same format, using relative paths.</p>
+
+        <h3>4. Example</h3>
+        <p>Once connected, ask any MCP-compatible AI:</p>
+        <pre><code>"Write a blog post about dental implants for pacific-dental
+ using organic-blog for the system prompt and organic-voice
+ for the brand voice."</code></pre>
+        <p>The AI will automatically call the right tools to fetch your brand's voice profile, editorial guidelines, SEO rules, and banned phrases — then generate content that sounds like your brand, not like a chatbot.</p>
 
         <!-- Supported Models -->
         <h2 id="supported-models">Supported <em>Models</em></h2>
