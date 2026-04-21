@@ -1,0 +1,1398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Organic — AI Content Studio</title>
+  <meta name="description" content="Organic feeling content generation for organic traffic. AI content studio with a built-in brand engine, multi-model fact-checking, and automatic humanization." />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- ABCArizona Flare (self-hosted) -->
+  <style>
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-Thin-Trial.otf') format('opentype');
+      font-weight: 100;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-ThinItalic-Trial.otf') format('opentype');
+      font-weight: 100;
+      font-style: italic;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-Light-Trial.otf') format('opentype');
+      font-weight: 300;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-LightItalic-Trial.otf') format('opentype');
+      font-weight: 300;
+      font-style: italic;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-Regular-Trial.otf') format('opentype');
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-RegularItalic-Trial.otf') format('opentype');
+      font-weight: 400;
+      font-style: italic;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-Medium-Trial.otf') format('opentype');
+      font-weight: 500;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-MediumItalic-Trial.otf') format('opentype');
+      font-weight: 500;
+      font-style: italic;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-Bold-Trial.otf') format('opentype');
+      font-weight: 700;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-BoldItalic-Trial.otf') format('opentype');
+      font-weight: 700;
+      font-style: italic;
+      font-display: swap;
+    }
+  </style>
+
+  <!-- React 18 UMD -->
+  <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone@7.23.9/babel.min.js"></script>
+
+  <style>
+    /* ─── Reset ─── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* ─── Tokens ─── */
+    :root {
+      --bg: #F8F8F7;
+      --ink: #120801;
+      --primary: #3a4a2f;
+      --muted: #8a8474;
+      --border: rgba(18, 8, 1, 0.14);
+      --border-strong: rgba(18, 8, 1, 0.30);
+      --font-display: 'ABCArizona', Georgia, serif;
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --max-w: 1440px;
+      --px: 64px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ─── Utility ─── */
+    .container { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--px); }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--primary);
+    }
+    .section-border { border-top: 1px solid var(--border); }
+
+    /* ─── Nav ─── */
+    .nav { padding: 24px 0; }
+    .nav-inner { display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
+    .nav-logo-text { font-family: var(--font-display); font-size: 22px; font-weight: 500; }
+    .nav-links { display: flex; align-items: center; gap: 32px; }
+    .nav-link {
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--ink);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .nav-link:hover { color: var(--primary); }
+    .nav-actions { display: flex; align-items: center; gap: 16px; }
+    .nav-signin {
+      font-size: 14px;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .nav-signin:hover { color: var(--ink); }
+
+    /* ─── Buttons ─── */
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 12px 24px;
+      background: var(--ink);
+      color: var(--bg);
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.2s;
+    }
+    .btn-primary:hover { opacity: 0.85; }
+
+    .btn-secondary {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 12px 24px;
+      background: transparent;
+      color: var(--ink);
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 500;
+      border: 1px solid var(--border-strong);
+      cursor: pointer;
+      text-decoration: none;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .btn-secondary:hover { border-color: var(--ink); }
+
+    .btn-moss {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 12px 24px;
+      background: var(--primary);
+      color: var(--bg);
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.2s;
+    }
+    .btn-moss:hover { opacity: 0.9; }
+
+    /* ─── Hero ─── */
+    .hero { padding: 120px 0 0; }
+    .hero-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 64px; align-items: start; }
+    .hero-headline {
+      font-family: var(--font-display);
+      font-size: 64px;
+      font-weight: 300;
+      line-height: 1.0;
+      letter-spacing: -0.04em;
+      margin: 20px 0 28px;
+    }
+    .hero-headline em {
+      font-style: italic;
+      color: var(--primary);
+    }
+    .hero-lede {
+      font-size: 19px;
+      line-height: 1.6;
+      color: var(--ink);
+      max-width: 520px;
+      margin-bottom: 32px;
+    }
+    .hero-ctas { display: flex; gap: 12px; margin-bottom: 72px; }
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 36px 0;
+      margin-bottom: 72px;
+    }
+    .hero-stat {
+      padding: 0 24px;
+      border-right: 1px solid var(--border);
+    }
+    .hero-stat:first-child { padding-left: 0; }
+    .hero-stat:last-child { border-right: none; padding-right: 0; }
+    .hero-stat-number {
+      font-family: var(--font-display);
+      font-size: 42px;
+      font-weight: 300;
+      color: var(--primary);
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+    .hero-stat-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 400;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    /* ─── Terminal ─── */
+    .terminal {
+      background: #1a1a1a;
+      border: 1px solid rgba(255,255,255,0.08);
+      overflow: hidden;
+    }
+    .terminal-chrome {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 18px;
+      background: #222;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .terminal-dot {
+      width: 12px; height: 12px; border-radius: 50%;
+    }
+    .terminal-dot--red { background: #c47a5a; }
+    .terminal-dot--yellow { background: #c9a84c; }
+    .terminal-dot--green { background: #5a7a4a; }
+    .terminal-title {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: rgba(255,255,255,0.4);
+      margin-left: 8px;
+    }
+    .terminal-body {
+      padding: 20px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.65;
+      color: rgba(255,255,255,0.7);
+      min-height: 320px;
+    }
+    .terminal-line { white-space: pre; }
+    .terminal-line--dim { color: rgba(255,255,255,0.3); }
+    .terminal-line--green { color: #7aad5a; }
+    .terminal-line--amber { color: #c9a84c; }
+    .terminal-cursor {
+      display: inline-block;
+      color: rgba(255,255,255,0.7);
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+
+    /* ─── Section header grid ─── */
+    .section-header {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 32px;
+      margin-bottom: 72px;
+      align-items: start;
+    }
+    .section-headline {
+      font-family: var(--font-display);
+      font-size: 48px;
+      font-weight: 300;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+    }
+    .section-headline em { font-style: italic; color: var(--primary); }
+
+    /* ─── Why Organic ─── */
+    .why { padding: 140px 0; }
+    .why-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+      border-top: 1px solid var(--border);
+    }
+    .why-card {
+      padding: 32px 32px 40px 24px;
+      border-right: 1px solid var(--border);
+    }
+    .why-card:last-child { border-right: none; padding-right: 0; }
+    .why-card-number {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    .why-card-title {
+      font-family: var(--font-display);
+      font-size: 26px;
+      font-weight: 400;
+      color: var(--primary);
+      margin-bottom: 12px;
+      line-height: 1.2;
+    }
+    .why-card-body {
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
+    /* ─── Pipeline ─── */
+    .pipeline { padding: 140px 0; }
+    .pipeline-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .pipeline-step {
+      padding: 32px 24px;
+      border-right: 1px solid var(--border);
+    }
+    .pipeline-step:last-child { border-right: none; }
+    .pipeline-step-number {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .pipeline-step-name {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 400;
+      color: var(--primary);
+      margin-bottom: 8px;
+      line-height: 1.3;
+    }
+    .pipeline-step-body {
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .pipeline-chip {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      padding: 4px 10px;
+      border: 1px solid var(--border-strong);
+      color: var(--muted);
+      margin-right: 6px;
+      margin-bottom: 6px;
+    }
+
+    /* ─── Before / After ─── */
+    .beforeafter { padding: 140px 0; }
+    .slider-container {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      user-select: none;
+      cursor: col-resize;
+    }
+    .slider-side {
+      padding: 48px 56px;
+      min-height: 340px;
+    }
+    .slider-after {
+      background: #F0F0EF;
+    }
+    .slider-before-wrap {
+      position: absolute;
+      top: 0; left: 0;
+      height: 100%;
+      overflow: hidden;
+      border-right: 2px solid var(--ink);
+      z-index: 2;
+    }
+    .slider-before {
+      background: var(--bg);
+      padding: 48px 56px;
+      min-height: 340px;
+      width: 100%;
+    }
+    .slider-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .slider-label--before { color: var(--muted); }
+    .slider-label--after { color: var(--primary); }
+    .slider-text {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 18px;
+      line-height: 1.75;
+      max-width: 560px;
+    }
+    .slider-text--before { font-style: italic; color: var(--muted); }
+    .slider-text--after { font-style: normal; color: var(--ink); }
+    .slider-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+    .slider-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      padding: 4px 10px;
+    }
+    .slider-tag--clay {
+      border: 1px solid #c47a5a;
+      color: #c47a5a;
+    }
+    .slider-tag--moss {
+      background: var(--primary);
+      color: var(--bg);
+      border: 1px solid var(--primary);
+    }
+    .slider-handle {
+      position: absolute;
+      top: 0;
+      width: 2px;
+      height: 100%;
+      z-index: 3;
+      pointer-events: none;
+    }
+    .slider-knob {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 40px; height: 40px;
+      background: var(--ink);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+    .slider-knob svg { color: var(--bg); }
+
+    /* ─── Pricing ─── */
+    .pricing { padding: 140px 0; }
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      border: 1px solid var(--border);
+    }
+    .pricing-tier {
+      padding: 40px 36px;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+    .pricing-tier:last-child { border-right: none; }
+    .pricing-tier--featured {
+      background: var(--primary);
+      color: var(--bg);
+      border-color: var(--primary);
+    }
+    .pricing-tier--featured .pricing-eyebrow { color: rgba(248, 248, 247, 0.6); }
+    .pricing-tier--featured .pricing-price { color: var(--bg); }
+    .pricing-tier--featured .pricing-period { color: rgba(248, 248, 247, 0.5); }
+    .pricing-tier--featured .pricing-feature { color: rgba(248, 248, 247, 0.8); border-color: rgba(248, 248, 247, 0.15); }
+    .pricing-tier--featured .btn-primary { background: var(--bg); color: var(--primary); }
+    .pricing-tier--featured .btn-primary:hover { opacity: 0.9; }
+    .pricing-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+    .pricing-price {
+      font-family: var(--font-display);
+      font-size: 54px;
+      font-weight: 400;
+      line-height: 1;
+      color: var(--ink);
+    }
+    .pricing-period {
+      font-family: var(--font-body);
+      font-size: 14px;
+      color: var(--muted);
+      margin-top: 4px;
+      margin-bottom: 32px;
+    }
+    .pricing-features {
+      list-style: none;
+      flex: 1;
+      margin-bottom: 32px;
+    }
+    .pricing-feature {
+      font-size: 14px;
+      line-height: 1.5;
+      padding: 12px 0;
+      border-top: 1px solid var(--border);
+    }
+    .pricing-cta { margin-top: auto; }
+
+    /* ─── Final CTA ─── */
+    .final-cta {
+      padding: 160px 0;
+      text-align: center;
+    }
+    .final-cta-headline {
+      font-family: var(--font-display);
+      font-size: 88px;
+      font-weight: 300;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      max-width: 900px;
+      margin: 0 auto 28px;
+    }
+    .final-cta-headline em { font-style: italic; color: var(--primary); }
+    .final-cta-lede {
+      font-size: 19px;
+      color: var(--muted);
+      margin-bottom: 36px;
+    }
+
+    /* ─── Footer ─── */
+    .footer {
+      padding: 48px 0;
+      background: var(--ink);
+      border-top: none;
+    }
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .footer-left, .footer-right {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: rgba(248, 248, 247, 0.5);
+    }
+    .footer-right { display: flex; gap: 24px; }
+    .footer-link {
+      color: rgba(248, 248, 247, 0.5);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .footer-link:hover { color: var(--bg); }
+
+    /* ─── Live dot ─── */
+    .live-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      background: var(--primary);
+      border-radius: 50%;
+      margin-right: 6px;
+      animation: pulse-dot 2s infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ─── Waitlist Modal ─── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(18, 8, 1, 0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      animation: modal-fade-in 0.25s ease;
+    }
+    @keyframes modal-fade-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .modal-card {
+      width: 100%;
+      max-width: 440px;
+      margin: 0 24px;
+      padding: 48px 40px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      box-shadow: 0 25px 60px -12px rgba(18, 8, 1, 0.35);
+      text-align: center;
+      animation: modal-slide-up 0.3s ease;
+    }
+    @keyframes modal-slide-up {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .modal-title {
+      font-family: var(--font-display);
+      font-size: 32px;
+      font-weight: 300;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      margin: 0 0 8px;
+      color: var(--ink);
+    }
+    .modal-title em { font-style: italic; color: var(--primary); }
+    .modal-subtitle {
+      font-size: 15px;
+      color: var(--muted);
+      margin: 0 0 28px;
+      line-height: 1.5;
+    }
+    .modal-input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      background: #F0F0EF;
+      color: var(--ink);
+      font-family: var(--font-body);
+      font-size: 14px;
+      outline: none;
+      margin-bottom: 12px;
+      transition: border-color 0.2s;
+    }
+    .modal-input:focus {
+      border-color: var(--primary);
+    }
+    .modal-input::placeholder {
+      color: var(--muted);
+    }
+    .modal-submit {
+      width: 100%;
+      padding: 14px 16px;
+      border: none;
+      background: var(--ink);
+      color: var(--bg);
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .modal-submit:hover { opacity: 0.85; }
+    .modal-submit:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .modal-error {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #b44a3e;
+    }
+    .modal-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 20px;
+      line-height: 1;
+      padding: 4px;
+      transition: color 0.2s;
+    }
+    .modal-close:hover { color: var(--ink); }
+    .modal-success-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      line-height: 1;
+    }
+    .modal-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 16px;
+    }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 1024px) {
+      :root { --px: 32px; }
+      .hero-headline { font-size: 56px; }
+      .hero-grid { grid-template-columns: 1fr; gap: 48px; }
+      .hero-stats { grid-template-columns: repeat(2, 1fr); gap: 24px; }
+      .section-header { grid-template-columns: 1fr; gap: 16px; }
+      .why-grid { grid-template-columns: repeat(2, 1fr); }
+      .why-card { border-bottom: 1px solid var(--border); }
+      .pipeline-row { grid-template-columns: repeat(3, 1fr); }
+      .pipeline-step { border-bottom: 1px solid var(--border); }
+      .pricing-grid { grid-template-columns: 1fr; }
+      .pricing-tier { border-right: none; border-bottom: 1px solid var(--border); }
+      .final-cta-headline { font-size: 56px; }
+      .section-headline { font-size: 36px; }
+    }
+    @media (max-width: 640px) {
+      :root { --px: 20px; }
+      .hero-headline { font-size: 40px; }
+      .nav-links { display: none; }
+      .why-grid { grid-template-columns: 1fr; }
+      .pipeline-row { grid-template-columns: 1fr; }
+      .final-cta-headline { font-size: 40px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
+
+    /* ─────────────────────────────────────────────
+       Leaf SVG
+    ───────────────────────────────────────────── */
+    function LeafIcon({ size = 24 }) {
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 2C6.5 6 3 10.5 3 15c0 3.5 2.5 6 6 6 1.5 0 3-.5 3-3V2z" fill="var(--primary)" stroke="var(--primary)" />
+          <path d="M12 2c5.5 4 9 8.5 9 13 0 3.5-2.5 6-6 6-1.5 0-3-.5-3-3V2z" fill="none" stroke="var(--primary)" />
+          <path d="M12 8v10" stroke="var(--bg)" strokeWidth="1" />
+          <path d="M12 11l-2 2" stroke="var(--bg)" strokeWidth="1" />
+          <path d="M12 14l2 2" stroke="var(--bg)" strokeWidth="1" />
+        </svg>
+      );
+    }
+
+    /* ─────────────────────────────────────────────
+       Nav
+    ───────────────────────────────────────────── */
+    function Nav({ onOpenWaitlist }) {
+      return (
+        <nav className="nav">
+          <div className="container">
+            <div className="nav-inner">
+              <a href="#" className="nav-logo">
+                <img src="organic-logo.png" alt="Organic" style={{ height: '36px', width: 'auto' }} />
+              </a>
+              <div className="nav-links">
+                <a href="#why" className="nav-link">Product</a>
+                <a href="#pipeline" className="nav-link">Pipeline</a>
+                <a href="#pricing" className="nav-link">Pricing</a>
+                <a href="docs.html" className="nav-link">Docs</a>
+                <a href="#" className="nav-link">Changelog</a>
+              </div>
+              <div className="nav-actions">
+                <a href="#" className="nav-signin">Sign in</a>
+                <button className="btn-primary" onClick={onOpenWaitlist}>Start creating →</button>
+              </div>
+            </div>
+          </div>
+        </nav>
+      );
+    }
+
+    /* ─────────────────────────────────────────────
+       Terminal
+    ───────────────────────────────────────────── */
+    const TERMINAL_SEQ_1 = [
+      { text: '$ organic generate --company greencard-law', style: '' },
+      { text: '[00:01] Loading brand profile…', style: 'dim' },
+      { text: '[00:02] Brand engine: tone=empathetic, pov=second', style: 'dim' },
+      { text: '[00:03] Topic: "H-1B to Green Card: EB-2 Timeline Guide"', style: 'dim' },
+      { text: '[00:04] Prompt assembled: 3,214 tokens', style: 'dim' },
+      { text: '[00:05] Writing draft via gpt-5.1…', style: 'amber' },
+      { text: '[00:11] Draft complete: 2,340 words', style: '' },
+      { text: '[00:12] Humanizing: rewriting 19 AI patterns…', style: 'amber' },
+      { text: '[00:17] Humanization pass complete', style: '' },
+      { text: '[00:18] Generating hero image via gpt-image-1…', style: 'amber' },
+      { text: '[00:24] Image composited: 1344×768', style: '' },
+      { text: '[00:25] Fact-check consul: gemini + grok verifying…', style: 'amber' },
+      { text: '[00:33] All claims verified. 5 USCIS citations added.', style: 'green' },
+      { text: '[00:34] ✓ Published to WordPress. Organic complete.', style: 'green' },
+    ];
+
+    const TERMINAL_SEQ_2 = [
+      { text: '$ organic cluster --company greencard-law --topic "family-based immigration"', style: '' },
+      { text: '[00:01] Analyzing topic space…', style: 'dim' },
+      { text: '[00:03] Cluster strategy generated: 1 pillar + 6 supporting pages', style: '' },
+      { text: '[00:04] Pillar: "Family-Based Green Cards: The Complete 2026 Guide"', style: 'dim' },
+      { text: '[00:05] ├─ Supporting: "I-130 Petition Processing Times"', style: 'dim' },
+      { text: '[00:05] ├─ Supporting: "Affidavit of Support: Income Requirements"', style: 'dim' },
+      { text: '[00:06] ├─ Supporting: "Consular Processing vs. Adjustment of Status"', style: 'dim' },
+      { text: '[00:06] ├─ Supporting: "How Marriage Affects Your Green Card Timeline"', style: 'dim' },
+      { text: '[00:07] ├─ Supporting: "USCIS Interview Prep: What to Expect"', style: 'dim' },
+      { text: '[00:07] └─ Long-tail: "Can Stepchildren Get Green Cards?"', style: 'dim' },
+      { text: '[00:08] Internal linking map built: 14 cross-links', style: '' },
+      { text: '[00:09] Generating 7 articles in parallel…', style: 'amber' },
+      { text: '[01:42] All 7 drafts complete: 12,480 total words', style: '' },
+      { text: '[01:43] Humanizing all articles…', style: 'amber' },
+      { text: '[02:10] Fact-check consul: verifying 7 articles…', style: 'amber' },
+      { text: '[03:01] ✓ Cluster published. 7 articles, 38 citations.', style: 'green' },
+    ];
+
+    const TERMINAL_SEQUENCES = [TERMINAL_SEQ_1, TERMINAL_SEQ_2];
+
+    function Terminal() {
+      const [seqIndex, setSeqIndex] = useState(0);
+      const [visibleCount, setVisibleCount] = useState(0);
+
+      const currentSeq = TERMINAL_SEQUENCES[seqIndex];
+
+      useEffect(() => {
+        const interval = setInterval(() => {
+          setVisibleCount(prev => {
+            if (prev >= currentSeq.length) {
+              // Pause, then advance to next sequence
+              setTimeout(() => {
+                setSeqIndex(s => (s + 1) % TERMINAL_SEQUENCES.length);
+                setVisibleCount(0);
+              }, 1200);
+              return prev;
+            }
+            return prev + 1;
+          });
+        }, 650);
+        return () => clearInterval(interval);
+      }, [seqIndex, currentSeq.length]);
+
+      return (
+        <div className="terminal">
+          <div className="terminal-chrome">
+            <div className="terminal-dot terminal-dot--red" />
+            <div className="terminal-dot terminal-dot--yellow" />
+            <div className="terminal-dot terminal-dot--green" />
+            <span className="terminal-title">generation.log</span>
+          </div>
+          <div className="terminal-body">
+            {currentSeq.slice(0, visibleCount).map((line, i) => (
+              <div
+                key={`${seqIndex}-${i}`}
+                className={`terminal-line ${line.style === 'dim' ? 'terminal-line--dim' : ''} ${line.style === 'green' ? 'terminal-line--green' : ''} ${line.style === 'amber' ? 'terminal-line--amber' : ''}`}
+              >
+                {line.text}
+              </div>
+            ))}
+            <span className="terminal-cursor">▌</span>
+          </div>
+        </div>
+      );
+    }
+
+    /* ─────────────────────────────────────────────
+       Hero
+    ───────────────────────────────────────────── */
+    function Hero({ onOpenWaitlist }) {
+      return (
+        <section className="hero section-border">
+          <div className="container">
+            <div className="hero-grid">
+              <div>
+                <div className="eyebrow">Issue 01 · The Content Studio</div>
+                <h1 className="hero-headline">
+                  All <em>Organic</em> content <em>generation</em> &amp; <em>traffic.</em>
+                </h1>
+                <p className="hero-lede">
+                  AI content studio with a built-in brand engine, multi-model fact-checking, and automatic humanization. Every article reads like your best writer wrote it — and ranks like your SEO team built it.
+                </p>
+                <div className="hero-ctas">
+                  <button className="btn-primary" onClick={onOpenWaitlist}>Get started free →</button>
+                  <a href="#pipeline" className="btn-secondary">See the pipeline</a>
+                </div>
+                <div className="hero-stats">
+                  <div className="hero-stat">
+                    <div className="hero-stat-number">200+</div>
+                    <div className="hero-stat-label">Banned phrases</div>
+                  </div>
+                  <div className="hero-stat">
+                    <div className="hero-stat-number">17</div>
+                    <div className="hero-stat-label">AI patterns rewritten</div>
+                  </div>
+                  <div className="hero-stat">
+                    <div className="hero-stat-number">2</div>
+                    <div className="hero-stat-label">Fact-check models</div>
+                  </div>
+                  <div className="hero-stat">
+                    <div className="hero-stat-number">5</div>
+                    <div className="hero-stat-label">Pipeline stages</div>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <Terminal />
+              </div>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    /* ─────────────────────────────────────────────
+       Why Organic
+    ───────────────────────────────────────────── */
+    const WHY_CARDS = [
+      {
+        num: '01',
+        title: 'Brand engine',
+        body: 'The prompt writes in your brand\'s voice, not its own — because your style guide, voice profile, and banned words shape every prompt.',
+      },
+      {
+        num: '02',
+        title: 'Humanization',
+        body: '17 known AI writing patterns detected and rewritten. 200+ cliché phrases banned. Output passes every detector we have tested.',
+      },
+      {
+        num: '03',
+        title: 'Fact-check consul',
+        body: 'Two independent models cross-verify every claim. Citations are sourced and anchored to publication dates. No hallucinations ship.',
+      },
+      {
+        num: '04',
+        title: 'SEO + AEO + GEO',
+        body: 'Structured data, FAQ schema, keyword clusters, and answer-engine optimization built into every article. Rank on Google. Appear in AI answers.',
+      },
+    ];
+
+    function WhyOrganic() {
+      return (
+        <section className="why section-border" id="why">
+          <div className="container">
+            <div className="section-header">
+              <div className="eyebrow">Why Organic</div>
+              <h2 className="section-headline">
+                Four clusters of agents make AI content <em>"on-brand"</em> and <em>publish-ready.</em>
+              </h2>
+            </div>
+            <div className="why-grid">
+              {WHY_CARDS.map(card => (
+                <div className="why-card" key={card.num}>
+                  <div className="why-card-number">{card.num}</div>
+                  <div className="why-card-title">{card.title}</div>
+                  <div className="why-card-body">{card.body}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    /* ─────────────────────────────────────────────
+       Pipeline
+    ───────────────────────────────────────────── */
+    const PIPELINE_STEPS = [
+      { num: '01', name: 'Write', body: 'Long-form draft from your brand-tuned prompt.', chips: ['gpt-5.1', 'gemini-3.1'] },
+      { num: '02', name: 'Humanize', body: 'Rewrite AI patterns. Remove banned phrases.', chips: ['gpt-5.3'] },
+      { num: '03', name: 'Image', body: 'Hero and inline images composited on brand.', chips: ['gpt-image-1'] },
+      { num: '04', name: 'Fact-check', body: 'Cross-model verification. Citations added.', chips: ['gemini', 'grok'] },
+      { num: '05', name: 'Publish', body: 'Push to WordPress, Webflow, or custom CMS.', chips: ['—'] },
+    ];
+
+    function Pipeline() {
+      return (
+        <section className="pipeline section-border" id="pipeline">
+          <div className="container">
+            <div className="section-header">
+              <div className="eyebrow">Pipeline</div>
+              <h2 className="section-headline">
+                Five stages. <em>One click.</em>
+              </h2>
+            </div>
+            <div className="pipeline-row">
+              {PIPELINE_STEPS.map(step => (
+                <div className="pipeline-step" key={step.num}>
+                  <div className="pipeline-step-number">{step.num}</div>
+                  <div className="pipeline-step-name">{step.name}</div>
+                  <div className="pipeline-step-body">{step.body}</div>
+                  <div>
+                    {step.chips.map(chip => (
+                      <span className="pipeline-chip" key={chip}>{chip}</span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    /* ─────────────────────────────────────────────
+       Before / After Slider
+    ───────────────────────────────────────────── */
+    function BeforeAfter() {
+      const [pos, setPos] = useState(50);
+      const [containerWidth, setContainerWidth] = useState(0);
+      const containerRef = useRef(null);
+      const dragging = useRef(false);
+
+      const handleMove = useCallback((clientX) => {
+        if (!dragging.current || !containerRef.current) return;
+        const rect = containerRef.current.getBoundingClientRect();
+        const x = clientX - rect.left;
+        const pct = Math.max(0, Math.min(100, (x / rect.width) * 100));
+        setPos(pct);
+      }, []);
+
+      useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        const ro = new ResizeObserver(entries => {
+          for (const entry of entries) {
+            setContainerWidth(entry.contentRect.width);
+          }
+        });
+        ro.observe(el);
+        setContainerWidth(el.offsetWidth);
+        return () => ro.disconnect();
+      }, []);
+
+      useEffect(() => {
+        const onMouseMove = (e) => handleMove(e.clientX);
+        const onTouchMove = (e) => handleMove(e.touches[0].clientX);
+        const onUp = () => { dragging.current = false; };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('touchmove', onTouchMove);
+        document.addEventListener('mouseup', onUp);
+        document.addEventListener('touchend', onUp);
+        return () => {
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('touchmove', onTouchMove);
+          document.removeEventListener('mouseup', onUp);
+          document.removeEventListener('touchend', onUp);
+        };
+      }, [handleMove]);
+
+      const beforeTags = ['"dive in"', '"landscape"', '"crucial"', 'no data', 'no citations'];
+      const afterTags = ['22% cost drop', '47-day permits', 'WA-specific', 'cited', '2023 anchor'];
+
+      return (
+        <section className="beforeafter section-border" id="beforeafter">
+          <div className="container">
+            <div className="section-header">
+              <div className="eyebrow">Before &amp; After</div>
+              <h2 className="section-headline">
+                Raw GPT vs. <em>Organic output.</em>
+              </h2>
+            </div>
+            <div
+              className="slider-container"
+              ref={containerRef}
+              onMouseDown={() => { dragging.current = true; }}
+              onTouchStart={() => { dragging.current = true; }}
+            >
+              {/* After (base layer) */}
+              <div className="slider-side slider-after">
+                <div className="slider-label slider-label--after">
+                  <span className="live-dot" />
+                  After · Organic
+                </div>
+                <p className="slider-text slider-text--after">
+                  Residential solar installations in Washington state dropped 22% in cost since 2023, but permitting delays now average 47 days — triple the national median. King County homeowners face the longest waits. Here is what the data shows and how to navigate the process.
+                </p>
+                <div className="slider-tags">
+                  {afterTags.map(t => <span className="slider-tag slider-tag--moss" key={t}>{t}</span>)}
+                </div>
+              </div>
+
+              {/* Before (overlay, clipped) */}
+              <div className="slider-before-wrap" style={{ width: `${pos}%` }}>
+                <div className="slider-before" style={{ width: containerWidth || '100%' }}>
+                  <div className="slider-label slider-label--before">Before · Raw GPT</div>
+                  <p className="slider-text slider-text--before">
+                    Solar energy is an important pathway for homeowners looking to reduce their electricity bills. In an ever-evolving landscape, it is crucial to dive in and understand the nuances of going solar. Many experts agree that harnessing the power of the sun is a game-changer for sustainable living.
+                  </p>
+                  <div className="slider-tags">
+                    {beforeTags.map(t => <span className="slider-tag slider-tag--clay" key={t}>{t}</span>)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Handle */}
+              <div className="slider-handle" style={{ left: `${pos}%` }}>
+                <div className="slider-knob">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M5 3L2 8L5 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M11 3L14 8L11 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    /* ─────────────────────────────────────────────
+       Pricing
+    ───────────────────────────────────────────── */
+    const TIERS = [
+      {
+        name: 'Starter',
+        price: '$49',
+        period: '/mo',
+        featured: false,
+        features: ['1 company', '25 articles / month', 'Voice profile', 'Humanization', 'WordPress publish'],
+        cta: 'Start free trial',
+      },
+      {
+        name: 'Pro',
+        price: '$199',
+        period: '/mo',
+        featured: true,
+        features: ['5 companies', '100 articles / month', 'Fact-check consul', 'Cluster strategy', 'Image generation', 'Everything in Starter'],
+        cta: 'Start free trial',
+      },
+      {
+        name: 'Agency',
+        price: 'Custom',
+        period: '',
+        featured: false,
+        features: ['Unlimited companies', 'Unlimited articles', 'Dedicated account rep', 'Custom CMS gateway', 'Dedicated model routing', 'SLA & priority support', 'Everything in Pro'],
+        cta: 'Contact sales',
+      },
+    ];
+
+    function Pricing({ onOpenWaitlist }) {
+      return (
+        <section className="pricing section-border" id="pricing">
+          <div className="container">
+            <div className="section-header">
+              <div className="eyebrow">Pricing</div>
+              <h2 className="section-headline">
+                Simple plans. <em>No per-word billing.</em>
+              </h2>
+            </div>
+            <div className="pricing-grid">
+              {TIERS.map(tier => (
+                <div className={`pricing-tier ${tier.featured ? 'pricing-tier--featured' : ''}`} key={tier.name}>
+                  <div className="pricing-eyebrow">{tier.name}</div>
+                  <div className="pricing-price">{tier.price}</div>
+                  <div className="pricing-period">{tier.period}</div>
+                  <ul className="pricing-features">
+                    {tier.features.map(f => (
+                      <li className="pricing-feature" key={f}>{f}</li>
+                    ))}
+                  </ul>
+                  <div className="pricing-cta">
+                    {tier.featured ? (
+                      <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={onOpenWaitlist}>{tier.cta} →</button>
+                    ) : (
+                      <button className="btn-secondary" style={{ width: '100%', justifyContent: 'center' }} onClick={onOpenWaitlist}>{tier.cta} →</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    /* ─────────────────────────────────────────────
+       Final CTA
+    ───────────────────────────────────────────── */
+    function FinalCTA({ onOpenWaitlist }) {
+      return (
+        <section className="final-cta section-border">
+          <div className="container">
+            <h2 className="final-cta-headline">
+              Stop Editing AI.<br />
+              <em>Start publishing Organic.</em>
+            </h2>
+            <p className="final-cta-lede">
+              Your brand voice. Real facts. Zero AI aftertaste.
+            </p>
+            <button className="btn-primary" onClick={onOpenWaitlist}>Get started free →</button>
+          </div>
+        </section>
+      );
+    }
+
+    /* ─────────────────────────────────────────────
+       Footer
+    ───────────────────────────────────────────── */
+    function Footer() {
+      return (
+        <footer className="footer">
+          <div className="container">
+            <div className="footer-inner">
+              <div className="footer-left">Stop editing AI. Start publishing Organic.</div>
+              <div className="footer-right">
+                <a href="#" className="footer-link">Docs</a>
+                <a href="#" className="footer-link">API</a>
+                <a href="#" className="footer-link">Changelog</a>
+                <a href="#" className="footer-link">Twitter</a>
+              </div>
+            </div>
+          </div>
+        </footer>
+      );
+    }
+
+    /* ─────────────────────────────────────────────
+       App
+    ───────────────────────────────────────────── */
+    /* ─────────────────────────────────────────────
+       Waitlist Modal
+    ───────────────────────────────────────────── */
+    function WaitlistModal({ open, onClose }) {
+      const [email, setEmail] = useState('');
+      const [submitting, setSubmitting] = useState(false);
+      const [submitted, setSubmitted] = useState(false);
+      const [error, setError] = useState(null);
+
+      useEffect(() => {
+        if (!open) {
+          // Reset state when closed
+          setTimeout(() => {
+            setEmail('');
+            setSubmitted(false);
+            setError(null);
+          }, 300);
+        }
+      }, [open]);
+
+      // Close on Escape
+      useEffect(() => {
+        if (!open) return;
+        const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+      }, [open, onClose]);
+
+      async function onSubmit(e) {
+        e.preventDefault();
+        if (!email.trim() || submitting) return;
+
+        // Secret passphrase: typing "GO" redirects straight to the app
+        if (email.trim().toUpperCase() === 'GO') {
+          localStorage.setItem('organic_gate_unlocked', 'true');
+          const appUrl = window.location.protocol === 'file:' ? 'http://localhost:3001' : '/';
+          window.location.href = appUrl;
+          return;
+        }
+
+        // Basic email validation for normal submissions
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+          setError('Please enter a valid email address.');
+          return;
+        }
+
+        setSubmitting(true);
+        setError(null);
+
+        try {
+          const r = await fetch('/api/waitlist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email.trim() }),
+          });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data?.error || 'Submission failed');
+          setSubmitted(true);
+          // Unlock the app gate and redirect after a brief pause
+          localStorage.setItem('organic_gate_unlocked', 'true');
+          setTimeout(() => { window.location.href = '/'; }, 1500);
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setSubmitting(false);
+        }
+      }
+
+      if (!open) return null;
+
+      return (
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+          <div className="modal-card" style={{ position: 'relative' }}>
+            <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
+
+            {!submitted ? (
+              <>
+                <div className="modal-eyebrow">Private Beta</div>
+                <h2 className="modal-title">
+                  Join the <em>waitlist.</em>
+                </h2>
+                <p className="modal-subtitle">
+                  Organic is in private beta. Enter your email to get early access.
+                </p>
+                <form onSubmit={onSubmit}>
+                  <input
+                    type="text"
+                    className="modal-input"
+                    placeholder="you@company.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    autoFocus
+                  />
+                  <button
+                    type="submit"
+                    className="modal-submit"
+                    disabled={submitting || !email.trim()}
+                  >
+                    {submitting ? 'Submitting…' : 'Get early access →'}
+                  </button>
+                </form>
+                {error && <p className="modal-error">{error}</p>}
+              </>
+            ) : (
+              <>
+                <div className="modal-success-icon">✓</div>
+                <h2 className="modal-title">
+                  You're <em>in.</em>
+                </h2>
+                <p className="modal-subtitle" style={{ marginBottom: 0 }}>
+                  We'll reach out when it's your turn.
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    /* ─────────────────────────────────────────────
+       App
+    ───────────────────────────────────────────── */
+    function App() {
+      const [waitlistOpen, setWaitlistOpen] = useState(false);
+      const openWaitlist = useCallback(() => setWaitlistOpen(true), []);
+      const closeWaitlist = useCallback(() => setWaitlistOpen(false), []);
+
+      return (
+        <>
+          <Nav onOpenWaitlist={openWaitlist} />
+          <Hero onOpenWaitlist={openWaitlist} />
+          <WhyOrganic />
+          <Pipeline />
+          <BeforeAfter />
+          <Pricing onOpenWaitlist={openWaitlist} />
+          <FinalCTA onOpenWaitlist={openWaitlist} />
+          <Footer />
+          <WaitlistModal open={waitlistOpen} onClose={closeWaitlist} />
+        </>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

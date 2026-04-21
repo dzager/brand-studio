@@ -85,14 +85,14 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
       >
         {/* Sidebar Header */}
         <div className="flex h-14 items-center justify-center px-3 border-b border-sidebar-border">
-          <Link href="/" className="flex items-center justify-center w-full overflow-hidden">
+          <a href="/index.html" className="flex items-center justify-center w-full overflow-hidden">
             <img
               src="/organic-logo.png"
               alt="Organic"
               className="h-auto dark:invert"
               style={{ width: sidebarCollapsed ? '43%' : '32%' }}
             />
-          </Link>
+          </a>
         </div>
 
         {/* Nav Items */}

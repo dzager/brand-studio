@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Organic — Documentation</title>
+  <meta name="description" content="User documentation for Organic, the AI content studio with a built-in brand engine, multi-model fact-checking, and automatic humanization." />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- ABCArizona Flare (self-hosted) -->
+  <style>
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-Thin-Trial.otf') format('opentype');
+      font-weight: 100;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-ThinItalic-Trial.otf') format('opentype');
+      font-weight: 100;
+      font-style: italic;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-Light-Trial.otf') format('opentype');
+      font-weight: 300;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-LightItalic-Trial.otf') format('opentype');
+      font-weight: 300;
+      font-style: italic;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-Regular-Trial.otf') format('opentype');
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-RegularItalic-Trial.otf') format('opentype');
+      font-weight: 400;
+      font-style: italic;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-Medium-Trial.otf') format('opentype');
+      font-weight: 500;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-MediumItalic-Trial.otf') format('opentype');
+      font-weight: 500;
+      font-style: italic;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-Bold-Trial.otf') format('opentype');
+      font-weight: 700;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-BoldItalic-Trial.otf') format('opentype');
+      font-weight: 700;
+      font-style: italic;
+      font-display: swap;
+    }
+  </style>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #F8F8F7;
+      --ink: #120801;
+      --primary: #3a4a2f;
+      --muted: #8a8474;
+      --border: rgba(18, 8, 1, 0.14);
+      --font-display: 'ABCArizona', Georgia, serif;
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --max-w: 1440px;
+      --px: 64px;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .container {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 0 var(--px);
+    }
+
+    /* ─── Nav ─── */
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+    }
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 500;
+      color: var(--ink);
+      text-decoration: none;
+    }
+    .nav-logo svg { width: 22px; height: 22px; fill: var(--ink); }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      list-style: none;
+    }
+    .nav-links a {
+      font-size: 14px;
+      color: var(--muted);
+      transition: color 0.2s;
+    }
+    .nav-links a:hover,
+    .nav-links a.active { color: var(--ink); text-decoration: none; }
+
+    /* ─── Docs Layout ─── */
+    .docs-layout {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      gap: 64px;
+      padding: 80px 0 140px;
+      align-items: start;
+    }
+
+    /* ─── Sidebar ─── */
+    .docs-sidebar {
+      position: sticky;
+      top: 100px;
+    }
+    .docs-sidebar-section {
+      margin-bottom: 32px;
+    }
+    .docs-sidebar-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    .docs-sidebar-list {
+      list-style: none;
+    }
+    .docs-sidebar-list li { margin-bottom: 4px; }
+    .docs-sidebar-list a {
+      display: block;
+      font-size: 14px;
+      color: var(--muted);
+      padding: 6px 12px;
+      border-left: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .docs-sidebar-list a:hover {
+      color: var(--ink);
+      text-decoration: none;
+    }
+    .docs-sidebar-list a.active {
+      color: var(--primary);
+      border-left-color: var(--primary);
+      font-weight: 500;
+    }
+
+    /* ─── Content ─── */
+    .docs-content {
+      max-width: 720px;
+    }
+    .docs-content h1 {
+      font-family: var(--font-display);
+      font-size: 48px;
+      font-weight: 400;
+      line-height: 1.1;
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+    }
+    .docs-content h1 em {
+      font-style: italic;
+      color: var(--primary);
+    }
+    .docs-content .docs-subtitle {
+      font-size: 18px;
+      color: var(--muted);
+      line-height: 1.6;
+      max-width: 560px;
+      margin-bottom: 64px;
+    }
+    .docs-content h2 {
+      font-family: var(--font-display);
+      font-size: 28px;
+      font-weight: 400;
+      margin-top: 72px;
+      margin-bottom: 24px;
+      padding-top: 48px;
+      border-top: 1px solid var(--border);
+      letter-spacing: -0.02em;
+    }
+    .docs-content h2:first-of-type {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+    .docs-content h2 em {
+      font-style: italic;
+      color: var(--primary);
+    }
+    .docs-content h3 {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 400;
+      margin-top: 40px;
+      margin-bottom: 12px;
+    }
+    .docs-content p {
+      font-size: 15px;
+      line-height: 1.75;
+      color: var(--ink);
+      margin-bottom: 16px;
+    }
+    .docs-content ul,
+    .docs-content ol {
+      padding-left: 20px;
+      margin-bottom: 20px;
+    }
+    .docs-content li {
+      font-size: 15px;
+      line-height: 1.75;
+      margin-bottom: 8px;
+      color: var(--ink);
+    }
+    .docs-content li strong {
+      font-weight: 600;
+    }
+    .docs-content code {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      background: rgba(18, 8, 1, 0.06);
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    .docs-content .callout {
+      background: rgba(58, 74, 47, 0.06);
+      border-left: 3px solid var(--primary);
+      padding: 20px 24px;
+      margin: 24px 0;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    .docs-content .callout strong {
+      color: var(--primary);
+      font-size: 12px;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      display: block;
+      margin-bottom: 6px;
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 24px 0;
+    }
+    .feature-card {
+      border: 1px solid var(--border);
+      padding: 20px 24px;
+    }
+    .feature-card-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--primary);
+      margin-bottom: 8px;
+    }
+    .feature-card p {
+      font-size: 14px;
+      margin-bottom: 0;
+      color: var(--muted);
+    }
+    .model-chip {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: rgba(18, 8, 1, 0.06);
+      padding: 3px 8px;
+      border-radius: 3px;
+      margin: 2px 4px 2px 0;
+    }
+
+    /* ─── Footer ─── */
+    .footer {
+      padding: 48px 0;
+      border-top: 1px solid var(--border);
+    }
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .footer-link {
+      color: var(--muted);
+      margin-left: 24px;
+    }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 900px) {
+      :root { --px: 24px; }
+      .docs-layout {
+        grid-template-columns: 1fr;
+        gap: 32px;
+      }
+      .docs-sidebar {
+        position: relative;
+        top: 0;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 24px;
+      }
+      .docs-content h1 { font-size: 36px; }
+      .feature-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav class="nav">
+    <div class="container">
+      <div class="nav-inner">
+        <a href="index.html" class="nav-logo">
+          <img src="organic-logo.png" alt="Organic" style="height: 28px; width: auto;" />
+        </a>
+        <ul class="nav-links">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="docs.html" class="active">Docs</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="docs-layout">
+
+      <!-- Sidebar -->
+      <aside class="docs-sidebar">
+        <div class="docs-sidebar-section">
+          <div class="docs-sidebar-label">Getting Started</div>
+          <ul class="docs-sidebar-list">
+            <li><a href="#overview" class="active">Overview</a></li>
+            <li><a href="#quick-start">Quick Start</a></li>
+          </ul>
+        </div>
+        <div class="docs-sidebar-section">
+          <div class="docs-sidebar-label">Features</div>
+          <ul class="docs-sidebar-list">
+            <li><a href="#studio">Studio</a></li>
+            <li><a href="#companies">Companies</a></li>
+            <li><a href="#brand-engine">Brand Engine</a></li>
+            <li><a href="#voice-analysis">Voice Analysis</a></li>
+            <li><a href="#humanization">Humanization</a></li>
+            <li><a href="#fact-checking">Fact-Checking</a></li>
+            <li><a href="#image-generation">Image Generation</a></li>
+            <li><a href="#composite-images">Composite Images</a></li>
+            <li><a href="#content-architecture">Content Architecture</a></li>
+            <li><a href="#topical-clusters">Topical Clusters</a></li>
+            <li><a href="#seo-optimization">SEO & GEO</a></li>
+            <li><a href="#settings">Settings</a></li>
+          </ul>
+        </div>
+        <div class="docs-sidebar-section">
+          <div class="docs-sidebar-label">Reference</div>
+          <ul class="docs-sidebar-list">
+            <li><a href="#supported-models">Supported Models</a></li>
+            <li><a href="#keyboard-shortcuts">Shortcuts</a></li>
+          </ul>
+        </div>
+      </aside>
+
+      <!-- Content -->
+      <main class="docs-content">
+
+        <h1>Organic <em>Docs.</em></h1>
+        <p class="docs-subtitle">
+          Everything you need to create on-brand, SEO-optimized, human-sounding content — from a single prompt.
+        </p>
+
+        <!-- Overview -->
+        <h2 id="overview"><em>Overview</em></h2>
+        <p>
+          Organic is an AI content studio that generates publication-ready blog posts and hero images from a single prompt. Unlike generic AI writers, Organic embeds a full brand engine into every generation — ensuring every article sounds like your best writer wrote it and ranks like your SEO team built it.
+        </p>
+        <div class="feature-grid">
+          <div class="feature-card">
+            <div class="feature-card-label">Brand Engine</div>
+            <p>Tone, voice, archetypes, guardrails, and editorial guidelines compiled into every prompt automatically.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-card-label">Multi-Model</div>
+            <p>Choose from GPT, Claude, and Gemini models for writing. Use separate models for image generation and utilities.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-card-label">Fact-Check Consul</div>
+            <p>Cross-verify claims using multiple AI models (Gemini + Grok) for true multi-source validation.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-card-label">Auto-Humanize</div>
+            <p>Detects and rewrites 17+ AI writing patterns so content passes detection tools and reads naturally.</p>
+          </div>
+        </div>
+
+        <!-- Quick Start -->
+        <h2 id="quick-start">Quick <em>Start</em></h2>
+        <ol>
+          <li><strong>Create a Company</strong> — Go to the Companies page and set up your brand with a name, tagline, tone, archetype, and target audiences.</li>
+          <li><strong>Set Up Voice</strong> — Paste a sample article into the Voice Analyzer to extract your brand's exact writing profile (tone descriptors, sentence rhythm, vocabulary level, banned phrases).</li>
+          <li><strong>Write Your First Prompt</strong> — From the Studio page, select your company, choose a model, and describe the article you want. Hit <strong>Create</strong>.</li>
+          <li><strong>Review & Refine</strong> — Use Humanize, Fact-Check, or Deep Consul to polish the output. Refresh images, search for media, or composite product shots.</li>
+          <li><strong>Download</strong> — Export your complete article bundle (HTML, images, SEO metadata, and JSON-LD structured data).</li>
+        </ol>
+
+        <!-- Studio -->
+        <h2 id="studio"><em>Studio</em></h2>
+        <p>
+          The Studio is your main workspace for generating content. Select a company, describe the article you want in natural language, and Organic handles the rest — from prompt assembly to image generation.
+        </p>
+        <h3>Creation Controls</h3>
+        <ul>
+          <li><strong>Company Selector</strong> — Required. Determines which brand engine configuration is used for generation.</li>
+          <li><strong>Prompt Templates</strong> — Pre-saved prompts attached to companies. Click to load a template, or write a custom prompt from scratch.</li>
+          <li><strong>Image Style</strong> — Select from Default or custom image styles defined in your company settings. Organic will recommend a style using AI if you click <strong>Recommend</strong>.</li>
+          <li><strong>Model</strong> — Choose which AI model writes the article. Options include GPT-5.x, Claude Sonnet, and Gemini models.</li>
+          <li><strong>Length</strong> — Short (300–500 words), Medium (800–1,200), Long (1,500–2,500), Deep Dive (2,500–4,000), or No Limit.</li>
+        </ul>
+        <h3>Preview Prompt</h3>
+        <p>
+          Click <strong>Preview Prompt</strong> to inspect the exact system, user, and image prompts that will be sent to the model — including estimated token count. You can copy individual sections or all prompts at once.
+        </p>
+        <h3>Check Overlap</h3>
+        <p>
+          Before generating, use <strong>Check Overlap</strong> to scan your existing article library for semantic similarity. If a closely matching article already exists (above 75% similarity), you'll see a warning with the match percentage and slug — preventing duplicate content.
+        </p>
+
+        <!-- Companies -->
+        <h2 id="companies"><em>Companies</em></h2>
+        <p>
+          Companies are brand configurations that control every aspect of content generation. Each company has its own brand engine, voice profile, image styles, editorial guidelines, and prompt templates.
+        </p>
+        <h3>Company Settings</h3>
+        <ul>
+          <li><strong>Name & Tagline</strong> — Injected into every prompt for brand identity.</li>
+          <li><strong>Mission</strong> — Used to align article angle and value proposition.</li>
+          <li><strong>Brand Archetype</strong> — Pathfinder, Innovator, Caregiver, Sage, Creator, Hero, Explorer, or Rebel. Shapes the voice personality and decision-making framework of generated content.</li>
+          <li><strong>Tone</strong> — Comma-separated tone descriptors (e.g. "confident, clear, modern") applied to all output.</li>
+          <li><strong>Target Audiences</strong> — Used for positioning and language calibration.</li>
+          <li><strong>Photography / Image Style</strong> — Directs the AI image generation aesthetic.</li>
+          <li><strong>Primary & Secondary Colors</strong> — Applied to design tokens and image palette guidance.</li>
+          <li><strong>Avoid Phrases</strong> — Words and phrases the brand never uses.</li>
+          <li><strong>Editorial Guidelines</strong> — Freeform text block for company-specific voice, citation rules, content depth requirements, and formatting preferences. Overrides base engine rules when in conflict.</li>
+          <li><strong>SEO Content Guidelines</strong> — Company-specific SEO rules that supplement the built-in framework.</li>
+          <li><strong>Reference Articles</strong> — URLs of gold-standard articles used as style references during generation.</li>
+          <li><strong>Auto-Humanize</strong> — When enabled, articles are automatically humanized after generation (~30s extra).</li>
+          <li><strong>Include Table of Contents</strong> — Generates a clickable TOC nav element at the top of each article.</li>
+        </ul>
+        <h3>Custom Image Styles</h3>
+        <p>
+          Each company can define multiple image style categories with unique narratives, storytelling cues, and prompt directives. Styles can be either <strong>AI Prompt</strong> (standard image generation) or <strong>Composite Blend</strong> (product-on-background compositing with built-in background removal).
+        </p>
+
+        <!-- Brand Engine -->
+        <h2 id="brand-engine">Brand <em>Engine</em></h2>
+        <p>
+          The Brand Engine is the core system that compiles every company configuration — archetype, tone, voice profile, editorial guidelines, SEO rules, guardrails, and banned phrases — into a structured system prompt. This prompt is injected into every AI call, ensuring consistent, on-brand output.
+        </p>
+        <div class="callout">
+          <strong>How it works</strong>
+          When you click Create, Organic compiles a comprehensive system prompt that includes: editorial credibility rules, first-sentence quality enforcement, specificity mandates, anti-AI pattern detection, structure and extraction guidelines, SEO targeting, source attribution requirements, freshness signals, structured data guidance, internal linking strategy, and your company's custom editorial and SEO guidelines.
+        </div>
+        <h3>Guardrails</h3>
+        <p>
+          The engine enforces strict guardrails to prevent common AI writing pitfalls:
+        </p>
+        <ul>
+          <li><strong>Banned Phrases</strong> — 70+ phrases that never appear in output (e.g. "let's dive in," "game-changer," "in today's landscape").</li>
+          <li><strong>Allowed Tone</strong> — Confident, clear, modern, helpful, calm.</li>
+          <li><strong>Disallowed Tone</strong> — Bureaucratic, cold, condescending, fear-based, hyperbolic.</li>
+          <li><strong>Content Patterns to Avoid</strong> — Dense text blocks, overuse of disclaimers, overpromising outcomes, vague generalizations.</li>
+        </ul>
+
+        <!-- Voice Analysis -->
+        <h2 id="voice-analysis">Voice <em>Analysis</em></h2>
+        <p>
+          The Voice Analyzer extracts a detailed writing profile from sample content. Paste any article (text or HTML) and Organic will analyze it to produce a complete voice profile including:
+        </p>
+        <ul>
+          <li><strong>Tone Descriptors</strong> — How the writing sounds (e.g. "direct, informative, casual").</li>
+          <li><strong>Sentence Rhythm</strong> — Average sentence structure and pacing patterns.</li>
+          <li><strong>Paragraph Style</strong> — Typical paragraph length and transition patterns.</li>
+          <li><strong>Vocabulary Level</strong> — Reading level and word choice tendencies.</li>
+          <li><strong>Rhetorical Devices</strong> — Identified techniques the writer uses.</li>
+          <li><strong>Point of View</strong> — First-person, second-person, or third-person conventions.</li>
+          <li><strong>Sample Phrases</strong> — Characteristic phrases to emulate.</li>
+          <li><strong>Banned Phrases</strong> — Specific phrases the brand should never use.</li>
+          <li><strong>Structural Do's & Don'ts</strong> — Patterns to replicate and patterns to avoid.</li>
+          <li><strong>Specificity & Length Rules</strong> — Precision and depth requirements.</li>
+        </ul>
+        <p>
+          You can also generate a <strong>Voice Priority Prompt Template</strong> directly from the voice profile — a structured prompt that forces the AI to prioritize voice matching above all other style guidance.
+        </p>
+
+        <!-- Humanization -->
+        <h2 id="humanization"><em>Humanization</em></h2>
+        <p>
+          The Humanizer is a comprehensive rewriting system based on Wikipedia's "Signs of AI writing" guide. It detects and rewrites 17+ categories of AI artifacts:
+        </p>
+        <ul>
+          <li>Undue emphasis on significance and legacy</li>
+          <li>Superficial analyses with -ing endings</li>
+          <li>Promotional, advertisement-like language</li>
+          <li>Vague attributions and weasel words</li>
+          <li>Formulaic "Challenges and Future Prospects" sections</li>
+          <li>Casual dramatic framing & negative editorial coloring</li>
+          <li>Overused AI vocabulary (delve, landscape, pivotal, crucial, etc.)</li>
+          <li>Copula avoidance ("serves as" instead of "is")</li>
+          <li>Negative parallelisms and Rule of Three overuse</li>
+          <li>Elegant variation (synonym cycling)</li>
+          <li>Em dash overuse, filler phrases, excessive hedging</li>
+          <li>Generic positive conclusions</li>
+          <li>Collaborative communication artifacts ("I hope this helps")</li>
+        </ul>
+        <div class="callout">
+          <strong>Goes beyond removal</strong>
+          The Humanizer doesn't just strip AI patterns — it actively injects personality. It varies sentence rhythm, adds opinions where appropriate, acknowledges complexity, and uses first-person when it fits. The goal is writing that has a human behind it.
+        </div>
+
+        <!-- Fact-Checking -->
+        <h2 id="fact-checking">Fact-<em>Checking</em></h2>
+        <p>Organic provides two levels of fact-checking:</p>
+        <h3>Quick Check</h3>
+        <p>
+          A single-model fact check that scans the article for claims and evaluates each one as accurate, unverifiable, misleading, or inaccurate. Returns a confidence percentage and suggested edits for flagged claims.
+        </p>
+        <h3>Deep Consul</h3>
+        <p>
+          The Fact-Check Consul sends the article to multiple independent AI models (Gemini and Grok) for independent verification. Each model evaluates every factual claim, and the Consul synthesizes their verdicts into a consensus with an agreement level:
+        </p>
+        <ul>
+          <li><strong>Full Agreement</strong> — Both models agree on the verdict.</li>
+          <li><strong>Partial Agreement</strong> — Models agree on direction but differ on severity.</li>
+          <li><strong>Models Disagree</strong> — Contradictory verdicts requiring human review.</li>
+          <li><strong>Single Source</strong> — Only one model returned a result.</li>
+        </ul>
+        <p>
+          Each claim shows the individual model reasoning (expandable), linked sources, and a <strong>suggested rewrite</strong> that you can apply with one click to update the article directly.
+        </p>
+
+        <!-- Image Generation -->
+        <h2 id="image-generation">Image <em>Generation</em></h2>
+        <p>
+          Every article generates a hero image automatically. The image prompt is compiled from your company's photography style, color palette, narrative cues, and the selected image style category.
+        </p>
+        <h3>Image Gallery</h3>
+        <p>
+          Generate multiple image variations using the <strong>Refresh Image</strong> button. Add custom direction (e.g. "more warm lighting" or "include a laptop on the desk") to guide regeneration. All variations are saved in an in-session gallery where you can switch between them.
+        </p>
+        <h3>Web Image Search</h3>
+        <p>
+          Search the web for stock photos, product images, or any visual asset. Results show title, domain, dimensions, and can be:
+        </p>
+        <ul>
+          <li><strong>Used</strong> — directly as the article's hero image</li>
+          <li><strong>Downloaded</strong> — via the image proxy</li>
+          <li><strong>Composited</strong> — used as input for the composite engine</li>
+        </ul>
+        <h3>YouTube Search</h3>
+        <p>
+          Search YouTube for related videos, tutorials, and media to embed or reference in your content.
+        </p>
+
+        <!-- Composite Images -->
+        <h2 id="composite-images">Composite <em>Images</em></h2>
+        <p>
+          The Composite Engine creates professional product-on-background images using an automated pipeline:
+        </p>
+        <ol>
+          <li><strong>Background Acquisition</strong> — Uses an AI-generated background from a scene prompt, a searched web image, or a custom URL.</li>
+          <li><strong>Product Extraction</strong> — Sends the product image to Gemini for green-screen replacement, then applies chroma-key transparency with anti-aliased edge smoothing.</li>
+          <li><strong>Intelligent Sizing</strong> — Scales the product cutout to fill ~80% of the frame with sharpening for upscaled images.</li>
+          <li><strong>Ambient Color Sampling</strong> — Samples the background's edge colors and applies a subtle tint to the product for natural color integration.</li>
+          <li><strong>Shadow Generation</strong> — Creates a realistic soft drop shadow from the product's alpha channel.</li>
+          <li><strong>Final Composite</strong> — Layers background → shadow → tinted product using rule-of-thirds positioning.</li>
+        </ol>
+        <p>
+          Companies can define <strong>Composite Blend</strong> image styles with default background prompts, background images, and product search queries — making compositing a one-click operation during article creation.
+        </p>
+
+        <!-- Content Architecture -->
+        <h2 id="content-architecture">Content <em>Architecture</em></h2>
+        <p>
+          The Articles page provides two views for managing your content library:
+        </p>
+        <h3>Graph View</h3>
+        <p>
+          A visual canvas showing all articles and clusters as an interconnected network. Articles are color-coded by company and connected to their cluster. Click any node to view its details.
+        </p>
+        <h3>Outline View</h3>
+        <p>
+          A sidebar tree + detail panel layout. Browse articles organized by cluster with a full article detail pane showing the generated content, metadata, SEO data, and inline actions (humanize, fact-check, shorten, delete).
+        </p>
+
+        <!-- Topical Clusters -->
+        <h2 id="topical-clusters">Topical <em>Clusters</em></h2>
+        <p>
+          Organic supports topical cluster strategies for building authority around core topics:
+        </p>
+        <ul>
+          <li><strong>AI Cluster</strong> — Describe a topic and let AI generate a full cluster strategy with pillar, supporting, and long-tail pages, including internal linking instructions and keyword targets.</li>
+          <li><strong>Manual Cluster</strong> — Create a cluster and manually assign existing articles to it.</li>
+          <li><strong>Auto Cluster</strong> — Automatically group existing articles into clusters using embedding-based semantic similarity.</li>
+        </ul>
+        <p>
+          When generating articles within a cluster, Organic injects sibling page context — slugs, keywords, and linking instructions — directly into the prompt so each article naturally links to its cluster siblings.
+        </p>
+
+        <!-- SEO & GEO -->
+        <h2 id="seo-optimization">SEO & <em>GEO</em></h2>
+        <p>
+          Every article is generated with built-in SEO and Generative Engine Optimization (GEO):
+        </p>
+        <ul>
+          <li><strong>Keyword Strategy</strong> — Primary and secondary keywords derived from the topic with optimized placement in titles, headings, and body.</li>
+          <li><strong>Featured Snippet Targeting</strong> — Direct 40–60 word answers formatted for Google snippet extraction.</li>
+          <li><strong>FAQ Schema</strong> — Mandatory FAQ section with H3→p structure for FAQPage schema markup.</li>
+          <li><strong>HowTo Schema</strong> — Procedural content formatted as ordered lists for HowTo schema extraction.</li>
+          <li><strong>JSON-LD Structured Data</strong> — Full structured data exported with every article download (FAQ, HowTo, Article schema).</li>
+          <li><strong>Meta Tags</strong> — Click-optimized title (50–60 chars), compelling meta description (150–160 chars), and keyword-rich slug.</li>
+          <li><strong>Source Attribution</strong> — Inline hyperlinked citations to authoritative sources (minimum 4–6 per article).</li>
+          <li><strong>Freshness Signals</strong> — Year references and "as of" qualifiers for time-sensitive content.</li>
+          <li><strong>Entity Optimization</strong> — Key entities wrapped in <code>&lt;strong&gt;</code> tags with full official names on first use.</li>
+        </ul>
+        <div class="callout">
+          <strong>GEO Differentiation</strong>
+          Every article must include original analysis, decision frameworks, statistical breakdowns, edge case coverage, and practitioner-level guidance that cannot be easily synthesized from other sources — making content more likely to be cited by AI answer engines.
+        </div>
+
+        <!-- Settings -->
+        <h2 id="settings"><em>Settings</em></h2>
+        <p>
+          Access Settings from the sidebar gear icon. Configure default AI models for three process categories:
+        </p>
+        <ul>
+          <li><strong>Writing Model</strong> — The primary model for article generation (default: GPT-5.3).</li>
+          <li><strong>Image Generation</strong> — The model used for hero images (default: Gemini 3 Pro Image).</li>
+          <li><strong>Utility Model</strong> — Used for SEO analysis, style recommendations, and other utility tasks (default: GPT-4.1 Nano).</li>
+        </ul>
+        <p>Settings are persisted in your browser's localStorage and applied automatically to all future generations.</p>
+
+        <!-- Supported Models -->
+        <h2 id="supported-models">Supported <em>Models</em></h2>
+        <p>Organic supports models from three providers:</p>
+        <h3>OpenAI</h3>
+        <p>
+          <span class="model-chip">GPT-4.1 Nano</span>
+          <span class="model-chip">GPT-4.1</span>
+          <span class="model-chip">GPT-4.1 Mini</span>
+          <span class="model-chip">GPT-5.1</span>
+          <span class="model-chip">GPT-5.2</span>
+          <span class="model-chip">GPT-5.3</span>
+          <span class="model-chip">GPT-5.4</span>
+        </p>
+        <h3>Anthropic</h3>
+        <p>
+          <span class="model-chip">Claude Sonnet 4</span>
+          <span class="model-chip">Claude 3.5 Haiku</span>
+        </p>
+        <h3>Google</h3>
+        <p>
+          <span class="model-chip">Gemini 3.1 Pro</span>
+          <span class="model-chip">Gemini 2.5 Flash</span>
+          <span class="model-chip">Gemini 2.5 Pro</span>
+          <span class="model-chip">Gemini 3.1 Flash</span>
+          <span class="model-chip">Gemini 2.5 Flash Image</span>
+          <span class="model-chip">Gemini 3 Pro Image</span>
+        </p>
+        <p>Available models depend on which API keys are configured in your environment (<code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, <code>GOOGLE_GENERATIVE_AI_API_KEY</code>).</p>
+
+        <!-- Keyboard Shortcuts -->
+        <h2 id="keyboard-shortcuts"><em>Shortcuts</em></h2>
+        <ul>
+          <li><strong>PSL</strong> — Type the letters P, S, L in sequence on the landing page to bypass the waitlist gate and unlock the application.</li>
+        </ul>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-inner">
+        <div>© 2026 Organic - A PSL company</div>
+        <div>
+          <a href="docs.html" class="footer-link">Docs</a>
+          <a href="index.html" class="footer-link">Home</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
