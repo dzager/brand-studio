@@ -89,8 +89,8 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
             <img
               src="/organic-logo.png"
               alt="Organic"
-              className="h-auto dark:invert"
-              style={{ width: sidebarCollapsed ? '43%' : '32%' }}
+              className="dark:invert"
+              style={{ height: '36px', width: 'auto' }}
             />
           </a>
         </div>
