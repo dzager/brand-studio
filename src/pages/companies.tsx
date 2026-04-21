@@ -15,6 +15,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import {
     Pencil, Trash2, Mic, FileText, Plus, ChevronDown, ChevronRight,
     Copy as CopyIcon, X, AlertCircle, CheckCircle2, Save, Sparkles, Search,
+    Globe, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -54,6 +55,13 @@ export default function CompaniesPage() {
     const [newRefUrl, setNewRefUrl] = useState("");
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+
+    // URL import state
+    const [importUrl, setImportUrl] = useState("");
+    const [importing, setImporting] = useState(false);
+    const [importErr, setImportErr] = useState<string | null>(null);
+    const [importSuccess, setImportSuccess] = useState(false);
+    const [importNotes, setImportNotes] = useState<string | null>(null);
 
     // Composite image search state (keyed by style idx)
     type SearchImage = { title: string; imageUrl: string; thumbnailUrl: string; source: string; domain: string };
@@ -190,7 +198,47 @@ export default function CompaniesPage() {
     }, []);
     useEffect(() => { fetchCompanies(); }, [fetchCompanies]);
 
-    function openCreate() { setEditingId(null); setForm(EMPTY_FORM); setShowForm(true); }
+    function openCreate() { setEditingId(null); setForm(EMPTY_FORM); setShowForm(true); setImportUrl(""); setImportErr(null); setImportSuccess(false); setImportNotes(null); }
+
+    async function handleUrlImport() {
+        if (!importUrl.trim()) return;
+        setImporting(true); setImportErr(null); setImportSuccess(false); setImportNotes(null);
+        try {
+            const r = await fetch("/api/crawl-brand", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url: importUrl.trim() }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || "Import failed");
+            const b = data.brand;
+            const hasImageStyles = Array.isArray(b.image_style_categories) && b.image_style_categories.length > 0;
+            setForm((prev) => ({
+                ...prev,
+                name: b.name || prev.name,
+                tagline: b.tagline || prev.tagline,
+                mission: b.mission || prev.mission,
+                archetype: b.archetype || prev.archetype,
+                tone: b.tone || prev.tone,
+                target_audiences: b.target_audiences || prev.target_audiences,
+                photography_style: b.photography_style || prev.photography_style,
+                color_primary: b.color_primary || prev.color_primary,
+                color_secondary: b.color_secondary || prev.color_secondary,
+                avoid_phrases: b.avoid_phrases || prev.avoid_phrases,
+                editorial_guidelines: b.editorial_guidelines || prev.editorial_guidelines,
+                ...(hasImageStyles ? {
+                    useCustomStyles: true,
+                    image_style_categories: b.image_style_categories,
+                } : {}),
+            }));
+            setImportSuccess(true);
+            setImportNotes(b.confidence_notes || null);
+        } catch (e: any) {
+            setImportErr(e.message);
+        } finally {
+            setImporting(false);
+        }
+    }
     function openEdit(c: Company) {
         setEditingId(c.id);
         const hasCustomStyles = Array.isArray(c.image_style_categories) && c.image_style_categories.length > 0;
@@ -251,6 +299,63 @@ export default function CompaniesPage() {
                     <Card>
                         <CardContent className="p-6 space-y-4">
                             <h2 className="text-lg font-semibold">{editingId ? "Edit Company" : "New Company"}</h2>
+
+                            {/* URL Import Section — only for new companies */}
+                            {!editingId && (
+                                <div className="rounded-lg border border-dashed border-border bg-muted/30 p-4 space-y-3">
+                                    <div className="flex items-center gap-2">
+                                        <Globe className="h-4 w-4 text-primary" />
+                                        <Label className="text-sm font-semibold">Import from Website</Label>
+                                        <span className="text-xs text-muted-foreground">— paste a URL and we'll extract brand info automatically</span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="url"
+                                            value={importUrl}
+                                            onChange={(e) => setImportUrl(e.target.value)}
+                                            placeholder="https://example.com"
+                                            disabled={importing}
+                                            onKeyDown={(e) => { if (e.key === "Enter" && importUrl.trim()) { e.preventDefault(); handleUrlImport(); } }}
+                                        />
+                                        <Button
+                                            variant="outline"
+                                            onClick={handleUrlImport}
+                                            disabled={importing || !importUrl.trim()}
+                                            className="gap-1.5 whitespace-nowrap"
+                                        >
+                                            {importing ? (
+                                                <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Scanning…</>
+                                            ) : (
+                                                <><Globe className="h-3.5 w-3.5" /> Scan Website</>
+                                            )}
+                                        </Button>
+                                    </div>
+                                    {importing && (
+                                        <p className="text-xs text-muted-foreground animate-pulse">
+                                            Crawling pages and analyzing brand signals… this takes 10–20 seconds.
+                                        </p>
+                                    )}
+                                    {importErr && (
+                                        <Alert variant="destructive">
+                                            <AlertCircle className="h-4 w-4" />
+                                            <AlertDescription>{importErr}</AlertDescription>
+                                        </Alert>
+                                    )}
+                                    {importSuccess && (
+                                        <Alert className="border-success bg-success/5">
+                                            <CheckCircle2 className="h-4 w-4 text-success" />
+                                            <AlertDescription className="text-success">
+                                                Brand data extracted! Review the fields below and edit as needed.
+                                                {importNotes && (
+                                                    <span className="block mt-1 text-xs text-muted-foreground font-normal">
+                                                        <strong>AI notes:</strong> {importNotes}
+                                                    </span>
+                                                )}
+                                            </AlertDescription>
+                                        </Alert>
+                                    )}
+                                </div>
+                            )}
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-1.5"><Label>Company Name *</Label><Input value={form.name} onChange={(e) => setField("name", e.target.value)} placeholder="Acme Corp" /></div>

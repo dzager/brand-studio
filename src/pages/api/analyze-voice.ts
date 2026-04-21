@@ -190,7 +190,7 @@ ${plainText}
 Produce a voice profile that captures how this writer writes — their rhythm, word choices, structural habits, tone, editorial standards, and content rules — so that future AI-generated articles can closely match this voice and quality.`;
 
         const voiceProfile = await getStructuredResponse<VoiceProfile>(
-            "gpt-5.3-chat-latest",
+            "gpt-5.4",
             systemPrompt,
             userPrompt,
             VoiceProfileSchema as any,

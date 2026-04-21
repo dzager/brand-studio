@@ -157,7 +157,7 @@ export default async function handler(
                 );
 
                 const updatedHtml = await getTextResponse(
-                    "gpt-5.3-chat-latest",
+                    "gpt-5.4",
                     "",
                     prompt,
                     { temperature: 0.3 }

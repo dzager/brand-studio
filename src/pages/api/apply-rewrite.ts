@@ -49,7 +49,7 @@ export default async function handler(
         ].join("\n");
 
         const correctedHtml = await getTextResponse(
-            "gpt-4.1",
+            "gpt-5.4",
             APPLY_REWRITE_SYSTEM_PROMPT,
             userPrompt
         );

@@ -4,7 +4,7 @@
  * Provides a unified interface for text generation across multiple providers
  * (OpenAI, Anthropic, Google) via the Vercel AI SDK.
  * 
- * Image generation defaults to Gemini 3 Pro Image, with OpenAI as fallback.
+ * Image generation defaults to GPT Image 2, with Gemini as fallback.
  */
 
 import { generateText, Output, experimental_generateImage as generateImage } from "ai";
@@ -36,6 +36,7 @@ export const MODEL_REGISTRY: ModelOption[] = [
     { id: "gpt-5.2",        label: "GPT-5.2",             provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true, capabilities: ["writing", "utility"] },
     { id: "gpt-5.3-chat-latest", label: "GPT-5.3",        provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true, capabilities: ["writing", "utility"] },
     { id: "gpt-5.4",        label: "GPT-5.4",             provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true, capabilities: ["writing", "utility"] },
+    { id: "gpt-image-2",    label: "GPT Image 2",          provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: false, capabilities: ["imageGeneration"] },
 
     // Anthropic
     { id: "claude-sonnet-4-20250514",    label: "Claude Sonnet 4",     provider: "anthropic", envKey: "ANTHROPIC_API_KEY",            supportsStructured: true, capabilities: ["writing", "utility"] },
@@ -84,7 +85,7 @@ export function getModel(modelId: string): LanguageModel {
  * Validates and resolves a model ID from user input.
  * Returns the model ID if available, or fallback.
  */
-export function resolveModelId(requestedModel: string | undefined, fallback = "gpt-5.3-chat-latest"): string {
+export function resolveModelId(requestedModel: string | undefined, fallback = "gpt-5.4"): string {
     const available = getAvailableModels();
     if (typeof requestedModel === "string" && available.some((m) => m.id === requestedModel)) {
         return requestedModel;
@@ -94,7 +95,7 @@ export function resolveModelId(requestedModel: string | undefined, fallback = "g
         return fallback;
     }
     // Use first available
-    return available[0]?.id ?? "gpt-5.3-chat-latest";
+    return available[0]?.id ?? "gpt-5.4";
 }
 
 // ── Text Generation Helpers ─────────────────────────────────────────────
@@ -159,11 +160,11 @@ export function getOpenAIClient(): OpenAI {
 
 /**
  * Default image generation model.
- * Uses Gemini 3 Pro Image when Google key is available, otherwise falls back to OpenAI.
+ * Uses GPT Image 2 when OpenAI key is available, otherwise falls back to Gemini.
  */
-export const DEFAULT_IMAGE_MODEL = "gemini-3-pro-image-preview";
-export const DEFAULT_WRITING_MODEL = "gpt-5.3-chat-latest";
-export const DEFAULT_UTILITY_MODEL = "gpt-4.1-nano";
+export const DEFAULT_IMAGE_MODEL = "gpt-image-2";
+export const DEFAULT_WRITING_MODEL = "gpt-5.4";
+export const DEFAULT_UTILITY_MODEL = "gpt-4.1-mini";
 
 /**
  * Resolves an image model ID from user settings.
@@ -184,7 +185,7 @@ export function resolveImageModelId(requestedModel: string | undefined): string 
 
 /**
  * Generate an image and return its base64-encoded data.
- * Defaults to Gemini 3 Pro Image; falls back to OpenAI gpt-image-1.
+ * Defaults to GPT Image 2; falls back to Gemini if OpenAI is unavailable.
  * Accepts an optional imageModel to override the default.
  */
 export async function generateImageBase64(
@@ -194,41 +195,77 @@ export async function generateImageBase64(
     const aspectRatio = options?.aspectRatio ?? "16:9";
     const imageModel = options?.imageModel ?? DEFAULT_IMAGE_MODEL;
 
-    // Try Gemini/Google image model first if the key is available
-    if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-        try {
-            const result = await generateImage({
-                model: google.image(imageModel),
-                prompt,
-                aspectRatio: aspectRatio as `${number}:${number}`,
-            });
+    // Determine provider for the selected image model
+    const modelEntry = MODEL_REGISTRY.find((m) => m.id === imageModel);
+    const isOpenAIModel = !modelEntry || modelEntry.provider === "openai";
 
-            // experimental_generateImage returns image in result.image
-            if (result.image?.base64) {
-                return result.image.base64;
+    if (isOpenAIModel) {
+        // ── OpenAI path (GPT Image 2 or gpt-image-1) ──
+        if (process.env.OPENAI_API_KEY) {
+            try {
+                const imageResp = await getOpenAIClient().images.generate({
+                    model: imageModel,
+                    prompt,
+                    size: (options?.size as any) ?? "1792x1024",
+                });
+
+                const b64 = imageResp.data?.[0]?.b64_json ?? null;
+                if (b64) return b64;
+
+                console.warn(`${imageModel} generation returned no image, falling back to Gemini`);
+            } catch (err) {
+                console.warn(`${imageModel} generation failed, falling back to Gemini:`, err);
             }
+        }
 
-            // Check uint8Array fallback
-            if (result.image?.uint8Array) {
-                return Buffer.from(result.image.uint8Array).toString("base64");
+        // Fallback to Gemini
+        if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+            try {
+                const result = await generateImage({
+                    model: google.image("gemini-3-pro-image-preview"),
+                    prompt,
+                    aspectRatio: aspectRatio as `${number}:${number}`,
+                });
+                if (result.image?.base64) return result.image.base64;
+                if (result.image?.uint8Array) return Buffer.from(result.image.uint8Array).toString("base64");
+            } catch (geminiErr) {
+                console.warn("Gemini fallback also failed:", geminiErr);
             }
+        }
+    } else {
+        // ── Google/Gemini path ──
+        if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+            try {
+                const result = await generateImage({
+                    model: google.image(imageModel),
+                    prompt,
+                    aspectRatio: aspectRatio as `${number}:${number}`,
+                });
 
-            console.warn(`${imageModel} generation returned no image, falling back to OpenAI`);
-        } catch (err) {
-            console.warn(`${imageModel} generation failed, falling back to OpenAI:`, err);
+                if (result.image?.base64) return result.image.base64;
+                if (result.image?.uint8Array) return Buffer.from(result.image.uint8Array).toString("base64");
+
+                console.warn(`${imageModel} generation returned no image, falling back to OpenAI`);
+            } catch (err) {
+                console.warn(`${imageModel} generation failed, falling back to OpenAI:`, err);
+            }
+        }
+
+        // Fallback to OpenAI GPT Image 2
+        if (process.env.OPENAI_API_KEY) {
+            try {
+                const imageResp = await getOpenAIClient().images.generate({
+                    model: "gpt-image-2",
+                    prompt,
+                    size: (options?.size as any) ?? "1792x1024",
+                });
+                const b64 = imageResp.data?.[0]?.b64_json ?? null;
+                if (b64) return b64;
+            } catch (oaiErr) {
+                console.warn("OpenAI fallback also failed:", oaiErr);
+            }
         }
     }
 
-    // Fallback to OpenAI (1792x1024 is closest supported 16:9 size)
-    if (!process.env.OPENAI_API_KEY) {
-        throw new Error("No image generation API key configured (need GOOGLE_GENERATIVE_AI_API_KEY or OPENAI_API_KEY)");
-    }
-
-    const imageResp = await getOpenAIClient().images.generate({
-        model: "gpt-image-1",
-        prompt,
-        size: (options?.size as any) ?? "1792x1024",
-    });
-
-    return imageResp.data?.[0]?.b64_json ?? null;
+    throw new Error("No image generation API key configured (need OPENAI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY)");
 }

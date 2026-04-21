@@ -234,7 +234,7 @@ ${styleDescriptions}
 
 Which style best fits this article? Respond with JSON only.`;
 
-                const recRaw = await getTextResponse("gpt-4.1-nano", recSystem, recUser, { temperature: 0.2 });
+                const recRaw = await getTextResponse("gpt-4.1-mini", recSystem, recUser, { temperature: 0.2 });
                 const recJson = recRaw.replace(/^```json?\s*/i, "").replace(/\s*```$/i, "");
                 const recResult = JSON.parse(recJson);
 
@@ -284,7 +284,7 @@ Which style best fits this article? Respond with JSON only.`;
             console.log(`Auto-humanizing cluster article: ${page.slug}`);
 
             const bodyPrompt = buildBlogHumanizePrompt(blog.html, blog.title, brand);
-            const humanizedHtml = await getTextResponse("gpt-5.3-chat-latest", "", bodyPrompt, { temperature: 0.5 });
+            const humanizedHtml = await getTextResponse("gpt-5.4", "", bodyPrompt, { temperature: 0.5 });
             if (humanizedHtml && humanizedHtml.length > 100) {
                 blog.html = humanizedHtml;
             }
@@ -294,7 +294,7 @@ Which style best fits this article? Respond with JSON only.`;
                 "This is a blog post title. Keep it concise, specific, and punchy.",
                 brand
             );
-            const humanizedTitle = await getTextResponse("gpt-5.3-chat-latest", "", titlePrompt, { temperature: 0.5 });
+            const humanizedTitle = await getTextResponse("gpt-5.4", "", titlePrompt, { temperature: 0.5 });
             if (humanizedTitle && humanizedTitle.length > 5) {
                 blog.title = humanizedTitle;
             }
@@ -304,7 +304,7 @@ Which style best fits this article? Respond with JSON only.`;
                 "This is a blog post excerpt. Keep it to 1-2 sentences, factual and direct.",
                 brand
             );
-            const humanizedExcerpt = await getTextResponse("gpt-5.3-chat-latest", "", excerptPrompt, { temperature: 0.5 });
+            const humanizedExcerpt = await getTextResponse("gpt-5.4", "", excerptPrompt, { temperature: 0.5 });
             if (humanizedExcerpt && humanizedExcerpt.length > 10) {
                 blog.excerpt = humanizedExcerpt;
             }
@@ -375,7 +375,7 @@ Which style best fits this article? Respond with JSON only.`;
                 styleId,
             });
 
-            finalImagePrompt = await getTextResponse("gpt-4.1-nano", imgSystem, imgUser);
+            finalImagePrompt = await getTextResponse("gpt-4.1-mini", imgSystem, imgUser);
 
             image_base64 = await generateImageBase64(
                 finalImagePrompt || `Editorial photo for: ${blog.title}`

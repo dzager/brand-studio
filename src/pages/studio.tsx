@@ -540,7 +540,7 @@ export default function Home() {
                         <select id="model-select" value={model} onChange={(e) => setModel(e.target.value)}
                             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                             {availableModels.length > 0 ? availableModels.map((m) => <option key={m.id} value={m.id}>{m.label}{m.provider !== "openai" ? ` (${m.provider})` : ""}</option>)
-                                : <><option value="gpt-5.3-chat-latest">GPT-5.3</option><option value="gpt-5.1">GPT-5.1</option><option value="gpt-4.1-nano">GPT-4.1 Nano</option></>}
+                                : <><option value="gpt-5.4">GPT-5.4</option><option value="gpt-5.1">GPT-5.1</option><option value="gpt-4.1-mini">GPT-4.1 Mini</option></>}
                         </select>
                     </div>
 

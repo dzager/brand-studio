@@ -1,7 +1,7 @@
 {
-  "name": "@organic/photo-style-mcp",
+  "name": "@organic/brand-mcp",
   "version": "1.0.0",
-  "description": "MCP server exposing Organic brand photography style, image categories, color palettes, and image prompt generation.",
+  "description": "Unified MCP server exposing Organic brand voice, photography style, and blog generation tools for any compatible AI client.",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

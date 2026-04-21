@@ -252,7 +252,7 @@ export default async function handler(
             console.log("Auto-humanizing pillar guide...");
 
             const bodyPrompt = buildBlogHumanizePrompt(guide.html, guide.title, brand);
-            const humanizedHtml = await getTextResponse("gpt-5.3-chat-latest", "", bodyPrompt, { temperature: 0.5 });
+            const humanizedHtml = await getTextResponse("gpt-5.4", "", bodyPrompt, { temperature: 0.5 });
             if (humanizedHtml && humanizedHtml.length > 100) {
                 guide.html = humanizedHtml;
             }
@@ -262,7 +262,7 @@ export default async function handler(
                 "This is a comprehensive guide title. Keep it authoritative, specific, and compelling.",
                 brand
             );
-            const humanizedTitle = await getTextResponse("gpt-5.3-chat-latest", "", titlePrompt, { temperature: 0.5 });
+            const humanizedTitle = await getTextResponse("gpt-5.4", "", titlePrompt, { temperature: 0.5 });
             if (humanizedTitle && humanizedTitle.length > 5) {
                 guide.title = humanizedTitle;
             }
@@ -272,7 +272,7 @@ export default async function handler(
                 "This is a pillar guide excerpt. Keep it to 1-2 sentences, authoritative and comprehensive.",
                 brand
             );
-            const humanizedExcerpt = await getTextResponse("gpt-5.3-chat-latest", "", excerptPrompt, { temperature: 0.5 });
+            const humanizedExcerpt = await getTextResponse("gpt-5.4", "", excerptPrompt, { temperature: 0.5 });
             if (humanizedExcerpt && humanizedExcerpt.length > 10) {
                 guide.excerpt = humanizedExcerpt;
             }
@@ -295,7 +295,7 @@ export default async function handler(
                 const recSystem = `You are an expert creative director. Given an article topic and a list of available image styles, recommend the single best-fit style.\nRespond with ONLY valid JSON: {"id": "<style id>", "reason": "<1 sentence>"}`;
                 const recUser = `Article: "${guide.title}" — Comprehensive pillar guide for "${cluster.name}"\n\nAvailable styles:\n${styleDescriptions}`;
 
-                const recRaw = await getTextResponse("gpt-4.1-nano", recSystem, recUser, { temperature: 0.2 });
+                const recRaw = await getTextResponse("gpt-4.1-mini", recSystem, recUser, { temperature: 0.2 });
                 const recJson = recRaw.replace(/^```json?\s*/i, "").replace(/\s*```$/i, "");
                 const recResult = JSON.parse(recJson);
                 if (recResult?.id && brandCategories.some((c) => c.id === recResult.id)) {
@@ -315,7 +315,7 @@ export default async function handler(
             styleId,
         });
 
-        const finalImagePrompt = await getTextResponse("gpt-4.1-nano", imgSystem, imgUser);
+        const finalImagePrompt = await getTextResponse("gpt-4.1-mini", imgSystem, imgUser);
         const image_base64 = await generateImageBase64(
             finalImagePrompt || `Comprehensive guide editorial photo: ${guide.title}`
         );

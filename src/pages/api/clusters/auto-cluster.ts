@@ -182,7 +182,7 @@ export default async function handler(
         ].join("\n");
 
         const result = await getStructuredResponse<{ clusters: any[] }>(
-            "gpt-4.1-nano",
+            "gpt-4.1-mini",
             systemPrompt,
             userPrompt,
             AutoClusterSchema as any,

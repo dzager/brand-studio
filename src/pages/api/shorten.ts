@@ -96,7 +96,7 @@ export default async function handler(
         }
 
         const prompt = buildShortenPrompt(html, title, brand);
-        const shortenedHtml = await getTextResponse("gpt-5.3-chat-latest", "", prompt, { temperature: 0.3 });
+        const shortenedHtml = await getTextResponse("gpt-5.4", "", prompt, { temperature: 0.3 });
 
         if (!shortenedHtml || shortenedHtml.length < 100) {
             throw new Error("Shortener returned an insufficient response.");
@@ -114,7 +114,7 @@ export default async function handler(
         let shortenedExcerpt = excerpt;
         if (excerpt && typeof excerpt === "string" && excerpt.split(/\s+/).length > 40) {
             const excerptPrompt = buildShortenExcerptPrompt(excerpt, 30);
-            const result = await getTextResponse("gpt-4.1-nano", "", excerptPrompt, { temperature: 0.3 });
+            const result = await getTextResponse("gpt-4.1-mini", "", excerptPrompt, { temperature: 0.3 });
             if (result && result.length > 10) {
                 shortenedExcerpt = result;
             }

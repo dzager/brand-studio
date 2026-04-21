@@ -216,7 +216,7 @@
     }
     .hero-headline em {
       font-style: italic;
-      color: var(--primary);
+      color: var(--ink);
     }
     .hero-lede {
       font-size: 19px;
@@ -317,9 +317,9 @@
       font-size: 48px;
       font-weight: 300;
       line-height: 1.1;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.04em;
     }
-    .section-headline em { font-style: italic; color: var(--primary); }
+    .section-headline em { font-style: italic; color: var(--ink); }
 
     /* ─── Why Organic ─── */
     .why { padding: 140px 0; }
@@ -538,7 +538,31 @@
       font-size: 14px;
       color: var(--muted);
       margin-top: 4px;
+    }
+    .pricing-per-article {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 6px;
       margin-bottom: 32px;
+    }
+    .pricing-tier--featured .pricing-per-article { color: rgba(248, 248, 247, 0.5); }
+    .pricing-eyebrow-badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      background: var(--primary);
+      color: var(--bg);
+      padding: 3px 8px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+    .pricing-tier--featured .pricing-eyebrow-badge {
+      background: var(--bg);
+      color: var(--primary);
     }
     .pricing-features {
       list-style: none;
@@ -566,7 +590,7 @@
       font-size: 88px;
       font-weight: 300;
       line-height: 1.05;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.04em;
       max-width: 900px;
       margin: 0 auto 28px;
       color: var(--bg);
@@ -659,11 +683,11 @@
       font-size: 32px;
       font-weight: 300;
       line-height: 1.15;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.04em;
       margin: 0 0 8px;
       color: var(--ink);
     }
-    .modal-title em { font-style: italic; color: var(--primary); }
+    .modal-title em { font-style: italic; color: var(--ink); }
     .modal-subtitle {
       font-size: 15px;
       color: var(--muted);
@@ -803,7 +827,7 @@
                 <a href="#pipeline" className="nav-link">Pipeline</a>
                 <a href="#pricing" className="nav-link">Pricing</a>
                 <a href="docs.html" className="nav-link">Docs</a>
-                <a href="#" className="nav-link">Changelog</a>
+                <a href="changelog.html" className="nav-link">Changelog</a>
               </div>
               <div className="nav-actions">
                 <a href="#" className="nav-signin">Sign in</a>
@@ -913,7 +937,7 @@
               <div>
                 <div className="eyebrow">Issue 01 · The Content Studio</div>
                 <h1 className="hero-headline">
-                  All <em>Organic</em> content <em>generation</em> &amp; <em>traffic.</em>
+                  All Organic content generation &amp; traffic.
                 </h1>
                 <p className="hero-lede">
                   AI content studio with a built-in brand engine, multi-model fact-checking, and automatic humanization. Every article reads like your best writer wrote it — and ranks like your SEO team built it.
@@ -983,7 +1007,7 @@
             <div className="section-header">
               <div className="eyebrow">Why Organic</div>
               <h2 className="section-headline">
-                Four clusters of agents make AI content <em>"on-brand"</em> and <em>publish-ready.</em>
+                Four clusters of agents make <em>On Brand</em> AI content <em>publish-ready.</em>
               </h2>
             </div>
             <div className="why-grid">
@@ -1153,27 +1177,33 @@
     const TIERS = [
       {
         name: 'Starter',
-        price: '$49',
+        price: '$99',
         period: '/mo',
+        perArticle: '$3.96/article',
         featured: false,
-        features: ['1 company', '25 articles / month', 'Voice profile', 'Humanization', 'WordPress publish'],
-        cta: 'Start free trial',
+        badge: null,
+        features: ['25 articles/month', '$3.50 per extra article', 'Solo use', '5 domains', 'Research + Optimize'],
+        cta: 'Start free',
       },
       {
-        name: 'Pro',
-        price: '$199',
+        name: 'Standard',
+        price: '$299',
         period: '/mo',
+        perArticle: '$3.74/article',
         featured: true,
-        features: ['5 companies', '100 articles / month', 'Fact-check consul', 'Cluster strategy', 'Image generation', 'Everything in Starter'],
-        cta: 'Start free trial',
+        badge: 'POPULAR',
+        features: ['80 articles/month', '$3.00 per extra article', '3 team seats (+$25/extra)', 'Unlimited domains', 'API access'],
+        cta: 'Start free',
       },
       {
-        name: 'Agency',
-        price: 'Custom',
-        period: '',
+        name: 'Scale',
+        price: '$999',
+        period: '/mo',
+        perArticle: '$3.33/article',
         featured: false,
-        features: ['Unlimited companies', 'Unlimited articles', 'Dedicated account rep', 'Custom CMS gateway', 'Dedicated model routing', 'SLA & priority support', 'Everything in Pro'],
-        cta: 'Contact sales',
+        badge: null,
+        features: ['300 articles/month', '$2.50 per extra article', '10 team seats (+$20/extra)', 'Unlimited domains', 'Priority support'],
+        cta: 'Start free',
       },
     ];
 
@@ -1190,9 +1220,13 @@
             <div className="pricing-grid">
               {TIERS.map(tier => (
                 <div className={`pricing-tier ${tier.featured ? 'pricing-tier--featured' : ''}`} key={tier.name}>
-                  <div className="pricing-eyebrow">{tier.name}</div>
+                  <div className="pricing-eyebrow">
+                    {tier.name}
+                    {tier.badge && <span className="pricing-eyebrow-badge">{tier.badge}</span>}
+                  </div>
                   <div className="pricing-price">{tier.price}</div>
                   <div className="pricing-period">{tier.period}</div>
+                  <div className="pricing-per-article">{tier.perArticle}</div>
                   <ul className="pricing-features">
                     {tier.features.map(f => (
                       <li className="pricing-feature" key={f}>{f}</li>
@@ -1241,11 +1275,11 @@
         <footer className="footer">
           <div className="container">
             <div className="footer-inner">
-              <div className="footer-left">Stop editing AI. Start publishing Organic.</div>
+              <div className="footer-left">© All Organic, INC, a PSL Company</div>
               <div className="footer-right">
                 <a href="#" className="footer-link">Docs</a>
                 <a href="#" className="footer-link">API</a>
-                <a href="#" className="footer-link">Changelog</a>
+                <a href="changelog.html" className="footer-link">Changelog</a>
                 <a href="#" className="footer-link">Twitter</a>
               </div>
             </div>

@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Organic — Changelog</title>
+  <meta name="description" content="Product changelog for Organic. New features, improvements, and updates to the AI content studio." />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- ABCArizona Flare (self-hosted) -->
+  <style>
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-Thin-Trial.otf') format('opentype');
+      font-weight: 100;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-ThinItalic-Trial.otf') format('opentype');
+      font-weight: 100;
+      font-style: italic;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-Light-Trial.otf') format('opentype');
+      font-weight: 300;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-LightItalic-Trial.otf') format('opentype');
+      font-weight: 300;
+      font-style: italic;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-Regular-Trial.otf') format('opentype');
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-RegularItalic-Trial.otf') format('opentype');
+      font-weight: 400;
+      font-style: italic;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-Medium-Trial.otf') format('opentype');
+      font-weight: 500;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-MediumItalic-Trial.otf') format('opentype');
+      font-weight: 500;
+      font-style: italic;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-Bold-Trial.otf') format('opentype');
+      font-weight: 700;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'ABCArizona';
+      src: url('fonts/ABCArizonaText-BoldItalic-Trial.otf') format('opentype');
+      font-weight: 700;
+      font-style: italic;
+      font-display: swap;
+    }
+  </style>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #F8F8F7;
+      --ink: #120801;
+      --primary: #3a4a2f;
+      --muted: #8a8474;
+      --border: rgba(18, 8, 1, 0.14);
+      --font-display: 'ABCArizona', Georgia, serif;
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --max-w: 1440px;
+      --px: 64px;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .container {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 0 var(--px);
+    }
+
+    /* ─── Nav ─── */
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+    }
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 500;
+      color: var(--ink);
+      text-decoration: none;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      list-style: none;
+    }
+    .nav-links a {
+      font-size: 14px;
+      color: var(--muted);
+      transition: color 0.2s;
+    }
+    .nav-links a:hover,
+    .nav-links a.active { color: var(--ink); text-decoration: none; }
+
+    /* ─── Changelog Layout ─── */
+    .changelog-layout {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 80px 0 140px;
+    }
+
+    .changelog-header {
+      margin-bottom: 72px;
+    }
+    .changelog-header h1 {
+      font-family: var(--font-display);
+      font-size: 48px;
+      font-weight: 400;
+      line-height: 1.1;
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+    }
+    .changelog-header h1 em {
+      font-style: italic;
+      color: var(--primary);
+    }
+    .changelog-header .subtitle {
+      font-size: 18px;
+      color: var(--muted);
+      line-height: 1.6;
+      max-width: 560px;
+    }
+
+    /* ─── Entry ─── */
+    .changelog-entry {
+      position: relative;
+      padding: 48px 0;
+      border-top: 1px solid var(--border);
+    }
+    .changelog-entry:last-child {
+      padding-bottom: 0;
+    }
+
+    .changelog-date {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    .changelog-title {
+      font-family: var(--font-display);
+      font-size: 28px;
+      font-weight: 400;
+      line-height: 1.2;
+      margin-bottom: 20px;
+      letter-spacing: -0.02em;
+    }
+    .changelog-title em {
+      font-style: italic;
+      color: var(--primary);
+    }
+
+    .changelog-body p {
+      font-size: 15px;
+      line-height: 1.75;
+      color: var(--ink);
+      margin-bottom: 16px;
+    }
+
+    .changelog-body ul {
+      padding-left: 20px;
+      margin-bottom: 20px;
+    }
+    .changelog-body li {
+      font-size: 15px;
+      line-height: 1.75;
+      margin-bottom: 8px;
+      color: var(--ink);
+    }
+    .changelog-body li strong {
+      font-weight: 600;
+    }
+    .changelog-body code {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      background: rgba(18, 8, 1, 0.06);
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+
+    /* ─── Tags ─── */
+    .changelog-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .changelog-tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 4px 10px;
+      border-radius: 2px;
+    }
+    .changelog-tag--feature {
+      background: rgba(58, 74, 47, 0.1);
+      color: var(--primary);
+    }
+    .changelog-tag--improvement {
+      background: rgba(18, 8, 1, 0.06);
+      color: var(--muted);
+    }
+    .changelog-tag--infrastructure {
+      background: rgba(59, 130, 246, 0.08);
+      color: #3b6fad;
+    }
+    .changelog-tag--design {
+      background: rgba(168, 85, 247, 0.08);
+      color: #7c4dac;
+    }
+
+    /* ─── Callout ─── */
+    .callout {
+      background: rgba(58, 74, 47, 0.06);
+      border-left: 3px solid var(--primary);
+      padding: 20px 24px;
+      margin: 24px 0;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    .callout strong {
+      color: var(--primary);
+      font-size: 12px;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    /* ─── Model chips ─── */
+    .model-chip {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: rgba(18, 8, 1, 0.06);
+      padding: 3px 8px;
+      border-radius: 3px;
+      margin: 2px 4px 2px 0;
+    }
+
+    /* ─── Footer ─── */
+    .footer {
+      padding: 48px 0;
+      border-top: 1px solid var(--border);
+    }
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .footer-link {
+      color: var(--muted);
+      margin-left: 24px;
+    }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 900px) {
+      :root { --px: 24px; }
+      .changelog-header h1 { font-size: 36px; }
+      .changelog-title { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav class="nav">
+    <div class="container">
+      <div class="nav-inner">
+        <a href="index.html" class="nav-logo">
+          <img src="organic-logo.png" alt="Organic" style="height: 28px; width: auto;" />
+        </a>
+        <ul class="nav-links">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="docs.html">Docs</a></li>
+          <li><a href="changelog.html" class="active">Changelog</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="changelog-layout">
+
+      <div class="changelog-header">
+        <h1>Change<em>log.</em></h1>
+        <p class="subtitle">
+          New features, improvements, and fixes to Organic. We ship continuously — here's what's new.
+        </p>
+      </div>
+
+      <!-- ───────────────────────────────────── -->
+      <!-- April 21, 2026 -->
+      <!-- ───────────────────────────────────── -->
+      <div class="changelog-entry">
+        <div class="changelog-date">April 21, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+          <span class="changelog-tag changelog-tag--infrastructure">Infrastructure</span>
+        </div>
+        <h2 class="changelog-title">MCP <em>Servers</em></h2>
+        <div class="changelog-body">
+          <p>
+            Organic now exposes your brand configurations as Model Context Protocol (MCP) servers — an open standard that lets any compatible AI client access your brand's voice, photography style, and blog generation pipeline directly.
+          </p>
+          <ul>
+            <li><strong>Voice MCP</strong> — 6 tools for voice profiles, banned words, tone validation, and compiled prompts.</li>
+            <li><strong>Photo Style MCP</strong> — 6 tools for photography style, color palette, image categories, and prompt generation.</li>
+            <li><strong>Blog MCP</strong> — 7 tools for system prompts, SEO rules, editorial guidelines, cluster strategy, and article access.</li>
+          </ul>
+          <p>
+            Compatible with Claude Desktop, Cursor, and any MCP-enabled AI client. Update a voice profile in Organic → every connected client sees the change instantly.
+          </p>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">April 21, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+        </div>
+        <h2 class="changelog-title">Brand <em>Crawler</em></h2>
+        <div class="changelog-body">
+          <p>
+            Automate brand onboarding by entering a website URL. Organic crawls the homepage and internal pages to extract brand signals — meta data, colors, and image context — then uses an LLM to reverse-engineer a structured brand identity, editorial guidelines, and custom image style categories.
+          </p>
+          <ul>
+            <li><strong>One-URL setup</strong> — Enter a domain and Organic populates the entire company profile.</li>
+            <li><strong>Extracted signals</strong> — Colors, typography sentiment, hero imagery, meta descriptions, and site structure.</li>
+            <li><strong>AI synthesis</strong> — Generates tone, archetype, voice profile, editorial guidelines, and image style categories automatically.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">April 21, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--design">Design</span>
+        </div>
+        <h2 class="changelog-title">Landing page <em>refresh</em></h2>
+        <div class="changelog-body">
+          <p>
+            Complete redesign of the marketing site. New typographic system using ABCArizona serif, updated pricing tiers, a live terminal animation demoing the pipeline, and a draggable before/after slider comparing raw GPT output versus Organic output.
+          </p>
+          <ul>
+            <li><strong>ABCArizona serif</strong> — Custom display typeface replacing system defaults.</li>
+            <li><strong>Pricing update</strong> — Three tiers: Starter ($99/mo), Standard ($299/mo), and Scale ($999/mo).</li>
+            <li><strong>Documentation</strong> — Full docs page covering every feature, MCP setup guides, and supported models.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">April 21, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--improvement">Improvement</span>
+        </div>
+        <h2 class="changelog-title">Default model <em>updates</em></h2>
+        <div class="changelog-body">
+          <p>
+            Standardized AI model defaults across the platform. Writing tasks now default to GPT-5.4, utility tasks to GPT-4.1 Mini, and image generation to GPT Image 2.
+          </p>
+        </div>
+      </div>
+
+      <!-- ───────────────────────────────────── -->
+      <!-- April 20, 2026 -->
+      <!-- ───────────────────────────────────── -->
+      <div class="changelog-entry">
+        <div class="changelog-date">April 20, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--design">Design</span>
+          <span class="changelog-tag changelog-tag--improvement">Improvement</span>
+        </div>
+        <h2 class="changelog-title">Company page <em>polish</em></h2>
+        <div class="changelog-body">
+          <p>
+            Refined the company management experience with interactive hover previews, alphabetical sorting, and a friendly "OOO :)" error state for broken links.
+          </p>
+          <ul>
+            <li><strong>Cursor-following previews</strong> — Hovering over a company row shows a floating preview card that follows the cursor.</li>
+            <li><strong>Alphabetical sorting</strong> — Companies are now sorted by name across all views.</li>
+            <li><strong>Category mapping</strong> — Supabase "Categories" field now renders directly in the companies table.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ───────────────────────────────────── -->
+      <!-- April 18, 2026 -->
+      <!-- ───────────────────────────────────── -->
+      <div class="changelog-entry">
+        <div class="changelog-date">April 18, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+        </div>
+        <h2 class="changelog-title">Waitlist <em>gate</em></h2>
+        <div class="changelog-body">
+          <p>
+            Added a password-protected waitlist gate modal to the landing page. Visitors submit their email to a Supabase <code>waitlist</code> table for beta access, or bypass the gate entirely with a secret keyboard shortcut.
+          </p>
+        </div>
+      </div>
+
+      <!-- ───────────────────────────────────── -->
+      <!-- April 17, 2026 -->
+      <!-- ───────────────────────────────────── -->
+      <div class="changelog-entry">
+        <div class="changelog-date">April 17, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+        </div>
+        <h2 class="changelog-title">Global model <em>settings</em></h2>
+        <div class="changelog-body">
+          <p>
+            Implemented a centralized settings system for configuring default AI models. Accessible via the sidebar, Settings lets you assign preferred models for writing, image generation, and utility tasks.
+          </p>
+          <ul>
+            <li><strong>Persistent defaults</strong> — Backed by <code>localStorage</code>, applied automatically to all future generations.</li>
+            <li><strong>Three categories</strong> — Writing Model, Image Generation, and Utility Model each get independent selectors.</li>
+            <li><strong>Dynamic routing</strong> — The AI client and backend API routes respect your chosen defaults.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ───────────────────────────────────── -->
+      <!-- April 16, 2026 -->
+      <!-- ───────────────────────────────────── -->
+      <div class="changelog-entry">
+        <div class="changelog-date">April 16, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+        </div>
+        <h2 class="changelog-title">SEO &amp; GEO <em>export</em></h2>
+        <div class="changelog-body">
+          <p>
+            Article downloads now include a comprehensive <code>seo-geo.json</code> file containing meta tags, keywords, FAQ/HowTo schema, and JSON-LD structured data — everything needed for search engine and AI answer engine optimization.
+          </p>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">April 16, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+          <span class="changelog-tag changelog-tag--improvement">Improvement</span>
+        </div>
+        <h2 class="changelog-title">Editorial <em>controls</em></h2>
+        <div class="changelog-body">
+          <p>
+            New editorial configuration options for finer control over generated content:
+          </p>
+          <ul>
+            <li><strong>Table of Contents toggle</strong> — Per-company setting (defaults off) that adds a clickable TOC to generated articles.</li>
+            <li><strong>Em dash spacing</strong> — Configurable typography rule for consistent em dash presentation.</li>
+            <li><strong>Collapsible guidelines</strong> — Editorial and SEO guidelines sections in company settings are now collapsible for cleaner editing.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">April 16, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+        </div>
+        <h2 class="changelog-title">Topical cluster <em>diagrams</em></h2>
+        <div class="changelog-body">
+          <p>
+            Visual diagrams documenting the content architecture, data models, generation pipelines, and prompt creation stack. Includes flowcharts showing how pillar, supporting, and long-tail pages are structured, interlinked, and generated.
+          </p>
+        </div>
+      </div>
+
+      <!-- ───────────────────────────────────── -->
+      <!-- April 15, 2026 -->
+      <!-- ───────────────────────────────────── -->
+      <div class="changelog-entry">
+        <div class="changelog-date">April 15, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--design">Design</span>
+          <span class="changelog-tag changelog-tag--improvement">Improvement</span>
+        </div>
+        <h2 class="changelog-title">Graph view + <em>sidebar logo</em></h2>
+        <div class="changelog-body">
+          <p>
+            Added a company selector to the article graph view and redesigned the sidebar header with the Organic wordmark SVG. Company list edit buttons were refactored for reliable click detection.
+          </p>
+        </div>
+      </div>
+
+      <!-- ───────────────────────────────────── -->
+      <!-- April 10, 2026 -->
+      <!-- ───────────────────────────────────── -->
+      <div class="changelog-entry">
+        <div class="changelog-date">April 10, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+          <span class="changelog-tag changelog-tag--infrastructure">Infrastructure</span>
+        </div>
+        <h2 class="changelog-title">Fact-check <em>consul</em></h2>
+        <div class="changelog-body">
+          <p>
+            Introduced the multi-model Fact-Check Consul. Every factual claim is independently verified by Gemini and Grok, with a synthesized consensus report showing agreement level, individual model reasoning, linked sources, and one-click suggested rewrites.
+          </p>
+          <ul>
+            <li><strong>Dual-model verification</strong> — Gemini 3.1 Pro and Grok cross-verify every claim independently.</li>
+            <li><strong>Agreement scoring</strong> — Full Agreement, Partial Agreement, Models Disagree, or Single Source.</li>
+            <li><strong>Inline corrections</strong> — One-click "Apply Fix" buttons update article content directly from the consul report.</li>
+          </ul>
+          <div class="callout">
+            <strong>Why two models</strong>
+            Single-model fact-checking produces confident-sounding but sometimes wrong verdicts. Two independent models catch each other's blind spots — when they disagree, it flags human review.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-inner">
+        <div>© 2026 Organic - A PSL company</div>
+        <div>
+          <a href="docs.html" class="footer-link">Docs</a>
+          <a href="changelog.html" class="footer-link">Changelog</a>
+          <a href="index.html" class="footer-link">Home</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

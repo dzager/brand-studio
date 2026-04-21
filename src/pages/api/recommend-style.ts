@@ -36,7 +36,7 @@ ${styleDescriptions}
 
 Which style best fits this article topic? Respond with JSON only.`;
 
-        const raw = await getTextResponse("gpt-4.1-nano", systemPrompt, userPrompt, { temperature: 0.3 });
+        const raw = await getTextResponse("gpt-4.1-mini", systemPrompt, userPrompt, { temperature: 0.3 });
 
         // Parse JSON from response (strip markdown fences if present)
         const jsonStr = raw.replace(/^```json?\s*/i, "").replace(/\s*```$/i, "");
