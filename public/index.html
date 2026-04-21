@@ -1292,7 +1292,7 @@
         // Secret passphrase: typing "GO" redirects straight to the app
         if (email.trim().toUpperCase() === 'GO') {
           localStorage.setItem('organic_gate_unlocked', 'true');
-          const appUrl = window.location.protocol === 'file:' ? 'http://localhost:3001' : '/';
+          const appUrl = window.location.protocol === 'file:' ? 'http://localhost:3001/studio' : '/studio';
           window.location.href = appUrl;
           return;
         }
@@ -1317,7 +1317,7 @@
           setSubmitted(true);
           // Unlock the app gate and redirect after a brief pause
           localStorage.setItem('organic_gate_unlocked', 'true');
-          setTimeout(() => { window.location.href = '/'; }, 1500);
+          setTimeout(() => { window.location.href = '/studio'; }, 1500);
         } catch (err) {
           setError(err.message);
         } finally {

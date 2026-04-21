@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 import SettingsDialog from "@/components/layout/SettingsDialog";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Studio", icon: Home, description: "Create content" },
+  { href: "/studio", label: "Studio", icon: Home, description: "Create content" },
   { href: "/companies", label: "Companies", icon: Building2, description: "Manage brands" },
   { href: "/articles", label: "Articles", icon: FileText, description: "Content architecture" },
 ];
