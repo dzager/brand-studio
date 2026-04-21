@@ -31,6 +31,7 @@ export default async function handler(
                 "color_primary", "color_secondary", "avoid_phrases",
                 "image_style_categories", "voice_profile", "editorial_guidelines",
                 "seo_content_guidelines", "reference_articles", "evals", "auto_humanize",
+                "include_toc", "archived",
             ];
             const updates: Record<string, unknown> = {};
             for (const key of allowed) {

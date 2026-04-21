@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
     Pencil, Trash2, Mic, FileText, Plus, ChevronDown, ChevronRight,
-    Copy as CopyIcon, X, AlertCircle, CheckCircle2, Save, Sparkles,
+    Copy as CopyIcon, X, AlertCircle, CheckCircle2, Save, Sparkles, Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +30,7 @@ type Company = {
     voice_profile: VoiceProfile | null; editorial_guidelines: string | null;
     seo_content_guidelines: string | null;
     reference_articles: string[] | null; evals: BrandEngine["evals"] | null;
-    auto_humanize: boolean | null; created_at: string;
+    auto_humanize: boolean | null; include_toc: boolean | null; created_at: string;
 };
 
 type CompanyPrompt = { id: string; company_id: string; name: string; body: string; created_at: string; };
@@ -39,7 +39,7 @@ const EMPTY_FORM = {
     name: "", tagline: "", mission: "", archetype: "guide", tone: "confident, clear, modern",
     target_audiences: "", photography_style: "", color_primary: "#000000", color_secondary: "#FFFFFF",
     avoid_phrases: "", editorial_guidelines: "", seo_content_guidelines: "", reference_articles: [] as string[],
-    useCustomStyles: false, image_style_categories: [] as ImageStyleCategory[], auto_humanize: true,
+    useCustomStyles: false, image_style_categories: [] as ImageStyleCategory[], auto_humanize: true, include_toc: false,
 };
 
 export default function CompaniesPage() {
@@ -54,6 +54,41 @@ export default function CompaniesPage() {
     const [newRefUrl, setNewRefUrl] = useState("");
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+
+    // Composite image search state (keyed by style idx)
+    type SearchImage = { title: string; imageUrl: string; thumbnailUrl: string; source: string; domain: string };
+    const [csBgSearchQuery, setCsBgSearchQuery] = useState<Record<number, string>>({});
+    const [csBgSearchResults, setCsBgSearchResults] = useState<Record<number, SearchImage[]>>({});
+    const [csBgSearching, setCsBgSearching] = useState<Record<number, boolean>>({});
+    const [csProductSearchQuery, setCsProductSearchQuery] = useState<Record<number, string>>({});
+    const [csProductSearchResults, setCsProductSearchResults] = useState<Record<number, SearchImage[]>>({});
+    const [csProductSearching, setCsProductSearching] = useState<Record<number, boolean>>({});
+
+    async function onCsBgSearch(idx: number) {
+        const q = csBgSearchQuery[idx]?.trim();
+        if (!q) return;
+        setCsBgSearching((prev) => ({ ...prev, [idx]: true }));
+        try {
+            const r = await fetch("/api/image-search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q, num: 8 }) });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data?.error || "Search failed");
+            setCsBgSearchResults((prev) => ({ ...prev, [idx]: data.images ?? [] }));
+        } catch { setCsBgSearchResults((prev) => ({ ...prev, [idx]: [] })); }
+        finally { setCsBgSearching((prev) => ({ ...prev, [idx]: false })); }
+    }
+
+    async function onCsProductSearch(idx: number) {
+        const q = csProductSearchQuery[idx]?.trim();
+        if (!q) return;
+        setCsProductSearching((prev) => ({ ...prev, [idx]: true }));
+        try {
+            const r = await fetch("/api/image-search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q, num: 8 }) });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data?.error || "Search failed");
+            setCsProductSearchResults((prev) => ({ ...prev, [idx]: data.images ?? [] }));
+        } catch { setCsProductSearchResults((prev) => ({ ...prev, [idx]: [] })); }
+        finally { setCsProductSearching((prev) => ({ ...prev, [idx]: false })); }
+    }
 
     // Voice
     const [voiceCompanyId, setVoiceCompanyId] = useState<string | null>(null);
@@ -167,8 +202,11 @@ export default function CompaniesPage() {
             editorial_guidelines: c.editorial_guidelines ?? "", seo_content_guidelines: c.seo_content_guidelines ?? "", reference_articles: c.reference_articles ?? [],
             useCustomStyles: hasCustomStyles, image_style_categories: hasCustomStyles ? c.image_style_categories! : [],
             auto_humanize: c.auto_humanize !== false,
+            include_toc: c.include_toc === true,
         });
         setShowForm(true);
+        // Scroll to top so the form is visible
+        document.querySelector("main")?.scrollTo({ top: 0, behavior: "smooth" });
     }
     function closeForm() { setShowForm(false); setEditingId(null); setForm(EMPTY_FORM); }
     function setField(key: string, value: string) { setForm((prev) => ({ ...prev, [key]: value })); }
@@ -259,17 +297,47 @@ export default function CompaniesPage() {
                                 <div className="space-y-1.5"><Label>Avoid Phrases</Label><Input value={form.avoid_phrases} onChange={(e) => setField("avoid_phrases", e.target.value)} placeholder="synergy, disrupt" /></div>
                             </div>
 
-                            <div className="space-y-1.5"><Label>Editorial Guidelines</Label><Textarea value={form.editorial_guidelines} onChange={(e) => setField("editorial_guidelines", e.target.value)} placeholder="Company-specific voice, tone, citation rules..." rows={10} /></div>
+                            <details className="group border border-border rounded-lg">
+                                <summary className="flex items-center justify-between cursor-pointer px-4 py-2.5 select-none hover:bg-muted/50 transition-colors">
+                                    <div className="flex items-center gap-2">
+                                        <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+                                        <Label className="cursor-pointer text-sm font-semibold">Editorial Guidelines</Label>
+                                        {form.editorial_guidelines && <span className="text-xs text-muted-foreground">({form.editorial_guidelines.length} chars)</span>}
+                                    </div>
+                                </summary>
+                                <div className="px-4 pb-4 pt-1 space-y-1.5">
+                                    <Textarea value={form.editorial_guidelines} onChange={(e) => setField("editorial_guidelines", e.target.value)} placeholder="Company-specific voice, tone, citation rules..." rows={10} />
+                                </div>
+                            </details>
 
-                            <div className="space-y-1.5"><Label>SEO Content Guidelines</Label><p className="text-xs text-muted-foreground">Company-specific SEO rules injected into every article prompt. Supplements the built-in SEO framework.</p><Textarea value={form.seo_content_guidelines} onChange={(e) => setField("seo_content_guidelines", e.target.value)} placeholder="e.g. Target keywords must include city + service format. Always include a local comparison table. Minimum 3 external authority links per article..." rows={8} /></div>
+                            <details className="group border border-border rounded-lg">
+                                <summary className="flex items-center justify-between cursor-pointer px-4 py-2.5 select-none hover:bg-muted/50 transition-colors">
+                                    <div className="flex items-center gap-2">
+                                        <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+                                        <Label className="cursor-pointer text-sm font-semibold">SEO Content Guidelines</Label>
+                                        {form.seo_content_guidelines && <span className="text-xs text-muted-foreground">({form.seo_content_guidelines.length} chars)</span>}
+                                    </div>
+                                </summary>
+                                <div className="px-4 pb-4 pt-1 space-y-1.5">
+                                    <p className="text-xs text-muted-foreground">Company-specific SEO rules injected into every article prompt. Supplements the built-in SEO framework.</p>
+                                    <Textarea value={form.seo_content_guidelines} onChange={(e) => setField("seo_content_guidelines", e.target.value)} placeholder="e.g. Target keywords must include city + service format. Always include a local comparison table. Minimum 3 external authority links per article..." rows={8} />
+                                </div>
+                            </details>
 
-                            {/* Auto-Humanize */}
+                            {/* Auto-Humanize & TOC */}
                             <Separator />
                             <label className="flex items-center gap-3 cursor-pointer">
                                 <input type="checkbox" checked={form.auto_humanize} onChange={(e) => setForm((prev) => ({ ...prev, auto_humanize: e.target.checked }))} className="h-4 w-4 rounded" />
                                 <div>
                                     <div className="text-sm font-semibold">🧹 Auto-Humanize Generated Content</div>
                                     <div className="text-xs text-muted-foreground mt-0.5">Automatically humanizes articles after generation. Adds ~30s.</div>
+                                </div>
+                            </label>
+                            <label className="flex items-center gap-3 cursor-pointer">
+                                <input type="checkbox" checked={form.include_toc} onChange={(e) => setForm((prev) => ({ ...prev, include_toc: e.target.checked }))} className="h-4 w-4 rounded" />
+                                <div>
+                                    <div className="text-sm font-semibold">📑 Include Table of Contents</div>
+                                    <div className="text-xs text-muted-foreground mt-0.5">Generates a clickable TOC nav element at the top of each article.</div>
                                 </div>
                             </label>
 
@@ -318,6 +386,7 @@ export default function CompaniesPage() {
                                                             {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                                                             {cat.label || `Style #${idx + 1}`}
                                                             {cat.id && <span className="text-xs text-muted-foreground">({cat.id})</span>}
+                                                            {cat.type === "composite" && <Badge variant="outline" className="text-[10px] h-4 gap-0.5">🧩 Composite</Badge>}
                                                         </span>
                                                         <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
                                                             <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { const clone = { ...cat, label: `${cat.label} (Copy)`, id: `${cat.id}_copy_${Date.now()}`, storytelling_cues: [...cat.storytelling_cues] }; setForm((prev) => ({ ...prev, image_style_categories: [...prev.image_style_categories.slice(0, idx + 1), clone, ...prev.image_style_categories.slice(idx + 1)] })); }}>
@@ -334,9 +403,92 @@ export default function CompaniesPage() {
                                                                 <div className="space-y-1"><Label className="text-xs">Label *</Label><Input value={cat.label} onChange={(e) => { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], label: e.target.value, id: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") }; setForm((prev) => ({ ...prev, image_style_categories: nc })); }} placeholder="e.g. Families" /></div>
                                                                 <div className="space-y-1"><Label className="text-xs">ID</Label><Input value={cat.id} disabled className="bg-muted" /></div>
                                                             </div>
+                                                            {/* Style Type */}
+                                                            <div className="space-y-1">
+                                                                <Label className="text-xs">Style Type</Label>
+                                                                <div className="flex items-center gap-4">
+                                                                    <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                                                                        <input type="radio" name={`style-type-${idx}`} checked={cat.type !== "composite"} onChange={() => { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], type: "prompt" }; setForm((prev) => ({ ...prev, image_style_categories: nc })); }} />
+                                                                        🎨 AI Prompt
+                                                                    </label>
+                                                                    <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                                                                        <input type="radio" name={`style-type-${idx}`} checked={cat.type === "composite"} onChange={() => { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], type: "composite" }; setForm((prev) => ({ ...prev, image_style_categories: nc })); }} />
+                                                                        🧩 Composite Blend
+                                                                    </label>
+                                                                </div>
+                                                            </div>
                                                             <div className="space-y-1"><Label className="text-xs">Narrative</Label><Textarea value={cat.narrative} onChange={(e) => { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], narrative: e.target.value }; setForm((prev) => ({ ...prev, image_style_categories: nc })); }} placeholder="Context for this style..." rows={2} /></div>
                                                             <div className="space-y-1"><Label className="text-xs">Storytelling Cues</Label><Input value={cat.storytelling_cues.join(", ")} onChange={(e) => { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], storytelling_cues: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) }; setForm((prev) => ({ ...prev, image_style_categories: nc })); }} placeholder="emphasizes warmth, collaboration" /></div>
                                                             <div className="space-y-1"><Label className="text-xs">Image Prompt Style</Label><Textarea value={cat.image_prompt_style} onChange={(e) => { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], image_prompt_style: e.target.value }; setForm((prev) => ({ ...prev, image_style_categories: nc })); }} placeholder="Detailed style direction..." rows={3} /></div>
+                                                            {/* Composite Blend Fields */}
+                                                            {cat.type === "composite" && (
+                                                                <fieldset className="border border-border rounded-lg p-3.5 space-y-3 bg-muted/30">
+                                                                    <legend className="text-xs font-semibold px-1.5">🧩 Composite Blend Defaults</legend>
+                                                                    <div className="space-y-1">
+                                                                        <Label className="text-xs">Default Background Prompt</Label>
+                                                                        <Textarea value={cat.composite_bg_prompt ?? ""} onChange={(e) => { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], composite_bg_prompt: e.target.value }; setForm((prev) => ({ ...prev, image_style_categories: nc })); }} placeholder="e.g. Modern kitchen countertop with soft natural lighting" rows={2} />
+                                                                        <p className="text-[11px] text-muted-foreground">AI will generate a background from this prompt when no background image is provided.</p>
+                                                                    </div>
+
+                                                                    {/* Background Image — Search + URL */}
+                                                                    <div className="space-y-1.5">
+                                                                        <Label className="text-xs">Default Background Image</Label>
+                                                                        <div className="flex gap-2">
+                                                                            <Input placeholder="Search for background images..." value={csBgSearchQuery[idx] ?? ""} onChange={(e) => setCsBgSearchQuery((prev) => ({ ...prev, [idx]: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onCsBgSearch(idx); } }} />
+                                                                            <Button type="button" variant="outline" size="sm" onClick={() => onCsBgSearch(idx)} disabled={csBgSearching[idx] || !csBgSearchQuery[idx]?.trim()} className="whitespace-nowrap gap-1">
+                                                                                <Search className="h-3.5 w-3.5" />
+                                                                                {csBgSearching[idx] ? "…" : "Search"}
+                                                                            </Button>
+                                                                        </div>
+                                                                        {(csBgSearchResults[idx]?.length ?? 0) > 0 && (
+                                                                            <div className="grid grid-cols-4 gap-1.5">
+                                                                                {csBgSearchResults[idx]!.map((img, i) => (
+                                                                                    <button type="button" key={i} onClick={() => { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], composite_bg_image_url: img.imageUrl }; setForm((prev) => ({ ...prev, image_style_categories: nc })); }}
+                                                                                        className={cn("rounded-lg overflow-hidden border-2 transition-colors", cat.composite_bg_image_url === img.imageUrl ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-primary/50")}>
+                                                                                        <img src={img.thumbnailUrl || img.imageUrl} alt={img.title} loading="lazy" className="w-full aspect-[16/9] object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                                                                                        <div className="px-1 py-0.5 text-[10px] text-muted-foreground truncate">{img.title}</div>
+                                                                                    </button>
+                                                                                ))}
+                                                                            </div>
+                                                                        )}
+                                                                        {cat.composite_bg_image_url && (
+                                                                            <div className="flex items-center gap-2 p-1.5 rounded-md bg-card border border-border">
+                                                                                <img src={cat.composite_bg_image_url} alt="Selected background" className="w-16 h-10 object-cover rounded" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                                                                                <Input value={cat.composite_bg_image_url} onChange={(e) => { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], composite_bg_image_url: e.target.value }; setForm((prev) => ({ ...prev, image_style_categories: nc })); }} className="text-xs flex-1 h-7" />
+                                                                                <Button type="button" variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], composite_bg_image_url: "" }; setForm((prev) => ({ ...prev, image_style_categories: nc })); }}><X className="h-3 w-3" /></Button>
+                                                                            </div>
+                                                                        )}
+                                                                        <p className="text-[11px] text-muted-foreground">Search or paste a URL — used instead of AI generation when set.</p>
+                                                                    </div>
+
+                                                                    {/* Product Image Search */}
+                                                                    <div className="space-y-1.5">
+                                                                        <Label className="text-xs">Default Product Search Query</Label>
+                                                                        <div className="flex gap-2">
+                                                                            <Input value={cat.composite_product_query ?? ""} onChange={(e) => { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], composite_product_query: e.target.value }; setForm((prev) => ({ ...prev, image_style_categories: nc })); }} placeholder="e.g. stainless steel blender product photo"
+                                                                                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setCsProductSearchQuery((prev) => ({ ...prev, [idx]: cat.composite_product_query ?? "" })); setTimeout(() => onCsProductSearch(idx), 0); } }} />
+                                                                            <Button type="button" variant="outline" size="sm" onClick={() => { setCsProductSearchQuery((prev) => ({ ...prev, [idx]: cat.composite_product_query ?? "" })); setTimeout(() => onCsProductSearch(idx), 0); }} disabled={csProductSearching[idx] || !(cat.composite_product_query?.trim())} className="whitespace-nowrap gap-1">
+                                                                                <Search className="h-3.5 w-3.5" />
+                                                                                {csProductSearching[idx] ? "…" : "Preview"}
+                                                                            </Button>
+                                                                        </div>
+                                                                        {(csProductSearchResults[idx]?.length ?? 0) > 0 && (
+                                                                            <div>
+                                                                                <p className="text-[10px] text-muted-foreground mb-1">Preview — these are the products users will see when creating articles with this style:</p>
+                                                                                <div className="grid grid-cols-4 gap-1.5">
+                                                                                    {csProductSearchResults[idx]!.map((img, i) => (
+                                                                                        <div key={i} className="rounded-lg overflow-hidden border border-border">
+                                                                                            <img src={img.thumbnailUrl || img.imageUrl} alt={img.title} loading="lazy" className="w-full aspect-square object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                                                                                            <div className="px-1 py-0.5 text-[10px] text-muted-foreground truncate">{img.title}</div>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                        <p className="text-[11px] text-muted-foreground">Pre-populates the product image search when creating articles.</p>
+                                                                    </div>
+                                                                </fieldset>
+                                                            )}
                                                         </CardContent>
                                                     )}
                                                 </Card>
@@ -365,21 +517,23 @@ export default function CompaniesPage() {
 
                 <div className="space-y-3">
                     {companies.map((c) => (
-                        <Card key={c.id}>
-                            <CardContent className="p-4 flex items-start gap-4">
-                                <div className="w-12 h-12 rounded-lg shrink-0 border border-border" style={{ background: `linear-gradient(135deg, ${c.color_primary ?? "#000"}, ${c.color_secondary ?? "#fff"})` }} />
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="font-semibold">{c.name}</h3>
-                                    {c.tagline && <p className="text-sm text-muted-foreground italic">{c.tagline}</p>}
-                                    <div className="flex gap-1.5 flex-wrap mt-1.5">
-                                        {c.archetype && <Badge variant="secondary" className="text-xs">{c.archetype}</Badge>}
-                                        {c.tone && <Badge variant="secondary" className="text-xs">{c.tone}</Badge>}
-                                        {c.voice_profile && <Badge variant="outline" className="text-xs gap-1"><Mic className="h-3 w-3" /> Voice</Badge>}
-                                        {c.auto_humanize !== false && <Badge variant="outline" className="text-xs text-success border-success/50">🧹 Auto</Badge>}
-                                        <span className="text-xs text-muted-foreground self-center">{new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                        <Card key={c.id} className="overflow-visible">
+                            <CardContent className="p-4 space-y-3">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-lg shrink-0 border border-border" style={{ backgroundColor: c.color_primary ?? "#000" }} />
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-semibold">{c.name}</h3>
+                                        {c.tagline && <p className="text-sm text-muted-foreground italic">{c.tagline}</p>}
+                                        <div className="flex gap-1.5 flex-wrap mt-1.5">
+                                            {c.archetype && <Badge variant="secondary" className="text-xs">{c.archetype}</Badge>}
+                                            {c.tone && <Badge variant="secondary" className="text-xs">{c.tone}</Badge>}
+                                            {c.voice_profile && <Badge variant="outline" className="text-xs gap-1"><Mic className="h-3 w-3" /> Voice</Badge>}
+                                            {c.auto_humanize !== false && <Badge variant="outline" className="text-xs text-success border-success/50">🧹 Auto</Badge>}
+                                            <span className="text-xs text-muted-foreground self-center">{new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="flex gap-1.5 shrink-0">
+                                <div className="flex gap-1.5 flex-wrap items-center justify-end relative z-10">
                                     <Button variant="outline" size="sm" onClick={() => openEdit(c)} className="gap-1"><Pencil className="h-3 w-3" /> Edit</Button>
                                     <Button variant="outline" size="sm" onClick={() => openVoicePanel(c.id)} className={cn("gap-1", c.voice_profile && "text-primary")}><Mic className="h-3 w-3" /> Voice</Button>
                                     <Button variant="outline" size="sm" onClick={() => openPromptPanel(c.id)} className="gap-1"><FileText className="h-3 w-3" /> Prompts</Button>

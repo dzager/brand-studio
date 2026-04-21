@@ -37,6 +37,7 @@ export default async function handler(
                 reference_articles,
                 evals,
                 auto_humanize,
+                include_toc,
             } = req.body;
 
             if (!name || typeof name !== "string" || name.trim().length < 1) {
@@ -75,6 +76,9 @@ export default async function handler(
             }
             if (auto_humanize !== undefined) {
                 insertPayload.auto_humanize = auto_humanize ?? true;
+            }
+            if (include_toc !== undefined) {
+                insertPayload.include_toc = include_toc ?? false;
             }
 
             const { data, error } = await supabase

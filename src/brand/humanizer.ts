@@ -106,6 +106,18 @@ The opening sentence is the single highest-priority fix. AI-generated content al
 
 **Problem:** Many LLM-generated articles include formulaic "Challenges" sections.
 
+### 5b. Casual Dramatic Framing & Negative Editorial Coloring
+
+**Words to watch:** brace yourself, buckle up, steel yourself, here's the kicker, spoiler alert, the harsh reality, the hard truth, hate to break it to you, not for the faint of heart, sticker shock, can be brutal, painfully slow
+
+**Problem:** LLMs sometimes adopt a casual, dramatic, or fatalistic tone — especially in articles about costs, timelines, or bureaucratic processes. This sounds like a Reddit commenter, not a professional writer. Replace dramatic framing with direct factual statements.
+
+**Examples:**
+- BAD: "If you're applying for a marriage-based green card in 2026, brace yourself for a wait."
+- GOOD: "If you're applying for a marriage-based green card in 2026, you should expect the process to take a year or more."
+- BAD: "The costs can be brutal — especially if your case gets complicated."
+- GOOD: "Total costs typically range from $1,500 to $3,000, with additional expenses if complications arise."
+
 ---
 
 ## LANGUAGE AND GRAMMAR PATTERNS TO FIX
@@ -142,9 +154,10 @@ The opening sentence is the single highest-priority fix. AI-generated content al
 
 ## STYLE PATTERNS TO FIX
 
-### 12. Em Dash Overuse
+### 12. Em Dash Overuse & Spacing
 
 **Problem:** LLMs use em dashes (—) more than humans. Replace most with commas, periods, or parentheses.
+**Spacing rule:** When an em dash IS used, always place a space on either side — like this. Never use a closed em dash (word—word). Correct: "word — word". Incorrect: "word—word" or "word —word" or "word— word".
 
 ### 13. Filler Phrases
 

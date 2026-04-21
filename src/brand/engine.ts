@@ -52,6 +52,11 @@ export type ImageStyleCategory = {
     narrative: string;
     storytelling_cues: string[];
     image_prompt_style: string;
+    // Composite blend fields
+    type?: "prompt" | "composite";        // defaults to "prompt"
+    composite_bg_prompt?: string;          // default background scene description
+    composite_product_query?: string;      // default product search query
+    composite_bg_image_url?: string;       // default background image URL
 };
 
 export type VoiceProfile = {
@@ -338,6 +343,17 @@ export const BRAND_ENGINE: BrandEngine = {
             "unlock your",
             "level up",
             "deep dive",
+            // Casual / dramatic framing
+            "brace yourself",
+            "buckle up",
+            "steel yourself",
+            "here's the kicker",
+            "spoiler alert",
+            "the harsh reality",
+            "the hard truth",
+            "hate to break it to you",
+            "not for the faint of heart",
+            "sticker shock",
             // Content writer blacklist
             "delve",
             "cutting-edge",
@@ -478,6 +494,8 @@ export function compileBlogSystemPrompt(
         `\n\n## Editorial Credibility (HIGHEST PRIORITY)\nThis section overrides any conflicting brand voice instructions.`,
         `- ${brand} content must protect credibility above all. When in doubt between sounding "warm" and sounding "credible," always choose credible.`,
         `- Do NOT inject optimism, empowerment, motivational framing, or reassuring language into news, policy, or procedural content. If a situation is complex, say so plainly.`,
+        `- Do NOT use casual dramatic framing — phrases like "brace yourself," "buckle up," "steel yourself," "here's the kicker," or "spoiler alert" belong in conversational blogs, not professional content. State facts directly instead. Example: "brace yourself for a wait" → "you should expect the process to take a year or more."`,
+        `- Do NOT lean negative or fatalistic. Report challenges factually without editorial coloring. Example: "the costs can be brutal" → "total costs typically range from $1,500 to $3,000." Let the reader draw their own conclusions from the facts.`,
         `- Avoid any sentence that sounds like it was written by an AI assistant, a life coach, or a content agency. If you can imagine a LinkedIn influencer posting it, cut it.`,
         `- Do not address the reader's emotions. Report facts. Explain processes.`,
 
@@ -504,10 +522,25 @@ export function compileBlogSystemPrompt(
 
         // On-Page Architecture (universal — critical for long-form)
         `\n\n## On-Page Architecture (MANDATORY for Long-Form Content)\nLong articles dilute page-level keyword signals unless properly architected. Use these techniques to maintain topical focus and improve user navigation.`,
-        `- **Clickable Table of Contents (MANDATORY)**: At the very top of the HTML, immediately after the intro paragraph, generate a \`<nav>\` element with the class \`toc\` containing an ordered list of all H2 sections as clickable anchor links. Each H2 in the body must have a corresponding \`id\` attribute (lowercase, hyphenated) that the TOC links to.`,
-        `- Example TOC format: \`<nav class="toc"><h2>Table of Contents</h2><ol><li><a href="#section-id">Section Title</a></li>...</ol></nav>\``,
-        `- Each H2 id must match its TOC link exactly (e.g., id="cost-breakdown" → href="#cost-breakdown").`,
-        `- The TOC H2 itself should NOT appear in the TOC list.`,
+    ];
+
+    // Table of Contents — only if enabled for this company
+    const includeToc = (engine as any).include_toc === true;
+    if (includeToc) {
+        sections.push(
+            `- **Clickable Table of Contents (MANDATORY)**: At the very top of the HTML, immediately after the intro paragraph, generate a \`<nav>\` element with the class \`toc\` containing an ordered list of all H2 sections as clickable anchor links. Each H2 in the body must have a corresponding \`id\` attribute (lowercase, hyphenated) that the TOC links to.`,
+            `- Example TOC format: \`<nav class="toc"><h2>Table of Contents</h2><ol><li><a href="#section-id">Section Title</a></li>...</ol></nav>\``,
+            `- Each H2 id must match its TOC link exactly (e.g., id="cost-breakdown" → href="#cost-breakdown").`,
+            `- The TOC H2 itself should NOT appear in the TOC list.`,
+        );
+    } else {
+        sections.push(
+            `- **Do NOT generate a Table of Contents**. Skip the TOC nav element entirely.`,
+            `- H2 headings should still use descriptive \`id\` attributes (lowercase, hyphenated) for deep linking.`,
+        );
+    }
+
+    sections.push(
         `- **Keyword signal concentration**: Reinforce the primary keyword in the first 100 words, the conclusion, and at least two H2 headings. Use secondary keywords as H2/H3 headings to create focused topical clusters.`,
         `- **Section self-sufficiency**: Each H2 section should be a self-contained topical unit targeting its own keyword. This helps search engines index individual sections for their respective queries.`,
 
@@ -521,11 +554,12 @@ export function compileBlogSystemPrompt(
         `- **FAQ geo-targeting**: When the topic involves location-dependent information (real estate, legal, medical, regulatory), include at least one FAQ that addresses regional or location-specific variation. Example: "How much does a dental implant cost in Seattle vs. national average?" rather than generic "How much do dental implants cost?"`,
         `- **Entity optimization**: Include relevant entities (agencies, forms, legal terms, programs, standards) by their full official name on first use, then consistently thereafter. Wrap key entities in <strong> tags. Make entity relationships clear and contextual (e.g., which agency administers which form, which program falls under which law).`,
         `- Each section should fully answer the question it introduces, without requiring the reader to infer missing steps or context.`,
+        `- **Em dash spacing (MANDATORY)**: When using an em dash (—), always place a space on either side — like this. Never output a closed em dash (word—word). Correct: "word — word". Incorrect: "word—word".`,
         `Do NOT use:`,
         `- Padded introductions explaining what the article will cover`,
         `- Redundant summary sections that repeat what was already said`,
         `- Rhetorical questions as transitions ("But what does this mean for you?")`,
-    ];
+    );
 
     // ── SEO TARGETING (universal) ───────────────────────────────────────
 

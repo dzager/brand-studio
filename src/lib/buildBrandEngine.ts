@@ -27,6 +27,7 @@ export type CompanyRecord = {
     reference_articles: string[] | null;
     evals: BrandEngine["evals"] | null;
     auto_humanize: boolean | null;
+    include_toc: boolean | null;
     created_at: string;
 };
 
@@ -120,6 +121,9 @@ export function buildBrandEngine(company: CompanyRecord): BrandEngine {
 
     // Auto-humanize toggle
     (base as any).auto_humanize = company.auto_humanize !== false; // default true
+
+    // Table of Contents toggle
+    (base as any).include_toc = company.include_toc === true; // default false
 
     // Update system prompt core to reflect the new brand
     base.prompt_layers.system.core = `You represent the ${company.name} brand.${company.tagline ? ` Tagline: "${company.tagline}".` : ""

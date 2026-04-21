@@ -10,6 +10,7 @@ import {
     compileBlogSystemPrompt,
     getImageStyleCategories,
 } from "@/brand/engine";
+import { generateCompositeImage } from "@/lib/compositeEngine";
 import {
     buildBlogHumanizePrompt,
     buildShortContentHumanizePrompt,
@@ -144,7 +145,13 @@ export default async function handler(
             return res.status(405).json({ error: "Method not allowed. Use POST." });
         }
 
-        const { creation_prompt, image_style, model: requestedModel, word_count, company_id } = req.body ?? {};
+        const {
+            creation_prompt, image_style, model: requestedModel, word_count, company_id,
+            // Composite-specific fields (when style type is "composite")
+            composite_product_image_url,
+            composite_bg_image_url,
+            composite_bg_prompt: compositeOverrideBgPrompt,
+        } = req.body ?? {};
 
         if (
             typeof creation_prompt !== "string" ||
@@ -284,20 +291,60 @@ Which style best fits this article? Respond with JSON only.`;
             }
         }
 
-        // ── Step 2: Generate image prompt (separate LLM call) ──────────
-        const imgSystem = compileImageSystemPrompt(brand);
-        const imgUser = compileImageUserPrompt({
-            title: blog.title,
-            excerpt: blog.excerpt,
-            brand,
-            styleId,
-        });
+        // ── Step 2: Generate image ──────────────────────────────────────
+        const resolvedStyle = brandCategories.find((c) => c.id === styleId);
+        const isCompositeStyle = resolvedStyle?.type === "composite";
+        const hasCompositeProduct = composite_product_image_url && typeof composite_product_image_url === "string";
 
-        const finalImagePrompt = await getTextResponse("gpt-4.1-nano", imgSystem, imgUser);
+        let finalImagePrompt = "";
+        let image_base64: string | null = null;
 
-        const image_base64 = await generateImageBase64(
-            finalImagePrompt || `Editorial photo for: ${blog.title}`
-        );
+        if (isCompositeStyle && hasCompositeProduct) {
+            // ── Composite pipeline ─────────────────────────────────────
+            console.log(`[create] Using composite pipeline for style "${styleId}"`);
+            const photo = brand.photography_style;
+            let brandDirective = resolvedStyle?.image_prompt_style
+                ? `Visual style: ${resolvedStyle.image_prompt_style}\n`
+                : "";
+            brandDirective += [
+                `Lighting: ${photo.lighting}`,
+                `Mood: ${photo.mood}`,
+                `Feel: ${photo.global_feel.join(", ")}`,
+            ].join(". ") + ".";
+
+            const bgPrompt = (typeof compositeOverrideBgPrompt === "string" && compositeOverrideBgPrompt.trim())
+                ? compositeOverrideBgPrompt.trim()
+                : resolvedStyle?.composite_bg_prompt || undefined;
+            const bgImageUrl = (typeof composite_bg_image_url === "string" && composite_bg_image_url.trim())
+                ? composite_bg_image_url.trim()
+                : resolvedStyle?.composite_bg_image_url || undefined;
+
+            const compositeResult = await generateCompositeImage({
+                productImageUrl: composite_product_image_url,
+                backgroundImageUrl: bgImageUrl,
+                backgroundPrompt: bgPrompt,
+                articleTitle: blog.title,
+                articleExcerpt: blog.excerpt,
+                brandStyleDirective: brandDirective,
+            });
+            image_base64 = compositeResult.image_base64;
+            finalImagePrompt = `Composite: ${compositeResult.background_prompt}`;
+        } else {
+            // ── Standard AI image generation ───────────────────────────
+            const imgSystem = compileImageSystemPrompt(brand);
+            const imgUser = compileImageUserPrompt({
+                title: blog.title,
+                excerpt: blog.excerpt,
+                brand,
+                styleId,
+            });
+
+            finalImagePrompt = await getTextResponse("gpt-4.1-nano", imgSystem, imgUser);
+
+            image_base64 = await generateImageBase64(
+                finalImagePrompt || `Editorial photo for: ${blog.title}`
+            );
+        }
 
         // Auto-save to Supabase — include AEO data in the seo column
         const seoWithAeo = {

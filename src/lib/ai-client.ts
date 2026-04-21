@@ -16,34 +16,38 @@ import type { LanguageModel } from "ai";
 
 // ── Model Registry ──────────────────────────────────────────────────────
 
+export type ModelCapability = "writing" | "imageGeneration" | "utility";
+
 export type ModelOption = {
     id: string;
     label: string;
     provider: "openai" | "anthropic" | "google";
     envKey: string;           // required env var
     supportsStructured: boolean; // supports JSON schema output
+    capabilities: ModelCapability[]; // which process categories this model supports
 };
 
 export const MODEL_REGISTRY: ModelOption[] = [
     // OpenAI
-    { id: "gpt-4.1-nano",   label: "GPT-4.1 Nano",       provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true },
-    { id: "gpt-4.1",        label: "GPT-4.1",             provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true },
-    { id: "gpt-4.1-mini",   label: "GPT-4.1 Mini",        provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true },
-    { id: "gpt-5.1",        label: "GPT-5.1",             provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true },
-    { id: "gpt-5.2",        label: "GPT-5.2",             provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true },
-    { id: "gpt-5.3-chat-latest", label: "GPT-5.3",        provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true },
-    { id: "gpt-5.4",        label: "GPT-5.4",             provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true },
+    { id: "gpt-4.1-nano",   label: "GPT-4.1 Nano",       provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true, capabilities: ["writing", "utility"] },
+    { id: "gpt-4.1",        label: "GPT-4.1",             provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true, capabilities: ["writing", "utility"] },
+    { id: "gpt-4.1-mini",   label: "GPT-4.1 Mini",        provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true, capabilities: ["writing", "utility"] },
+    { id: "gpt-5.1",        label: "GPT-5.1",             provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true, capabilities: ["writing", "utility"] },
+    { id: "gpt-5.2",        label: "GPT-5.2",             provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true, capabilities: ["writing", "utility"] },
+    { id: "gpt-5.3-chat-latest", label: "GPT-5.3",        provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true, capabilities: ["writing", "utility"] },
+    { id: "gpt-5.4",        label: "GPT-5.4",             provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true, capabilities: ["writing", "utility"] },
 
     // Anthropic
-    { id: "claude-sonnet-4-20250514",    label: "Claude Sonnet 4",     provider: "anthropic", envKey: "ANTHROPIC_API_KEY",            supportsStructured: true },
-    { id: "claude-3-5-haiku-20241022",   label: "Claude 3.5 Haiku",   provider: "anthropic", envKey: "ANTHROPIC_API_KEY",            supportsStructured: true },
+    { id: "claude-sonnet-4-20250514",    label: "Claude Sonnet 4",     provider: "anthropic", envKey: "ANTHROPIC_API_KEY",            supportsStructured: true, capabilities: ["writing", "utility"] },
+    { id: "claude-3-5-haiku-20241022",   label: "Claude 3.5 Haiku",   provider: "anthropic", envKey: "ANTHROPIC_API_KEY",            supportsStructured: true, capabilities: ["writing", "utility"] },
 
     // Google
-    { id: "gemini-2.5-flash-preview-04-17", label: "Gemini 2.5 Flash", provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true },
-    { id: "gemini-2.5-pro-preview-05-06",   label: "Gemini 2.5 Pro",   provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true },
-    { id: "gemini-3.1-flash-lite-preview",   label: "Gemini 3.1 Flash", provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true },
-    { id: "gemini-2.5-flash-image",            label: "Gemini 2.5 Flash Image", provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true },
-    { id: "gemini-3-pro-image-preview",         label: "Gemini 3 Pro Image",     provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true },
+    { id: "gemini-3.1-pro-preview",            label: "Gemini 3.1 Pro",   provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true, capabilities: ["writing", "utility"] },
+    { id: "gemini-2.5-flash-preview-04-17", label: "Gemini 2.5 Flash", provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true, capabilities: ["writing", "utility"] },
+    { id: "gemini-2.5-pro-preview-05-06",   label: "Gemini 2.5 Pro",   provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true, capabilities: ["writing", "utility"] },
+    { id: "gemini-3.1-flash-lite-preview",   label: "Gemini 3.1 Flash", provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true, capabilities: ["writing", "utility"] },
+    { id: "gemini-2.5-flash-image",            label: "Gemini 2.5 Flash Image", provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true, capabilities: ["writing", "imageGeneration"] },
+    { id: "gemini-3-pro-image-preview",         label: "Gemini 3 Pro Image",     provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true, capabilities: ["writing", "imageGeneration"] },
 ];
 
 /**
@@ -157,23 +161,44 @@ export function getOpenAIClient(): OpenAI {
  * Default image generation model.
  * Uses Gemini 3 Pro Image when Google key is available, otherwise falls back to OpenAI.
  */
-const DEFAULT_IMAGE_MODEL = "gemini-3-pro-image-preview";
+export const DEFAULT_IMAGE_MODEL = "gemini-3-pro-image-preview";
+export const DEFAULT_WRITING_MODEL = "gpt-5.3-chat-latest";
+export const DEFAULT_UTILITY_MODEL = "gpt-4.1-nano";
+
+/**
+ * Resolves an image model ID from user settings.
+ * Returns the model ID if available, or the default image model.
+ */
+export function resolveImageModelId(requestedModel: string | undefined): string {
+    const available = getAvailableModels();
+    if (typeof requestedModel === "string" && available.some((m) => m.id === requestedModel && m.capabilities.includes("imageGeneration"))) {
+        return requestedModel;
+    }
+    if (available.some((m) => m.id === DEFAULT_IMAGE_MODEL)) {
+        return DEFAULT_IMAGE_MODEL;
+    }
+    // Fallback to first image-capable model
+    const firstImage = available.find((m) => m.capabilities.includes("imageGeneration"));
+    return firstImage?.id ?? DEFAULT_IMAGE_MODEL;
+}
 
 /**
  * Generate an image and return its base64-encoded data.
  * Defaults to Gemini 3 Pro Image; falls back to OpenAI gpt-image-1.
+ * Accepts an optional imageModel to override the default.
  */
 export async function generateImageBase64(
     prompt: string,
-    options?: { size?: string; aspectRatio?: string }
+    options?: { size?: string; aspectRatio?: string; imageModel?: string }
 ): Promise<string | null> {
     const aspectRatio = options?.aspectRatio ?? "16:9";
+    const imageModel = options?.imageModel ?? DEFAULT_IMAGE_MODEL;
 
-    // Try Gemini first if the key is available
+    // Try Gemini/Google image model first if the key is available
     if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
         try {
             const result = await generateImage({
-                model: google.image(DEFAULT_IMAGE_MODEL),
+                model: google.image(imageModel),
                 prompt,
                 aspectRatio: aspectRatio as `${number}:${number}`,
             });
@@ -188,9 +213,9 @@ export async function generateImageBase64(
                 return Buffer.from(result.image.uint8Array).toString("base64");
             }
 
-            console.warn("Gemini 3 Pro Image generation returned no image, falling back to OpenAI");
+            console.warn(`${imageModel} generation returned no image, falling back to OpenAI`);
         } catch (err) {
-            console.warn("Gemini 3 Pro Image generation failed, falling back to OpenAI:", err);
+            console.warn(`${imageModel} generation failed, falling back to OpenAI:`, err);
         }
     }
 

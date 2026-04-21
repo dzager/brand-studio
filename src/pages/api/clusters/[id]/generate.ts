@@ -122,6 +122,7 @@ export default async function handler(
             page_index,
             model: requestedModel,
             image_style: rawStyle,
+            image_mode,
         } = req.body ?? {};
 
         if (!page_type || typeof page_index !== "number") {
@@ -310,19 +311,76 @@ Which style best fits this article? Respond with JSON only.`;
         }
 
         // Generate image
-        const imgSystem = compileImageSystemPrompt(brand);
-        const imgUser = compileImageUserPrompt({
-            title: blog.title,
-            excerpt: blog.excerpt,
-            brand,
-            styleId,
-        });
+        let finalImagePrompt = "";
+        let image_base64: string | null = null;
 
-        const finalImagePrompt = await getTextResponse("gpt-4.1-nano", imgSystem, imgUser);
+        if (image_mode === "search") {
+            // ── Search-based image: find a real photo via Serper ──────
+            try {
+                const searchQuery = `${page.keyword} ${page.title}`.slice(0, 120);
+                console.log(`Image search for cluster page "${page.slug}": "${searchQuery}"`);
 
-        const image_base64 = await generateImageBase64(
-            finalImagePrompt || `Editorial photo for: ${blog.title}`
-        );
+                const serperKey = process.env.SERPER_API_KEY;
+                if (!serperKey) throw new Error("Missing SERPER_API_KEY");
+
+                const serperResp = await fetch("https://google.serper.dev/images", {
+                    method: "POST",
+                    headers: {
+                        "X-API-KEY": serperKey,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ q: searchQuery, num: 5 }),
+                });
+
+                if (!serperResp.ok) throw new Error(`Serper status ${serperResp.status}`);
+                const serperData = await serperResp.json();
+                const images = serperData.images ?? [];
+
+                // Pick the first image that is large enough
+                let selectedUrl: string | null = null;
+                for (const img of images) {
+                    const w = img.imageWidth ?? 0;
+                    const h = img.imageHeight ?? 0;
+                    if (w >= 400 && h >= 300 && img.imageUrl) {
+                        selectedUrl = img.imageUrl;
+                        break;
+                    }
+                }
+                if (!selectedUrl && images.length > 0) selectedUrl = images[0].imageUrl;
+
+                if (selectedUrl) {
+                    // Fetch the image and convert to base64
+                    const imgResp = await fetch(selectedUrl, {
+                        headers: { "User-Agent": "Mozilla/5.0" },
+                    });
+                    if (imgResp.ok) {
+                        const buffer = Buffer.from(await imgResp.arrayBuffer());
+                        image_base64 = buffer.toString("base64");
+                        finalImagePrompt = `Image search: ${searchQuery} (source: ${selectedUrl})`;
+                        console.log(`Found search image for "${page.slug}" from ${selectedUrl}`);
+                    }
+                }
+            } catch (searchErr) {
+                console.warn(`Image search failed for "${page.slug}", falling back to AI:`, searchErr);
+            }
+        }
+
+        // ── Fallback / standard AI image generation ──────────────────
+        if (!image_base64) {
+            const imgSystem = compileImageSystemPrompt(brand);
+            const imgUser = compileImageUserPrompt({
+                title: blog.title,
+                excerpt: blog.excerpt,
+                brand,
+                styleId,
+            });
+
+            finalImagePrompt = await getTextResponse("gpt-4.1-nano", imgSystem, imgUser);
+
+            image_base64 = await generateImageBase64(
+                finalImagePrompt || `Editorial photo for: ${blog.title}`
+            );
+        }
 
         // Build JSON-LD
         const jsonld = buildAllJsonLd({

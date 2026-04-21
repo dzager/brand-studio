@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import type { ConsulResult, ConsulClaimReview } from "@/lib/consulPrompts";
 import { cn } from "@/lib/utils";
+import { useModelDefaults } from "@/hooks/useModelDefaults";
 
 export const getServerSideProps: GetServerSideProps = async () => {
   return { props: {} };
@@ -83,9 +84,10 @@ const AGREEMENT_LABELS: Record<string, { label: string; icon: string; color: str
 let _imgId = 0;
 
 export default function Home() {
+    const { defaults } = useModelDefaults();
     const [prompt, setPrompt] = useState("please make an image of a family in a major city");
     const [imageStyle, setImageStyle] = useState("default");
-    const [model, setModel] = useState("gpt-5.3-chat-latest");
+    const [model, setModel] = useState("");
     const [availableModels, setAvailableModels] = useState<{ id: string; label: string; provider: string }[]>([]);
     const [wordCount, setWordCount] = useState("1500-2500");
     const [companyId, setCompanyId] = useState<string>("");
@@ -104,6 +106,7 @@ export default function Home() {
     const [consulErr, setConsulErr] = useState<string | null>(null);
     const [expandedClaims, setExpandedClaims] = useState<Set<number>>(new Set());
     const [applyingRewrite, setApplyingRewrite] = useState<number | null>(null);
+    const [appliedRewrites, setAppliedRewrites] = useState<Set<number>>(new Set());
 
     const [gallery, setGallery] = useState<GalleryImage[]>([]);
     const [selectedImgId, setSelectedImgId] = useState<number | null>(null);
@@ -149,16 +152,51 @@ export default function Home() {
     const [compositeResult, setCompositeResult] = useState<string | null>(null);
     const [compositeErr, setCompositeErr] = useState<string | null>(null);
 
+    // Composite style state for create flow
+    const [csProductQuery, setCsProductQuery] = useState("");
+    const [csProductResults, setCsProductResults] = useState<SearchImage[]>([]);
+    const [csProductSearching, setCsProductSearching] = useState(false);
+    const [csProductUrl, setCsProductUrl] = useState<string | null>(null);
+    const [csProductThumb, setCsProductThumb] = useState<string | null>(null);
+    const [csBgPrompt, setCsBgPrompt] = useState("");
+    const [csBgImageUrl, setCsBgImageUrl] = useState("");
+
+    // Derived: is the currently selected style composite?
+    const selectedStyleObj = activeStyles.find((s) => s.id === imageStyle);
+    const isCompositeStyle = selectedStyleObj?.type === "composite";
+
+    async function csProductSearch() {
+        if (!csProductQuery.trim()) return;
+        setCsProductSearching(true);
+        try {
+            const r = await fetch("/api/image-search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: csProductQuery.trim(), num: 8 }) });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data?.error || "Search failed");
+            setCsProductResults(data.images ?? []);
+        } catch { setCsProductResults([]); }
+        finally { setCsProductSearching(false); }
+    }
+
     // Fetch companies + models
     useEffect(() => {
         fetch("/api/companies").then((r) => r.json()).then((data) => { if (Array.isArray(data)) setCompanies(data); }).catch(() => {});
         fetch("/api/models").then((r) => r.json()).then((data) => {
             if (data?.models && Array.isArray(data.models)) {
                 setAvailableModels(data.models);
-                if (data.models.length > 0 && !data.models.some((m: any) => m.id === model)) setModel(data.models[0].id);
             }
         }).catch(() => {});
     }, []);
+
+    // Initialize model from user's saved default once models are loaded
+    useEffect(() => {
+        if (availableModels.length === 0) return;
+        const target = defaults.writing;
+        if (availableModels.some((m) => m.id === target)) {
+            setModel(target);
+        } else {
+            setModel(availableModels[0].id);
+        }
+    }, [availableModels, defaults.writing]);
 
     useEffect(() => {
         if (!companyId) { setActiveStyles(IMAGE_STYLE_CATEGORIES); setImageStyle("default"); return; }
@@ -178,10 +216,25 @@ export default function Home() {
 
     async function onCreate() {
         setLoading(true); setErr(null); setResult(null); setFactCheck(null); setFactCheckErr(null);
-        setConsulResult(null); setConsulErr(null); setExpandedClaims(new Set());
+        setConsulResult(null); setConsulErr(null); setExpandedClaims(new Set()); setAppliedRewrites(new Set());
         setGallery([]); setSelectedImgId(null); setCustomImagePrompt(""); setRefreshErr(null); setHumanized(false); setHumanizeErr(null);
         try {
-            const r = await fetch("/api/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ creation_prompt: prompt, image_style: imageStyle, model, word_count: wordCount, company_id: companyId || undefined }) });
+            const payload: Record<string, unknown> = {
+                creation_prompt: prompt,
+                image_style: imageStyle,
+                model,
+                word_count: wordCount,
+                company_id: companyId || undefined,
+                image_model: defaults.imageGeneration,
+                utility_model: defaults.utility,
+            };
+            // Add composite params if applicable
+            if (isCompositeStyle && csProductUrl) {
+                payload.composite_product_image_url = csProductUrl;
+                if (csBgImageUrl.trim()) payload.composite_bg_image_url = csBgImageUrl.trim();
+                if (csBgPrompt.trim()) payload.composite_bg_prompt = csBgPrompt.trim();
+            }
+            const r = await fetch("/api/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
             const text = await r.text(); const data = text ? JSON.parse(text) : null;
             if (!r.ok) throw new Error(data?.error || `Request failed with status ${r.status}`);
             setResult(data);
@@ -192,7 +245,7 @@ export default function Home() {
     async function onPreviewPrompt() {
         setPreviewing(true); setPreviewErr(null); setPreviewData(null); setPreviewCopied(null);
         try {
-            const r = await fetch("/api/preview-prompt", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ creation_prompt: prompt, image_style: imageStyle, model, word_count: wordCount, company_id: companyId || undefined }) });
+            const r = await fetch("/api/preview-prompt", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ creation_prompt: prompt, image_style: imageStyle, model, word_count: wordCount, company_id: companyId || undefined, image_model: defaults.imageGeneration, utility_model: defaults.utility }) });
             const data = await r.json(); if (!r.ok) throw new Error(data?.error || `Preview failed (${r.status})`);
             setPreviewData(data);
         } catch (e: any) { setPreviewErr(e.message); } finally { setPreviewing(false); }
@@ -216,7 +269,21 @@ export default function Home() {
         if (!result?.image_prompt) return;
         setRefreshingImage(true); setRefreshErr(null);
         try {
-            const r = await fetch("/api/regenerate-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ base_prompt: result.image_prompt, custom_prompt: customImagePrompt.trim() || undefined, image_style: imageStyle, company_id: companyId || undefined }) });
+            const payload: Record<string, unknown> = {
+                base_prompt: result.image_prompt,
+                custom_prompt: customImagePrompt.trim() || undefined,
+                image_style: imageStyle,
+                company_id: companyId || undefined,
+            };
+            // Add composite params for refresh
+            if (isCompositeStyle && csProductUrl) {
+                payload.composite_product_image_url = csProductUrl;
+                payload.article_title = result.title;
+                payload.article_excerpt = result.excerpt;
+                if (csBgImageUrl.trim()) payload.composite_bg_image_url = csBgImageUrl.trim();
+                if (csBgPrompt.trim()) payload.composite_bg_prompt = csBgPrompt.trim();
+            }
+            const r = await fetch("/api/regenerate-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
             const text = await r.text(); const data = text ? JSON.parse(text) : null;
             if (!r.ok) throw new Error(data?.error || `Regeneration failed with status ${r.status}`);
             const newImg: GalleryImage = { id: ++_imgId, base64: data.image_base64, prompt: data.final_prompt ?? result.image_prompt, label: customImagePrompt.trim() ? `Variation: ${customImagePrompt.trim().slice(0, 40)}${customImagePrompt.trim().length > 40 ? "…" : ""}` : `Variation ${gallery.length + 1}` };
@@ -237,7 +304,7 @@ export default function Home() {
 
     async function onConsulCheck() {
         if (!result) return;
-        setConsulChecking(true); setConsulErr(null); setConsulResult(null); setExpandedClaims(new Set());
+        setConsulChecking(true); setConsulErr(null); setConsulResult(null); setExpandedClaims(new Set()); setAppliedRewrites(new Set());
         try {
             const r = await fetch("/api/fact-check-consul", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: result.title, excerpt: result.excerpt, html: result.html }) });
             const text = await r.text(); const data = text ? JSON.parse(text) : null;
@@ -268,6 +335,7 @@ export default function Home() {
             const data = await r.json();
             if (!r.ok) throw new Error(data?.error || "Apply rewrite failed");
             setResult((prev: any) => ({ ...prev, html: data.html }));
+            setAppliedRewrites((prev) => new Set(prev).add(claimIndex));
         } catch (e: any) { alert(`Rewrite failed: ${e.message}`); }
         finally { setApplyingRewrite(null); }
     }
@@ -407,7 +475,15 @@ export default function Home() {
                             <select id="image-style" value={imageStyle} onChange={(e) => {
                                     const newStyleId = e.target.value;
                                     setImageStyle(newStyleId);
-                                    // Clear previous prompt and pre-fill from the selected style's data
+                                    // Wipe previous prompt context and results when switching styles
+                                    setResult(null); setErr(null);
+                                    setGallery([]); setSelectedImgId(null); setRefreshErr(null);
+                                    setFactCheck(null); setFactCheckErr(null);
+                                    setConsulResult(null); setConsulErr(null); setExpandedClaims(new Set());
+                                    setHumanized(false); setHumanizeErr(null);
+                                    setRecommendation(null); setRecommendErr(null);
+                                    setPreviewData(null); setPreviewErr(null);
+                                    setOverlapResults(null); setOverlapErr(null);
                                     const style = activeStyles.find((s) => s.id === newStyleId);
                                     if (style && newStyleId !== "default") {
                                         const parts: string[] = [];
@@ -418,9 +494,18 @@ export default function Home() {
                                     } else {
                                         setCustomImagePrompt("");
                                     }
+                                    // Reset composite state and pre-populate from style defaults
+                                    setCsProductUrl(null); setCsProductThumb(null); setCsProductResults([]);
+                                    if (style?.type === "composite") {
+                                        setCsProductQuery(style.composite_product_query ?? "");
+                                        setCsBgPrompt(style.composite_bg_prompt ?? "");
+                                        setCsBgImageUrl(style.composite_bg_image_url ?? "");
+                                    } else {
+                                        setCsProductQuery(""); setCsBgPrompt(""); setCsBgImageUrl("");
+                                    }
                                 }}
                                 className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm">
-                                {activeStyles.map((cat) => <option key={cat.id} value={cat.id}>{cat.label}</option>)}
+                                {activeStyles.map((cat) => <option key={cat.id} value={cat.id}>{cat.type === "composite" ? `🧩 ${cat.label}` : cat.label}</option>)}
                             </select>
                             {activeStyles.length > 1 && (
                                 <Button variant="secondary" size="sm" disabled={recommending || !prompt.trim()} onClick={async () => {
@@ -484,6 +569,58 @@ export default function Home() {
                     </Alert>
                 )}
                 {recommendErr && <p className="text-sm text-destructive">{recommendErr}</p>}
+
+                {/* Composite Blend Panel — shown when composite style selected */}
+                {isCompositeStyle && (
+                    <Card className="border-primary/20 bg-primary/5">
+                        <CardContent className="pt-4 space-y-3">
+                            <div className="flex items-center gap-2">
+                                <Layers className="h-4 w-4 text-primary" />
+                                <span className="text-sm font-semibold text-primary">🧩 Composite Blend</span>
+                                {csProductUrl && <Badge variant="outline" className="text-[10px] border-green-500/50 text-green-600">✓ Product selected</Badge>}
+                            </div>
+                            <div className="flex gap-2">
+                                <Input placeholder={selectedStyleObj?.composite_product_query || "Search product image..."} value={csProductQuery} onChange={(e) => setCsProductQuery(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === "Enter") csProductSearch(); }} className="text-sm" />
+                                <Button variant="outline" size="sm" onClick={csProductSearch} disabled={csProductSearching || !csProductQuery.trim()} className="gap-1 whitespace-nowrap">
+                                    <Search className="h-3.5 w-3.5" />
+                                    {csProductSearching ? "…" : "Find Product"}
+                                </Button>
+                            </div>
+                            {csProductResults.length > 0 && (
+                                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                                    {csProductResults.map((img, i) => (
+                                        <button key={i} onClick={() => { setCsProductUrl(img.imageUrl); setCsProductThumb(img.thumbnailUrl || img.imageUrl); }}
+                                            className={cn("rounded-lg overflow-hidden border-2 transition-all",
+                                                csProductUrl === img.imageUrl ? "border-primary ring-2 ring-primary/30 scale-[1.02]" : "border-border hover:border-primary/50")}>
+                                            <img src={img.thumbnailUrl || img.imageUrl} alt={img.title} loading="lazy" className="w-full aspect-square object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                            {csProductUrl && csProductThumb && (
+                                <div className="flex items-center gap-3 p-2 rounded-md bg-card border border-border">
+                                    <img src={csProductThumb} alt="Selected product" className="w-12 h-12 object-contain rounded" />
+                                    <span className="text-sm text-muted-foreground truncate flex-1">Product selected for compositing</span>
+                                    <Button variant="ghost" size="sm" onClick={() => { setCsProductUrl(null); setCsProductThumb(null); }} className="text-destructive text-xs">Remove</Button>
+                                </div>
+                            )}
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Background prompt</Label>
+                                    <Input placeholder={selectedStyleObj?.composite_bg_prompt || "e.g. Modern kitchen countertop"} value={csBgPrompt} onChange={(e) => setCsBgPrompt(e.target.value)} className="text-sm" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Background image URL</Label>
+                                    <Input placeholder={selectedStyleObj?.composite_bg_image_url || "https://... (optional)"} value={csBgImageUrl} onChange={(e) => setCsBgImageUrl(e.target.value)} className="text-sm" />
+                                </div>
+                            </div>
+                            {isCompositeStyle && !csProductUrl && (
+                                <p className="text-xs text-muted-foreground italic">ℹ️ Select a product image above. If none is selected, the article will use standard AI image generation.</p>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex gap-2.5 items-center flex-wrap">
@@ -770,10 +907,10 @@ export default function Home() {
                                                 {claim.suggested_rewrite && (
                                                     <div className="mt-2 p-2 bg-card border border-dashed border-border rounded-md">
                                                         <p className="text-sm">✏️ <strong>Suggested rewrite:</strong> {claim.suggested_rewrite}</p>
-                                                        <Button variant="outline" size="sm" className="mt-2 gap-1.5 text-xs h-7"
-                                                            disabled={applyingRewrite === i}
+                                                        <Button variant="outline" size="sm" className={cn("mt-2 gap-1.5 text-xs h-7", appliedRewrites.has(i) && "border-success text-success")}
+                                                            disabled={applyingRewrite === i || appliedRewrites.has(i)}
                                                             onClick={() => onApplyRewrite(i)}>
-                                                            {applyingRewrite === i ? <><RefreshCw className="h-3 w-3 animate-spin" /> Applying…</> : <><Wand2 className="h-3 w-3" /> Apply Rewrite</>}
+                                                            {applyingRewrite === i ? <><RefreshCw className="h-3 w-3 animate-spin" /> Applying…</> : appliedRewrites.has(i) ? <><CheckCircle2 className="h-3 w-3" /> Applied</> : <><Wand2 className="h-3 w-3" /> Apply Rewrite</>}
                                                         </Button>
                                                     </div>
                                                 )}

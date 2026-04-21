@@ -364,8 +364,7 @@ export default function OutlineView({
                                                                                         : "text-foreground/80 hover:bg-accent border-l-2 border-transparent"
                                                                                 )}
                                                                             >
-                                                                                <div className="truncate">{article.title}</div>
-                                                                                <div className="text-[11px] text-muted-foreground truncate">/{article.slug}</div>
+                                                                                <div className="truncate">/{article.slug}</div>
                                                                             </button>
                                                                         ))}
                                                                     </div>
@@ -408,8 +407,7 @@ export default function OutlineView({
                                                                 : "text-foreground/80 hover:bg-accent border-l-2 border-transparent"
                                                         )}
                                                     >
-                                                        <div className="truncate">{article.title}</div>
-                                                        <div className="text-[11px] text-muted-foreground truncate">/{article.slug}</div>
+                                                        <div className="truncate">/{article.slug}</div>
                                                     </button>
                                                 ))}
                                             </div>

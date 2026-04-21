@@ -1,9 +1,10 @@
 // GraphView.tsx — Force-directed canvas graph showing content topology
 // Nodes = articles, edges = cluster links + semantic similarity
 
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 type Article = {
@@ -19,6 +20,7 @@ type Cluster = {
     id: string;
     name: string;
     strategy: any;
+    company_id: string;
 };
 
 type GraphNode = {
@@ -44,6 +46,7 @@ type GraphEdge = {
 type Props = {
     articles: Article[];
     clusters: Cluster[];
+    companies: Record<string, string>;
     onSelectArticle: (id: string) => void;
 };
 
@@ -61,7 +64,7 @@ function getRoleRadius(role: string | null): number {
     return 10;
 }
 
-export default function GraphView({ articles, clusters, onSelectArticle }: Props) {
+export default function GraphView({ articles, clusters, companies, onSelectArticle }: Props) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const nodesRef = useRef<GraphNode[]>([]);
     const edgesRef = useRef<GraphEdge[]>([]);
@@ -70,6 +73,29 @@ export default function GraphView({ articles, clusters, onSelectArticle }: Props
     const [dimensions, setDimensions] = useState({ w: 900, h: 500 });
     const dragRef = useRef<{ node: GraphNode; offsetX: number; offsetY: number } | null>(null);
     const isDarkRef = useRef(false);
+    const [selectedCompanyId, setSelectedCompanyId] = useState<string>("__all__");
+
+    // Derive the unique companies that actually own clusters
+    const companyOptions = useMemo(() => {
+        const ids = Array.from(new Set(clusters.map((c) => c.company_id).filter(Boolean)));
+        return ids.map((id) => ({ id, name: companies[id] || id })).sort((a, b) => a.name.localeCompare(b.name));
+    }, [clusters, companies]);
+
+    // Filter clusters and articles by selected company
+    const filteredClusters = useMemo(() => {
+        if (selectedCompanyId === "__all__") return clusters;
+        return clusters.filter((c) => c.company_id === selectedCompanyId);
+    }, [clusters, selectedCompanyId]);
+
+    const filteredArticles = useMemo(() => {
+        if (selectedCompanyId === "__all__") return articles;
+        const validClusterIds = new Set(filteredClusters.map((c) => c.id));
+        return articles.filter((a) => {
+            if (a.company_id === selectedCompanyId) return true;
+            if (a.cluster_id && validClusterIds.has(a.cluster_id)) return true;
+            return false;
+        });
+    }, [articles, filteredClusters, selectedCompanyId]);
 
     // Detect dark mode
     useEffect(() => {
@@ -85,14 +111,14 @@ export default function GraphView({ articles, clusters, onSelectArticle }: Props
     // Build graph data
     useEffect(() => {
         const clusterIndexMap: Record<string, number> = {};
-        clusters.forEach((c, i) => { clusterIndexMap[c.id] = i; });
+        filteredClusters.forEach((c, i) => { clusterIndexMap[c.id] = i; });
 
         const cx = dimensions.w / 2;
         const cy = dimensions.h / 2;
 
-        const nodes: GraphNode[] = articles.map((a, i) => {
+        const nodes: GraphNode[] = filteredArticles.map((a, i) => {
             const cIdx = a.cluster_id ? (clusterIndexMap[a.cluster_id] ?? -1) : -1;
-            const angle = (i / articles.length) * Math.PI * 2;
+            const angle = (i / filteredArticles.length) * Math.PI * 2;
             const spread = 150 + Math.random() * 100;
             return {
                 id: a.id,
@@ -110,9 +136,9 @@ export default function GraphView({ articles, clusters, onSelectArticle }: Props
 
         const edges: GraphEdge[] = [];
         const slugToId: Record<string, string> = {};
-        articles.forEach((a) => { slugToId[a.slug] = a.id; });
+        filteredArticles.forEach((a) => { slugToId[a.slug] = a.id; });
 
-        clusters.forEach((cluster) => {
+        filteredClusters.forEach((cluster) => {
             if (!cluster.strategy) return;
             const allPages = [
                 cluster.strategy.pillar,
@@ -122,13 +148,13 @@ export default function GraphView({ articles, clusters, onSelectArticle }: Props
 
             allPages.forEach((page: any) => {
                 if (!page.links_to) return;
-                const sourceArticle = articles.find(
+                const sourceArticle = filteredArticles.find(
                     (a) => a.cluster_id === cluster.id && a.slug === page.slug
                 );
                 if (!sourceArticle) return;
 
                 page.links_to.forEach((targetSlug: string) => {
-                    const targetArticle = articles.find(
+                    const targetArticle = filteredArticles.find(
                         (a) => a.cluster_id === cluster.id && a.slug === targetSlug
                     );
                     if (targetArticle) {
@@ -145,7 +171,7 @@ export default function GraphView({ articles, clusters, onSelectArticle }: Props
 
         nodesRef.current = nodes;
         edgesRef.current = edges;
-    }, [articles, clusters, dimensions]);
+    }, [filteredArticles, filteredClusters, dimensions]);
 
     // Physics simulation + render loop
     useEffect(() => {
@@ -342,7 +368,7 @@ export default function GraphView({ articles, clusters, onSelectArticle }: Props
         return () => ro.disconnect();
     }, []);
 
-    const clusterLegend = clusters.map((c, i) => ({
+    const clusterLegend = filteredClusters.map((c, i) => ({
         name: c.name,
         color: getClusterColor(i),
     }));
@@ -362,18 +388,41 @@ export default function GraphView({ articles, clusters, onSelectArticle }: Props
             />
 
             {/* Legend */}
-            <Card className="absolute top-3 left-3 max-w-[200px] shadow-md">
+            <Card className="absolute top-3 left-3 max-w-[220px] shadow-md">
                 <CardContent className="p-3">
+                    {/* Company filter */}
+                    {companyOptions.length > 1 && (
+                        <div className="mb-3">
+                            <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                                Company
+                            </div>
+                            <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+                                <SelectTrigger className="h-7 text-xs">
+                                    <SelectValue placeholder="All companies" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="__all__">All companies</SelectItem>
+                                    {companyOptions.map((co) => (
+                                        <SelectItem key={co.id} value={co.id}>{co.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+
                     <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                         Clusters
                     </div>
+                    {clusterLegend.length === 0 && (
+                        <div className="text-xs text-muted-foreground italic">No clusters</div>
+                    )}
                     {clusterLegend.map((c) => (
                         <div key={c.name} className="flex items-center gap-1.5 mb-1 text-xs">
                             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: c.color }} />
                             <span className="truncate">{c.name}</span>
                         </div>
                     ))}
-                    {articles.some((a) => !a.cluster_id) && (
+                    {filteredArticles.some((a) => !a.cluster_id) && (
                         <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
                             <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-muted-foreground/50" />
                             <span>Unclustered</span>

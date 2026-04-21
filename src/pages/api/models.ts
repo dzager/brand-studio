@@ -17,6 +17,7 @@ export default function handler(
         id: m.id,
         label: m.label,
         provider: m.provider,
+        capabilities: m.capabilities,
     }));
 
     return res.status(200).json({ models });

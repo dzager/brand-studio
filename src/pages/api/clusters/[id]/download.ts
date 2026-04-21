@@ -1,13 +1,16 @@
 // src/pages/api/clusters/[id]/download.ts
 // GET: Download all articles in a cluster as a ZIP file
 // Each article gets its own subfolder containing:
-//   - article.html (full styled HTML document)
+//   - article.html       (full styled HTML document)
+//   - seo-geo.json       (SEO + GEO/AEO metadata: meta tags, keywords, FAQ, key
+//                         takeaways, HowTo steps, and Schema.org JSON-LD blocks)
 //   - featured-image.png (if available)
 //   - Any inline images extracted from the HTML
 
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getSupabase } from "@/lib/supabase";
 import JSZip from "jszip";
+import { buildAllJsonLd } from "@/lib/jsonld";
 
 export const config = {
     api: {
@@ -202,7 +205,7 @@ export default async function handler(
         // Get all articles in the cluster with full content
         const { data: articles, error: articlesErr } = await supabase
             .from("articles")
-            .select("id, title, slug, excerpt, html, image_base64, cluster_role, created_at")
+            .select("id, title, slug, excerpt, html, image_base64, cluster_role, created_at, seo")
             .eq("cluster_id", id)
             .order("cluster_role", { ascending: true });
 
@@ -303,6 +306,59 @@ export default async function handler(
                 html: processedHtml,
             });
             zip.file(`${folderPath}/article.html`, standaloneHtml);
+
+            // ── SEO + GEO metadata file ──────────────────────────────────
+            // Combines all signals that search crawlers and AI answer engines
+            // (GEO / AEO) look for: meta tags, keywords, structured FAQ,
+            // key takeaways, and full Schema.org JSON-LD blocks.
+            const seo = (article.seo ?? {}) as Record<string, unknown>;
+            const faqItems = (seo.faq as { question: string; answer: string }[] | undefined) ?? [];
+            const howToSteps = (seo.how_to_steps as string[] | undefined) ?? [];
+            const keywords = (seo.keywords as string[] | undefined) ?? [];
+
+            const jsonldBlocks = buildAllJsonLd({
+                article: {
+                    title: article.title,
+                    slug: article.slug,
+                    excerpt: article.excerpt ?? "",
+                    html: processedHtml,
+                    keywords,
+                    date_published: article.created_at,
+                },
+                faq: faqItems,
+                content_type: seo.content_type as string | undefined,
+                how_to_steps: howToSteps,
+            });
+
+            const seoGeo = {
+                // ── On-page meta ─────────────────────────────────────────
+                meta_title: seo.meta_title ?? article.title,
+                meta_description: seo.meta_description ?? article.excerpt,
+                canonical_slug: article.slug,
+
+                // ── Keyword targeting ────────────────────────────────────
+                primary_keyword: seo.primary_keyword ?? null,
+                secondary_keywords: seo.secondary_keywords ?? [],
+                keywords,
+
+                // ── GEO / AEO signals ────────────────────────────────────
+                // These sections are highly cited by AI search engines
+                // (Google SGE, Perplexity, ChatGPT Browse, Bing Copilot)
+                faq: faqItems,
+                key_takeaways: seo.key_takeaways ?? [],
+                how_to_steps: howToSteps,
+                content_type: seo.content_type ?? "article",
+
+                // ── Schema.org JSON-LD ───────────────────────────────────
+                // Drop these as <script type="application/ld+json"> blocks
+                // in the page <head> to unlock rich results and AEO citations
+                structured_data: jsonldBlocks,
+            };
+
+            zip.file(
+                `${folderPath}/seo-geo.json`,
+                JSON.stringify(seoGeo, null, 2)
+            );
 
             // Add featured image
             if (article.image_base64) {

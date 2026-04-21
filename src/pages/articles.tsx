@@ -153,7 +153,7 @@ export default function ArticlesPage() {
     const selectedArticle = articles.find((a) => a.id === selectedArticleId) || null;
 
     return (
-        <AppLayout>
+        <AppLayout fullWidth>
             <div className="flex flex-col h-[calc(100vh-7rem)]">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-4 shrink-0">
@@ -213,6 +213,7 @@ export default function ArticlesPage() {
                             <GraphView
                                 articles={articles}
                                 clusters={clusters}
+                                companies={companies}
                                 onSelectArticle={handleSelectArticle}
                             />
                         )}
@@ -221,7 +222,7 @@ export default function ArticlesPage() {
                         {viewMode === "outline" && (
                             <div className="flex h-full gap-0">
                                 {/* Sidebar tree */}
-                                <div className="w-72 shrink-0 border-r border-border overflow-y-auto pr-2 bg-muted/30">
+                                <div className="w-96 shrink-0 border-r border-border overflow-y-auto pr-2 bg-muted/30">
                                     <OutlineView
                                         articles={articles}
                                         clusters={clusters}

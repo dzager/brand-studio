@@ -15,7 +15,7 @@ import {
     Play, RefreshCw, Pencil, X, Trash2,
     AlertCircle, CheckCircle2, Link2, Network,
     Crown, BookOpen, Scroll, FileText, Sparkles,
-    Download, LinkIcon,
+    Download, LinkIcon, Plus, ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -122,6 +122,14 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
 
     const [overlapWarnings, setOverlapWarnings] = useState<OverlapWarnings | null>(null);
 
+    const [addingPageType, setAddingPageType] = useState<string | null>(null);
+    const [newPage, setNewPage] = useState<ClusterPage>({
+        title: "", keyword: "", slug: "", description: "", word_count: "1,500", links_to: [],
+    });
+    const [savingNewPage, setSavingNewPage] = useState(false);
+
+    const [imageMode, setImageMode] = useState<"ai" | "search">("ai");
+
     const loadCluster = useCallback(async () => {
         setLoading(true); setErr(null);
         try {
@@ -141,7 +149,7 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
             const r = await fetch(`/api/clusters/${clusterId}/generate`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ page_type: pageType, page_index: pageIndex }),
+                body: JSON.stringify({ page_type: pageType, page_index: pageIndex, image_mode: imageMode }),
             });
             const data = await r.json();
             if (!r.ok) throw new Error(data.error || "Generation failed");
@@ -168,7 +176,7 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                 const r = await fetch(`/api/clusters/${clusterId}/generate`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ page_type: pages[i].type, page_index: pages[i].index }),
+                    body: JSON.stringify({ page_type: pages[i].type, page_index: pages[i].index, image_mode: imageMode }),
                 });
                 const data = await r.json();
                 if (!r.ok) throw new Error(data.error || `Failed on page ${i + 1}`);
@@ -319,6 +327,55 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
         return (cluster?.articles ?? []).some((a) => a.slug === slug);
     }
 
+    function openAddPageForm(type: string) {
+        setAddingPageType(type);
+        setNewPage({ title: "", keyword: "", slug: "", description: "", word_count: type === "pillar" ? "3,000" : type === "supporting" ? "1,500" : "800", links_to: [] });
+    }
+
+    function handleNewPageFieldChange(field: keyof ClusterPage, value: string) {
+        setNewPage((prev) => ({ ...prev, [field]: value }));
+    }
+
+    // Auto-generate slug from title
+    function autoSlug(title: string) {
+        return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    }
+
+    async function saveNewPage() {
+        if (!cluster || !addingPageType || !newPage.title.trim()) return;
+        setSavingNewPage(true);
+        try {
+            const updatedStrategy = JSON.parse(JSON.stringify(cluster.strategy)) as ClusterStrategy;
+            const pageToAdd = { ...newPage, slug: newPage.slug || autoSlug(newPage.title) };
+
+            if (addingPageType === "pillar") {
+                // For pillar, replace if no pillar exists, or add as supporting if pillar already set
+                if (!updatedStrategy.pillar?.title) {
+                    updatedStrategy.pillar = pageToAdd;
+                } else {
+                    // Can't have multiple pillars — add as supporting instead
+                    updatedStrategy.supporting = [...(updatedStrategy.supporting ?? []), pageToAdd];
+                }
+            } else if (addingPageType === "supporting") {
+                updatedStrategy.supporting = [...(updatedStrategy.supporting ?? []), pageToAdd];
+            } else if (addingPageType === "long_tail") {
+                updatedStrategy.long_tail = [...(updatedStrategy.long_tail ?? []), pageToAdd];
+            }
+
+            const r = await fetch(`/api/clusters/${clusterId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ strategy: updatedStrategy }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || "Save failed");
+            setCluster((prev) => prev ? { ...prev, strategy: updatedStrategy } : prev);
+            setAddingPageType(null);
+            onUpdate();
+        } catch (e: any) { alert(`Failed to add page: ${e.message}`); }
+        finally { setSavingNewPage(false); }
+    }
+
     if (loading) {
         return (
             <div className="p-5 space-y-4">
@@ -373,6 +430,14 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                         : generatedCount >= totalPages ? <><CheckCircle2 className="h-3.5 w-3.5" /> All Generated</>
                             : <><Play className="h-3.5 w-3.5" /> Generate All ({totalPages - generatedCount})</>}
                 </Button>
+                <div className="flex items-center gap-1 border rounded-md px-1.5 bg-muted/30">
+                    <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                    <select value={imageMode} onChange={(e) => setImageMode(e.target.value as "ai" | "search")}
+                        className="text-xs bg-transparent border-0 py-1 pr-1 focus:outline-none cursor-pointer">
+                        <option value="ai">🎨 AI Generated</option>
+                        <option value="search">🔍 Image Search</option>
+                    </select>
+                </div>
                 <Button variant="outline" size="sm" onClick={handleGenerateGuide}
                     disabled={generatingGuide || generatedCount === 0}
                     className={cn("gap-1.5", guideSuccess && "text-success border-success")}>
@@ -583,14 +648,83 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
     );
 
     function renderPageSection(label: string, type: string, pages: ClusterPage[]) {
+        const isAddingThisType = addingPageType === type;
         return (
             <div className="space-y-2">
-                <h4 className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <span className={cn("w-2.5 h-2.5 rounded-full",
-                        type === "pillar" ? "bg-primary" : type === "supporting" ? "bg-green-500" : "bg-amber-500"
-                    )} />
-                    {label} ({pages.length})
-                </h4>
+                <div className="flex items-center justify-between">
+                    <h4 className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                        <span className={cn("w-2.5 h-2.5 rounded-full",
+                            type === "pillar" ? "bg-primary" : type === "supporting" ? "bg-green-500" : "bg-amber-500"
+                        )} />
+                        {label} ({pages.length})
+                    </h4>
+                    {/* Hide add button for pillar if one already exists */}
+                    {!(type === "pillar" && pages.length > 0) && (
+                        <Button variant="ghost" size="sm"
+                            onClick={() => isAddingThisType ? setAddingPageType(null) : openAddPageForm(type)}
+                            className="h-6 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground">
+                            {isAddingThisType ? <><X className="h-3 w-3" /> Cancel</> : <><Plus className="h-3 w-3" /> Add Page</>}
+                        </Button>
+                    )}
+                </div>
+
+                {/* Inline add-page form */}
+                {isAddingThisType && (
+                    <Card className="border-dashed border-primary/40 bg-primary/5">
+                        <CardContent className="p-3 space-y-2.5">
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <Label className="text-xs">Title</Label>
+                                    <Input placeholder="Page title" value={newPage.title}
+                                        onChange={(e) => {
+                                            handleNewPageFieldChange("title", e.target.value);
+                                            if (!newPage.slug || newPage.slug === autoSlug(newPage.title.slice(0, -1))) {
+                                                handleNewPageFieldChange("slug", autoSlug(e.target.value));
+                                            }
+                                        }}
+                                        className="h-8 text-sm" />
+                                </div>
+                                <div>
+                                    <Label className="text-xs">Keyword</Label>
+                                    <Input placeholder="Target keyword" value={newPage.keyword}
+                                        onChange={(e) => handleNewPageFieldChange("keyword", e.target.value)}
+                                        className="h-8 text-sm" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <Label className="text-xs">Slug</Label>
+                                    <Input placeholder="url-slug" value={newPage.slug}
+                                        onChange={(e) => handleNewPageFieldChange("slug", e.target.value)}
+                                        className="h-8 text-sm font-mono" />
+                                </div>
+                                <div>
+                                    <Label className="text-xs">Word Count</Label>
+                                    <Input placeholder="1,500" value={newPage.word_count}
+                                        onChange={(e) => handleNewPageFieldChange("word_count", e.target.value)}
+                                        className="h-8 text-sm" />
+                                </div>
+                            </div>
+                            <div>
+                                <Label className="text-xs">Description</Label>
+                                <Textarea placeholder="Brief description of this page…" value={newPage.description}
+                                    onChange={(e) => handleNewPageFieldChange("description", e.target.value)}
+                                    rows={2} className="text-sm resize-none" />
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                                <Button variant="ghost" size="sm" onClick={() => setAddingPageType(null)} className="h-7 text-xs">
+                                    Cancel
+                                </Button>
+                                <Button size="sm" onClick={saveNewPage} disabled={savingNewPage || !newPage.title.trim()}
+                                    className="h-7 text-xs gap-1">
+                                    {savingNewPage ? <><RefreshCw className="h-3 w-3 animate-spin" /> Saving…</>
+                                        : <><Plus className="h-3 w-3" /> Add {type === "pillar" ? "Pillar" : type === "supporting" ? "Supporting" : "Long-Tail"} Page</>}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
                 <div className="space-y-1.5">
                     {pages.map((page, idx) => {
                         const generated = isPageGenerated(page.slug);

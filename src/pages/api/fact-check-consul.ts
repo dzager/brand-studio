@@ -21,10 +21,66 @@ import {
 
 // ── Constants ───────────────────────────────────────────────────────────
 
-const GEMINI_MODEL = "gemini-2.5-pro-preview-05-06";
+const GEMINI_MODEL = "gemini-3.1-pro-preview";
 const GROK_MODEL = "xai/grok-4";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Robustly extract a JSON object from text that may contain markdown fences,
+ * preamble, or trailing content. Uses balanced-brace counting so it won't
+ * break on nested objects/arrays.
+ */
+function extractJSON(raw: string): any {
+    // Strip markdown code fences
+    let text = raw.trim()
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+
+    // Find the first '{' character
+    const start = text.indexOf("{");
+    if (start < 0) throw new Error("No JSON object found in model response.");
+
+    // Walk forward with balanced brace counting, respecting strings
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    let end = -1;
+
+    for (let i = start; i < text.length; i++) {
+        const ch = text[i];
+
+        if (escaped) { escaped = false; continue; }
+        if (ch === "\\") { escaped = true; continue; }
+
+        if (ch === '"' && !escaped) {
+            inString = !inString;
+            continue;
+        }
+
+        if (inString) continue;
+
+        if (ch === "{") depth++;
+        else if (ch === "}") {
+            depth--;
+            if (depth === 0) { end = i; break; }
+        }
+    }
+
+    if (end < 0) throw new Error("Unterminated JSON object in model response.");
+
+    const jsonStr = text.slice(start, end + 1);
+
+    try {
+        return JSON.parse(jsonStr);
+    } catch {
+        // Attempt repair: trailing commas before ] or }
+        const repaired = jsonStr
+            .replace(/,\s*([}\]])/g, "$1");
+        return JSON.parse(repaired);
+    }
+}
 
 /**
  * Run fact-check via Gemini with Google Search grounding.
@@ -33,49 +89,32 @@ const GROK_MODEL = "xai/grok-4";
 async function checkWithGemini(
     userPrompt: string
 ): Promise<SingleModelFactCheckResult> {
-    // Gemini with search grounding — get text response, then parse as JSON
     const result = await generateText({
         model: google(GEMINI_MODEL),
-        system: FACT_CHECK_SYSTEM_PROMPT + "\n\nIMPORTANT: You MUST respond with valid JSON matching this schema exactly:\n" + JSON.stringify(SINGLE_MODEL_FACT_CHECK_SCHEMA, null, 2) + "\n\nDo NOT include any text outside the JSON object.",
+        system: FACT_CHECK_SYSTEM_PROMPT + "\n\nIMPORTANT: You MUST respond with valid JSON matching this schema exactly:\n" + JSON.stringify(SINGLE_MODEL_FACT_CHECK_SCHEMA, null, 2) + "\n\nRespond ONLY with the JSON object. No markdown fences, no preamble, no text after the JSON.",
         prompt: userPrompt,
         tools: {
             google_search: google.tools.googleSearch({}),
         },
     });
 
-    // Parse the JSON response
-    const text = result.text.trim();
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-        throw new Error("Gemini did not return valid JSON.");
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]) as SingleModelFactCheckResult;
-    return parsed;
+    return extractJSON(result.text) as SingleModelFactCheckResult;
 }
 
 /**
  * Run fact-check via Grok through the Vercel AI Gateway.
- * Uses the gateway string format — no separate xAI key needed.
+ * Uses the gateway string format — authenticated via AI_GATEWAY_API_KEY.
  */
 async function checkWithGrok(
     userPrompt: string
 ): Promise<SingleModelFactCheckResult> {
     const result = await generateText({
         model: GROK_MODEL as any,
-        system: FACT_CHECK_SYSTEM_PROMPT + "\n\nIMPORTANT: You MUST respond with valid JSON matching this schema exactly:\n" + JSON.stringify(SINGLE_MODEL_FACT_CHECK_SCHEMA, null, 2) + "\n\nDo NOT include any text outside the JSON object.",
+        system: FACT_CHECK_SYSTEM_PROMPT + "\n\nIMPORTANT: You MUST respond with valid JSON matching this schema exactly:\n" + JSON.stringify(SINGLE_MODEL_FACT_CHECK_SCHEMA, null, 2) + "\n\nRespond ONLY with the JSON object. No markdown fences, no preamble, no text after the JSON.",
         prompt: userPrompt,
     });
 
-    // Parse the JSON response
-    const text = result.text.trim();
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-        throw new Error("Grok did not return valid JSON.");
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]) as SingleModelFactCheckResult;
-    return parsed;
+    return extractJSON(result.text) as SingleModelFactCheckResult;
 }
 
 // ── Claim Matching & Reconciliation ─────────────────────────────────────

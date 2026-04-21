@@ -11,7 +11,7 @@ import {
   Monitor,
   PanelLeftClose,
   PanelLeft,
-  Sparkles,
+  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import SettingsDialog from "@/components/layout/SettingsDialog";
 
 const NAV_ITEMS = [
   { href: "/", label: "Studio", icon: Home, description: "Create content" },
@@ -68,9 +69,10 @@ function ThemeToggle() {
   );
 }
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default function AppLayout({ children, fullWidth }: { children: React.ReactNode; fullWidth?: boolean }) {
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -82,22 +84,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         )}
       >
         {/* Sidebar Header */}
-        <div className="flex h-14 items-center px-4 border-b border-sidebar-border">
-          {!sidebarCollapsed && (
-            <Link href="/" className="flex items-center gap-2 group">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <Sparkles className="h-4 w-4" />
-              </div>
-              <span className="font-semibold text-sm tracking-tight text-sidebar-foreground">
-                Brand Studio
-              </span>
-            </Link>
-          )}
-          {sidebarCollapsed && (
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground mx-auto">
-              <Sparkles className="h-4 w-4" />
-            </div>
-          )}
+        <div className="flex h-14 items-center justify-center px-3 border-b border-sidebar-border">
+          <Link href="/" className="flex items-center justify-center w-full overflow-hidden">
+            <img
+              src="/organic-logo.png"
+              alt="Organic"
+              className="h-auto dark:invert"
+              style={{ width: sidebarCollapsed ? '43%' : '32%' }}
+            />
+          </Link>
         </div>
 
         {/* Nav Items */}
@@ -151,7 +146,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* Sidebar Footer */}
-        <div className="border-t border-sidebar-border p-2">
+        <div className="border-t border-sidebar-border p-2 flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn("h-9 w-9", sidebarCollapsed ? "mx-auto" : "")}
+                onClick={() => setSettingsOpen(true)}
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>Settings</p>
+            </TooltipContent>
+          </Tooltip>
+          {!sidebarCollapsed && <div className="flex-1" />}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -177,7 +188,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Main Content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top Bar */}
-        <header className="flex h-14 items-center justify-between border-b border-border bg-background/80 backdrop-blur-sm px-6">
+        <header className="flex h-14 items-center justify-between border-b border-border bg-background/80 backdrop-blur-sm px-6 relative z-10">
           <div className="flex items-center gap-4">
             {/* Mobile hamburger */}
             <Button
@@ -251,11 +262,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-7xl px-6 py-6">
+          <div className={cn("mx-auto w-full px-6 py-6", !fullWidth && "max-w-7xl")}>
             {children}
           </div>
         </main>
       </div>
+
+      {/* Settings Dialog */}
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
   );
 }

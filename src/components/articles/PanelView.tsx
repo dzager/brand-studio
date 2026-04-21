@@ -21,7 +21,7 @@ import {
     Copy, Rocket, Pencil, RefreshCw, ImageIcon, Trash2,
     Search, Sparkles, Upload, AlertCircle, CheckCircle2,
     Crown, BookOpen, Scroll, Eye, Code, Layers, ArrowLeft,
-    ChevronDown, FileText, ClipboardCopy, Scissors,
+    ChevronDown, FileText, ClipboardCopy, Scissors, Crop,
     Scale, ExternalLink, ShieldCheck, Wand2, ChevronRight,
 } from "lucide-react";
 import type { ConsulResult, ConsulClaimReview } from "@/lib/consulPrompts";
@@ -101,12 +101,22 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     const [consulErr, setConsulErr] = useState<string | null>(null);
     const [expandedClaims, setExpandedClaims] = useState<Set<number>>(new Set());
     const [applyingRewrite, setApplyingRewrite] = useState<number | null>(null);
+    const [appliedRewrites, setAppliedRewrites] = useState<Set<number>>(new Set());
 
     const [refreshingImage, setRefreshingImage] = useState(false);
     const [imagePromptInput, setImagePromptInput] = useState("");
-    const [imageStyles, setImageStyles] = useState<{ id: string; label: string; narrative?: string }[]>([]);
+    const [imageStyles, setImageStyles] = useState<{ id: string; label: string; narrative?: string; type?: string; composite_bg_prompt?: string; composite_product_query?: string; composite_bg_image_url?: string }[]>([]);
     const [selectedStyle, setSelectedStyle] = useState(article.image_style ?? "default");
     const [refreshErr, setRefreshErr] = useState<string | null>(null);
+
+    // Composite style state for PanelView image refresh
+    const [pvCsProductUrl, setPvCsProductUrl] = useState<string | null>(null);
+    const [pvCsProductThumb, setPvCsProductThumb] = useState<string | null>(null);
+    const [pvCsBgPrompt, setPvCsBgPrompt] = useState("");
+    const [pvCsBgImageUrl, setPvCsBgImageUrl] = useState("");
+    const [pvCsProductQuery, setPvCsProductQuery] = useState("");
+    const [pvCsProductResults, setPvCsProductResults] = useState<SearchImage[]>([]);
+    const [pvCsProductSearching, setPvCsProductSearching] = useState(false);
 
     const [similarResults, setSimilarResults] = useState<SimilarityResult[] | null>(null);
     const [checkingSimilarity, setCheckingSimilarity] = useState(false);
@@ -125,6 +135,14 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     const [insertErr, setInsertErr] = useState<string | null>(null);
     const [insertSaving, setInsertSaving] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // 16:9 crop state
+    const [cropActive, setCropActive] = useState(false);
+    const [cropDragY, setCropDragY] = useState(0);      // top of crop region in image-space pixels
+    const [cropImgLoaded, setCropImgLoaded] = useState(false);  // triggers re-render for overlay
+    const cropCanvasRef = useRef<HTMLCanvasElement>(null);
+    const cropImgRef = useRef<HTMLImageElement | null>(null);
+    const cropContainerRef = useRef<HTMLDivElement>(null);
 
     // Composite tab state — two-slot workflow: product + background
     const [compositeStep, setCompositeStep] = useState<"product" | "background" | "generating" | "preview">("product");
@@ -392,7 +410,7 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
 
     async function handleConsulCheck() {
         if (!displayArticle.html) return;
-        setConsulChecking(true); setConsulErr(null); setConsulResult(null); setExpandedClaims(new Set());
+        setConsulChecking(true); setConsulErr(null); setConsulResult(null); setExpandedClaims(new Set()); setAppliedRewrites(new Set());
         try {
             const r = await fetch("/api/fact-check-consul", {
                 method: "POST",
@@ -436,18 +454,49 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
             const saveData = await saveResp.json();
             if (!saveResp.ok) throw new Error(saveData.error || "Save failed");
             onUpdate({ ...article, ...saveData });
+            setAppliedRewrites((prev) => new Set(prev).add(claimIndex));
         } catch (e: any) { alert(`Rewrite failed: ${e.message}`); }
         finally { setApplyingRewrite(null); }
+    }
+
+    // PanelView: is the selected style composite?
+    const pvSelectedStyleObj = imageStyles.find((s) => s.id === selectedStyle);
+    const pvIsCompositeStyle = pvSelectedStyleObj?.type === "composite";
+
+    async function pvCsProductSearch() {
+        if (!pvCsProductQuery.trim()) return;
+        setPvCsProductSearching(true);
+        try {
+            const r = await fetch("/api/image-search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: pvCsProductQuery.trim(), num: 8 }) });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data?.error || "Search failed");
+            setPvCsProductResults(data.images ?? []);
+        } catch { setPvCsProductResults([]); }
+        finally { setPvCsProductSearching(false); }
     }
 
     async function refreshImage() {
         if (!article.image_prompt) return;
         setRefreshingImage(true); setRefreshErr(null);
         try {
+            const payload: Record<string, unknown> = {
+                base_prompt: article.image_prompt,
+                custom_prompt: imagePromptInput.trim() || undefined,
+                image_style: selectedStyle,
+                company_id: article.company_id ?? undefined,
+            };
+            // Add composite params if applicable
+            if (pvIsCompositeStyle && pvCsProductUrl) {
+                payload.composite_product_image_url = pvCsProductUrl;
+                payload.article_title = article.title;
+                payload.article_excerpt = article.excerpt;
+                if (pvCsBgImageUrl.trim()) payload.composite_bg_image_url = pvCsBgImageUrl.trim();
+                if (pvCsBgPrompt.trim()) payload.composite_bg_prompt = pvCsBgPrompt.trim();
+            }
             const r = await fetch("/api/regenerate-image", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ base_prompt: article.image_prompt, custom_prompt: imagePromptInput.trim() || undefined, image_style: selectedStyle, company_id: article.company_id ?? undefined }),
+                body: JSON.stringify(payload),
             });
             const data = await r.json();
             if (!r.ok) throw new Error(data.error || "Regeneration failed");
@@ -693,6 +742,33 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     const RoleIcon = article.cluster_role === "pillar" ? Crown : article.cluster_role === "supporting" ? BookOpen : Scroll;
 
     // ======= INSERT IMAGE MODAL =======
+    // ── Crop to 16:9 ─────────────────────────────────────────────────────
+    function startCrop() {
+        if (!insertPreview) return;
+        setCropActive(true);
+        setCropDragY(0);
+        setCropImgLoaded(false);
+    }
+
+    function applyCrop() {
+        if (!cropImgRef.current) return;
+        const img = cropImgRef.current;
+        const imgW = img.naturalWidth;
+        const imgH = img.naturalHeight;
+        // Crop region: full width, height = width * 9/16, top = cropDragY
+        const cropH = Math.round(imgW * (9 / 16));
+        const maxY = Math.max(0, imgH - cropH);
+        const y = Math.min(Math.max(0, Math.round(cropDragY)), maxY);
+        const canvas = document.createElement("canvas");
+        canvas.width = imgW;
+        canvas.height = cropH;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, y, imgW, cropH, 0, 0, imgW, cropH);
+        const base64 = canvas.toDataURL("image/png").split(",")[1];
+        setInsertPreview({ src: base64, type: "base64" });
+        setCropActive(false);
+    }
+
     const insertImageModal = (
         <Dialog open={showInsertModal} onOpenChange={setShowInsertModal}>
             <DialogContent className="max-w-7xl w-[95vw] max-h-[95vh] overflow-y-auto">
@@ -737,7 +813,7 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                         {imageStyles.length > 0 && (
                             <div>
                                 <Label className="text-xs">Image Style</Label>
-                                <select value={selectedStyle} onChange={(e) => setSelectedStyle(e.target.value)}
+                                <select value={selectedStyle} onChange={(e) => { setSelectedStyle(e.target.value); setImagePromptInput(""); setInsertGenPrompt(""); setInsertPreview(null); setRefreshErr(null); setPvCsProductUrl(null); setPvCsProductThumb(null); setPvCsProductResults([]); setPvCsProductQuery(""); setPvCsBgPrompt(""); setPvCsBgImageUrl(""); resetComposite(); }}
                                     className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm">
                                     {imageStyles.map((s) => (
                                         <option key={s.id} value={s.id}>{s.label}{s.narrative ? ` — ${s.narrative.slice(0, 60)}…` : ""}</option>
@@ -875,7 +951,7 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                                         {imageStyles.length > 0 && (
                                             <div>
                                                 <Label className="text-xs">Image Style</Label>
-                                                <select value={selectedStyle} onChange={(e) => setSelectedStyle(e.target.value)}
+                                                <select value={selectedStyle} onChange={(e) => { setSelectedStyle(e.target.value); setImagePromptInput(""); setInsertGenPrompt(""); setInsertPreview(null); setRefreshErr(null); setPvCsProductUrl(null); setPvCsProductThumb(null); setPvCsProductResults([]); setPvCsProductQuery(""); setPvCsBgPrompt(""); setPvCsBgImageUrl(""); resetComposite(); }}
                                                     className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm">
                                                     {imageStyles.map((s) => (
                                                         <option key={s.id} value={s.id}>{s.label}{s.narrative ? ` — ${s.narrative.slice(0, 50)}…` : ""}</option>
@@ -1043,9 +1119,88 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
 
                 {insertPreview && (
                     <div>
-                        <Label className="text-xs mb-2 block">Preview</Label>
-                        <img src={insertPreview.type === "base64" ? `data:image/png;base64,${insertPreview.src}` : insertPreview.src} alt="Preview"
-                            className="w-full max-h-72 object-contain rounded-lg border border-border" />
+                        <div className="flex items-center justify-between mb-2">
+                            <Label className="text-xs">Preview</Label>
+                            <div className="flex gap-1.5">
+                                {!cropActive && (
+                                    <Button variant="outline" size="sm" onClick={startCrop} className="gap-1 text-xs h-7">
+                                        <Crop className="h-3 w-3" /> Crop 16:9
+                                    </Button>
+                                )}
+                                {cropActive && (
+                                    <>
+                                        <Button variant="default" size="sm" onClick={applyCrop} className="gap-1 text-xs h-7">
+                                            <Crop className="h-3 w-3" /> Apply Crop
+                                        </Button>
+                                        <Button variant="ghost" size="sm" onClick={() => setCropActive(false)} className="text-xs h-7">
+                                            Cancel
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                        {!cropActive ? (
+                            <img src={insertPreview.type === "base64" ? `data:image/png;base64,${insertPreview.src}` : insertPreview.src} alt="Preview"
+                                className="w-full max-h-[50vh] object-contain rounded-lg border border-border" />
+                        ) : (
+                            /* Interactive 16:9 crop overlay */
+                            <div ref={cropContainerRef} className="relative select-none rounded-lg border border-border overflow-hidden bg-black"
+                                style={{ cursor: "ns-resize" }}
+                                onMouseDown={(e) => {
+                                    const container = cropContainerRef.current;
+                                    const img = cropImgRef.current;
+                                    if (!container || !img) return;
+                                    const rect = container.getBoundingClientRect();
+                                    const displayH = container.offsetHeight;
+                                    const imgH = img.naturalHeight;
+                                    const imgW = img.naturalWidth;
+                                    const cropH = Math.round(imgW * (9 / 16));
+                                    const maxY = Math.max(0, imgH - cropH);
+                                    const scale = imgH / displayH;
+                                    const startMouseY = e.clientY;
+                                    const startCropY = cropDragY;
+                                    const onMove = (ev: MouseEvent) => {
+                                        const delta = (ev.clientY - startMouseY) * scale;
+                                        setCropDragY(Math.min(maxY, Math.max(0, startCropY + delta)));
+                                    };
+                                    const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+                                    window.addEventListener("mousemove", onMove);
+                                    window.addEventListener("mouseup", onUp);
+                                }}>
+                                <img
+                                    ref={cropImgRef}
+                                    src={insertPreview.type === "base64" ? `data:image/png;base64,${insertPreview.src}` : insertPreview.src}
+                                    alt="Crop source"
+                                    className="w-full block"
+                                    style={{ maxHeight: "50vh", objectFit: "contain" }}
+                                    crossOrigin="anonymous"
+                                    onLoad={() => setCropImgLoaded(true)}
+                                />
+                                {/* Dark overlay above/below crop region */}
+                                {cropImgLoaded && cropImgRef.current && (() => {
+                                    const img = cropImgRef.current!;
+                                    const container = cropContainerRef.current;
+                                    if (!container) return null;
+                                    const displayW = container.offsetWidth;
+                                    const displayH = container.offsetHeight;
+                                    const imgW = img.naturalWidth || 1;
+                                    const imgH = img.naturalHeight || 1;
+                                    const cropH = imgW * (9 / 16);
+                                    const scale = displayH / imgH;
+                                    const topPx = cropDragY * scale;
+                                    const heightPx = cropH * scale;
+                                    return (
+                                        <>
+                                            <div className="absolute left-0 right-0 top-0 bg-black/60 pointer-events-none" style={{ height: `${topPx}px` }} />
+                                            <div className="absolute left-0 right-0 bg-black/60 pointer-events-none" style={{ top: `${topPx + heightPx}px`, bottom: 0 }} />
+                                            <div className="absolute left-0 right-0 border-2 border-dashed border-white/80 pointer-events-none" style={{ top: `${topPx}px`, height: `${heightPx}px` }}>
+                                                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-white/70 text-xs font-medium">↕ Drag to adjust crop</div>
+                                            </div>
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -1426,10 +1581,10 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                                         {claim.suggested_rewrite && (
                                             <div className="mt-2 p-2 bg-card border border-dashed border-border rounded-md">
                                                 <p className="text-sm">✏️ <strong>Suggested rewrite:</strong> {claim.suggested_rewrite}</p>
-                                                <Button variant="outline" size="sm" className="mt-2 gap-1.5 text-xs h-7"
-                                                    disabled={applyingRewrite === i}
+                                                <Button variant="outline" size="sm" className={cn("mt-2 gap-1.5 text-xs h-7", appliedRewrites.has(i) && "border-success text-success")}
+                                                    disabled={applyingRewrite === i || appliedRewrites.has(i)}
                                                     onClick={() => handleApplyRewrite(i)}>
-                                                    {applyingRewrite === i ? <><RefreshCw className="h-3 w-3 animate-spin" /> Applying…</> : <><Wand2 className="h-3 w-3" /> Apply Rewrite</>}
+                                                    {applyingRewrite === i ? <><RefreshCw className="h-3 w-3 animate-spin" /> Applying…</> : appliedRewrites.has(i) ? <><CheckCircle2 className="h-3 w-3" /> Applied</> : <><Wand2 className="h-3 w-3" /> Apply Rewrite</>}
                                                 </Button>
                                             </div>
                                         )}
@@ -1470,68 +1625,7 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                 </div>
             )}
 
-            {/* Image controls */}
-            {article.image_prompt && (
-                <Card>
-                    <CardContent className="p-4 space-y-3">
-                        <h4 className="text-sm font-medium flex items-center gap-1.5">
-                            <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" /> Image Options
-                        </h4>
-                        {imageStyles.length > 0 && (
-                            <div>
-                                <Label className="text-xs">Image Style</Label>
-                                <select value={selectedStyle} onChange={(e) => {
-                                        const newStyle = e.target.value;
-                                        setSelectedStyle(newStyle);
-                                        if (newStyle !== (article.image_style ?? "default") && article.image_prompt && !refreshingImage) {
-                                            // Auto-regenerate with new style
-                                            setTimeout(() => {
-                                                setRefreshingImage(true); setRefreshErr(null);
-                                                fetch("/api/regenerate-image", {
-                                                    method: "POST",
-                                                    headers: { "Content-Type": "application/json" },
-                                                    body: JSON.stringify({ base_prompt: article.image_prompt, image_style: newStyle, company_id: article.company_id ?? undefined }),
-                                                })
-                                                    .then((r) => r.json())
-                                                    .then(async (data) => {
-                                                        if (data.error) throw new Error(data.error);
-                                                        const saveResp = await fetch(`/api/articles/${article.id}`, {
-                                                            method: "PUT",
-                                                            headers: { "Content-Type": "application/json" },
-                                                            body: JSON.stringify({ image_base64: data.image_base64, image_prompt: data.base_prompt || data.final_prompt, image_style: newStyle }),
-                                                        });
-                                                        const saveData = await saveResp.json();
-                                                        if (!saveResp.ok) throw new Error(saveData.error || "Failed to save");
-                                                        onUpdate({ ...article, image_base64: data.image_base64, image_prompt: data.base_prompt || data.final_prompt, image_style: newStyle });
-                                                    })
-                                                    .catch((err: any) => setRefreshErr(err.message))
-                                                    .finally(() => setRefreshingImage(false));
-                                            }, 0);
-                                        }
-                                    }}
-                                    className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm">
-                                    {imageStyles.map((s) => (
-                                        <option key={s.id} value={s.id}>{s.label}{s.narrative ? ` — ${s.narrative.slice(0, 60)}…` : ""}</option>
-                                    ))}
-                                </select>
-                                {refreshingImage && (
-                                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                                        <RefreshCw className="h-3 w-3 animate-spin" /> Regenerating with new style…
-                                    </p>
-                                )}
-                            </div>
-                        )}
-                        <div className="flex gap-2">
-                            <Input placeholder="Optional: add extra image direction…" value={imagePromptInput} onChange={(e) => setImagePromptInput(e.target.value)} className="text-sm" />
-                            <Button variant="outline" size="sm" onClick={refreshImage} disabled={refreshingImage} className="gap-1.5 whitespace-nowrap">
-                                <RefreshCw className={cn("h-3.5 w-3.5", refreshingImage && "animate-spin")} />
-                                {refreshingImage ? "Generating…" : "Regenerate"}
-                            </Button>
-                        </div>
-                        {refreshErr && <p className="text-xs text-destructive">{refreshErr}</p>}
-                    </CardContent>
-                </Card>
-            )}
+
 
             {/* Article Content */}
             <div dangerouslySetInnerHTML={{ __html: displayArticle.html ?? "" }}
