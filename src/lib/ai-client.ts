@@ -207,7 +207,9 @@ export async function generateImageBase64(
                     model: imageModel,
                     prompt,
                     size: (options?.size as any) ?? "1792x1024",
-                });
+                    output_format: "png",
+                    quality: "high",
+                } as any);
 
                 const b64 = imageResp.data?.[0]?.b64_json ?? null;
                 if (b64) return b64;
@@ -258,7 +260,9 @@ export async function generateImageBase64(
                     model: "gpt-image-2",
                     prompt,
                     size: (options?.size as any) ?? "1792x1024",
-                });
+                    output_format: "png",
+                    quality: "high",
+                } as any);
                 const b64 = imageResp.data?.[0]?.b64_json ?? null;
                 if (b64) return b64;
             } catch (oaiErr) {
