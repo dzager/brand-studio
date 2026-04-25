@@ -36,6 +36,7 @@ export const MODEL_REGISTRY: ModelOption[] = [
     { id: "gpt-5.2",        label: "GPT-5.2",             provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true, capabilities: ["writing", "utility"] },
     { id: "gpt-5.3-chat-latest", label: "GPT-5.3",        provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true, capabilities: ["writing", "utility"] },
     { id: "gpt-5.4",        label: "GPT-5.4",             provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true, capabilities: ["writing", "utility"] },
+    { id: "gpt-5.5",        label: "GPT-5.5",             provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: true, capabilities: ["writing", "utility"] },
     { id: "gpt-image-2",    label: "GPT Image 2",          provider: "openai",    envKey: "OPENAI_API_KEY",              supportsStructured: false, capabilities: ["imageGeneration"] },
 
     // Anthropic

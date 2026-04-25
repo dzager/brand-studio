@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useAuth } from "@/hooks/useAuth";
 import type { GetServerSideProps } from "next";
 import { IMAGE_STYLE_CATEGORIES, type ImageStyleCategory } from "@/brand/engine";
 import AppLayout from "@/components/layout/AppLayout";
@@ -177,9 +178,20 @@ export default function Home() {
         finally { setCsProductSearching(false); }
     }
 
+    const { activeAccount, isAdmin } = useAuth();
+    const isScopedMember = !isAdmin && !!activeAccount?.company_id;
+
     // Fetch companies + models
     useEffect(() => {
-        fetch("/api/companies").then((r) => r.json()).then((data) => { if (Array.isArray(data)) setCompanies(data); }).catch(() => {});
+        fetch("/api/companies").then((r) => r.json()).then((data) => {
+            if (Array.isArray(data)) {
+                setCompanies(data);
+                // Auto-select if member is scoped to one company
+                if (data.length === 1 && !companyId) {
+                    setCompanyId(data[0].id);
+                }
+            }
+        }).catch(() => {});
         fetch("/api/models").then((r) => r.json()).then((data) => {
             if (data?.models && Array.isArray(data.models)) {
                 setAvailableModels(data.models);
@@ -440,7 +452,8 @@ export default function Home() {
                 <div className="flex gap-3 items-center">
                     <Label htmlFor="company-select" className="whitespace-nowrap">Company</Label>
                     <select id="company-select" value={companyId} onChange={(e) => setCompanyId(e.target.value)}
-                        className={cn("flex-1 max-w-xs rounded-md border bg-background px-3 py-2 text-sm", companyId ? "border-input" : "border-warning")}>
+                        disabled={isScopedMember && companies.length === 1}
+                        className={cn("flex-1 max-w-xs rounded-md border bg-background px-3 py-2 text-sm", companyId ? "border-input" : "border-warning", isScopedMember && companies.length === 1 && "opacity-70 cursor-not-allowed")}>
                         <option value="">— Select a company —</option>
                         {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
@@ -540,7 +553,7 @@ export default function Home() {
                         <select id="model-select" value={model} onChange={(e) => setModel(e.target.value)}
                             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                             {availableModels.length > 0 ? availableModels.map((m) => <option key={m.id} value={m.id}>{m.label}{m.provider !== "openai" ? ` (${m.provider})` : ""}</option>)
-                                : <><option value="gpt-5.4">GPT-5.4</option><option value="gpt-5.1">GPT-5.1</option><option value="gpt-4.1-mini">GPT-4.1 Mini</option></>}
+                                : <><option value="gpt-5.5">GPT-5.5</option><option value="gpt-5.4">GPT-5.4</option><option value="gpt-5.1">GPT-5.1</option><option value="gpt-4.1-mini">GPT-4.1 Mini</option></>}
                         </select>
                     </div>
 

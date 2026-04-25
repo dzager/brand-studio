@@ -1,11 +1,26 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getSupabase } from "@/lib/supabase";
+import { createServerSupabase, getAdminSupabase } from "@/lib/supabase";
+import { requireAuth, getUserAccounts, isPlatformAdmin } from "@/lib/auth";
 
 export default async function handler(
     req: NextApiRequest,
     res: NextApiResponse
 ) {
-    const supabase = getSupabase();
+    const user = await requireAuth(req, res);
+    if (!user) return;
+
+    const supabase = createServerSupabase(req, res);
+    const admin = getAdminSupabase();
+
+    // Determine if this user is scoped to specific companies
+    let scopedCompanyIds: string[] = [];
+    const isAdmin = await isPlatformAdmin(user.id);
+    if (!isAdmin) {
+        const accounts = await getUserAccounts(user.id);
+        scopedCompanyIds = accounts
+            .filter((a) => a.company_id)
+            .map((a) => a.company_id!);
+    }
 
     try {
         if (req.method === "GET") {
@@ -13,22 +28,22 @@ export default async function handler(
 
             // If requesting a specific article with full content
             if (typeof qId === "string" && qId) {
-                const { data, error } = await supabase
-                    .from("articles")
-                    .select("*")
-                    .eq("id", qId)
-                    .single();
+                let query = supabase.from("articles").select("*").eq("id", qId);
+                if (scopedCompanyIds.length > 0) query = query.in("company_id", scopedCompanyIds);
+                const { data, error } = await query.single();
                 if (error) throw error;
                 return res.status(200).json(data);
             }
 
             // List mode: exclude heavy columns (image_base64, html) to avoid Supabase timeout.
-            // Note: cluster_id/cluster_role/humanized may not exist if migration hasn't run — Supabase ignores unknown columns in select().
-            const { data, error } = await supabase
+            let listQuery = supabase
                 .from("articles")
                 .select("id,title,slug,excerpt,image_prompt,seo,outline,model_used,image_style,company_id,cluster_id,cluster_role,humanized,created_at,updated_at")
                 .order("created_at", { ascending: false });
 
+            if (scopedCompanyIds.length > 0) listQuery = listQuery.in("company_id", scopedCompanyIds);
+
+            const { data, error } = await listQuery;
             if (error) throw error;
             return res.status(200).json(data);
         }
@@ -45,9 +60,31 @@ export default async function handler(
                 outline,
                 model_used,
                 image_style,
+                company_id,
+                account_id,
             } = req.body;
 
-            const { data, error } = await supabase
+            // Determine account_id
+            let targetAccountId = account_id;
+            if (!targetAccountId) {
+                // If company_id provided, look up the company's account
+                if (company_id) {
+                    const { data: company } = await admin
+                        .from("companies")
+                        .select("account_id")
+                        .eq("id", company_id)
+                        .single();
+                    targetAccountId = company?.account_id || null;
+                }
+
+                // Fall back to user's first account
+                if (!targetAccountId) {
+                    const accounts = await getUserAccounts(user.id);
+                    targetAccountId = accounts[0]?.account_id || null;
+                }
+            }
+
+            const { data, error } = await admin
                 .from("articles")
                 .insert({
                     title,
@@ -60,6 +97,8 @@ export default async function handler(
                     outline,
                     model_used,
                     image_style,
+                    company_id: company_id || null,
+                    account_id: targetAccountId,
                 })
                 .select()
                 .single();

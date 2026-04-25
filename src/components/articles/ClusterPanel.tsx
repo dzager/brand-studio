@@ -12,10 +12,19 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
     Play, RefreshCw, Pencil, X, Trash2,
     AlertCircle, CheckCircle2, Link2, Network,
     Crown, BookOpen, Scroll, FileText, Sparkles,
-    Download, LinkIcon, Plus, ImageIcon,
+    Download, LinkIcon, Plus, ImageIcon, ChevronRight,
+    UserPlus, Mail, Copy, ExternalLink,
+    Zap, MoreHorizontal, ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +56,7 @@ type ClusterArticle = {
 type Cluster = {
     id: string;
     company_id: string;
+    account_id: string | null;
     name: string;
     pillar_topic: string;
     strategy: ClusterStrategy;
@@ -100,6 +110,10 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
     const [editingStrategy, setEditingStrategy] = useState(false);
     const [editStrategyJson, setEditStrategyJson] = useState("");
 
+    const [editingName, setEditingName] = useState(false);
+    const [editNameValue, setEditNameValue] = useState("");
+    const [savingName, setSavingName] = useState(false);
+
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [deleting, setDeleting] = useState(false);
 
@@ -130,6 +144,18 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
 
     const [imageMode, setImageMode] = useState<"ai" | "search">("ai");
 
+    const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({ pillar: true, supporting: true, long_tail: true });
+
+    // ── Share cluster state ────────────────────────────────────────
+    const [showSharePanel, setShowSharePanel] = useState(false);
+    const [shareEmail, setShareEmail] = useState("");
+    const [shareLoading, setShareLoading] = useState(false);
+    const [shareSuccess, setShareSuccess] = useState<string | null>(null);
+    const [shareErr, setShareErr] = useState<string | null>(null);
+    const [clusterInvites, setClusterInvites] = useState<any[]>([]);
+    const [loadingInvites, setLoadingInvites] = useState(false);
+    const [copiedLink, setCopiedLink] = useState(false);
+
     const loadCluster = useCallback(async () => {
         setLoading(true); setErr(null);
         try {
@@ -142,6 +168,55 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
     }, [clusterId]);
 
     useEffect(() => { loadCluster(); }, [loadCluster]);
+
+    // ── Share handlers ─────────────────────────────────────────────
+    async function loadClusterInvites() {
+        if (!cluster) return;
+        setLoadingInvites(true);
+        try {
+            const acctId = cluster.account_id || "";
+            const params = new URLSearchParams({
+                account_id: acctId,
+                cluster_id: cluster.id,
+            });
+            const r = await fetch(`/api/invitations?${params}`);
+            const data = await r.json();
+            if (r.ok && Array.isArray(data)) {
+                setClusterInvites(data);
+            }
+        } catch {} 
+        finally { setLoadingInvites(false); }
+    }
+
+    async function handleShareCluster() {
+        if (!cluster || !shareEmail.trim()) return;
+        setShareLoading(true); setShareErr(null); setShareSuccess(null);
+        try {
+            const r = await fetch("/api/invitations", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    account_id: cluster.account_id || undefined,
+                    email: shareEmail.trim(),
+                    role: "member",
+                    cluster_id: cluster.id,
+                }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || "Failed to send invitation");
+            setShareSuccess(`Invitation sent to ${shareEmail.trim()}`);
+            setShareEmail("");
+            loadClusterInvites();
+        } catch (e: any) { setShareErr(e.message); }
+        finally { setShareLoading(false); }
+    }
+
+    function handleCopyInviteLink(inviteUrl: string) {
+        navigator.clipboard.writeText(inviteUrl).then(() => {
+            setCopiedLink(true);
+            setTimeout(() => setCopiedLink(false), 2000);
+        });
+    }
 
     async function generatePage(pageType: string, pageIndex: number, pageKey: string) {
         setGeneratingPage(pageKey); setPageGenErr(null);
@@ -201,6 +276,25 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
             setEditingStrategy(false);
             onUpdate();
         } catch (e: any) { alert(`Save failed: ${e.message}`); }
+    }
+
+    async function saveClusterName() {
+        const trimmed = editNameValue.trim();
+        if (!trimmed || trimmed === cluster?.name) { setEditingName(false); return; }
+        setSavingName(true);
+        try {
+            const r = await fetch(`/api/clusters/${clusterId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: trimmed }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || "Save failed");
+            setCluster((prev) => prev ? { ...prev, name: trimmed } : prev);
+            setEditingName(false);
+            onUpdate();
+        } catch (e: any) { alert(`Rename failed: ${e.message}`); }
+        finally { setSavingName(false); }
     }
 
     async function handleDelete() {
@@ -407,7 +501,25 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
             <div>
                 <div className="flex items-center gap-2 mb-1">
                     <Network className="h-5 w-5 text-primary" />
-                    <h2 className="text-xl font-semibold tracking-tight">{cluster.name}</h2>
+                    {editingName ? (
+                        <Input
+                            autoFocus
+                            value={editNameValue}
+                            onChange={(e) => setEditNameValue(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") saveClusterName(); if (e.key === "Escape") setEditingName(false); }}
+                            onBlur={saveClusterName}
+                            disabled={savingName}
+                            className="text-xl font-semibold tracking-tight h-auto py-0 px-1 border-primary/50"
+                        />
+                    ) : (
+                        <>
+                            <h2 className="text-xl font-semibold tracking-tight">{cluster.name}</h2>
+                            <button onClick={() => { setEditNameValue(cluster.name); setEditingName(true); }}
+                                className="text-muted-foreground hover:text-foreground transition-colors" title="Edit cluster name">
+                                <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                        </>
+                    )}
                 </div>
                 <div className="flex gap-2 flex-wrap mt-2">
                     <Badge variant="secondary">
@@ -423,13 +535,16 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                 </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex gap-2 flex-wrap pb-4 border-b border-border">
+            {/* Actions — consolidated into primary buttons + dropdown menus */}
+            <div className="flex gap-2 flex-wrap items-center pb-4 border-b border-border">
+                {/* Primary: Generate All */}
                 <Button size="sm" onClick={batchGenerate} disabled={batchGenerating || generatedCount >= totalPages || !strategy} className="gap-1.5">
                     {batchGenerating ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> {batchProgress?.current}/{batchProgress?.total}…</>
                         : generatedCount >= totalPages ? <><CheckCircle2 className="h-3.5 w-3.5" /> All Generated</>
                             : <><Play className="h-3.5 w-3.5" /> Generate All ({totalPages - generatedCount})</>}
                 </Button>
+
+                {/* Image mode selector */}
                 <div className="flex items-center gap-1 border rounded-md px-1.5 bg-muted/30">
                     <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
                     <select value={imageMode} onChange={(e) => setImageMode(e.target.value as "ai" | "search")}
@@ -438,58 +553,120 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                         <option value="search">🔍 Image Search</option>
                     </select>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleGenerateGuide}
-                    disabled={generatingGuide || generatedCount === 0}
-                    className={cn("gap-1.5", guideSuccess && "text-success border-success")}>
-                    {generatingGuide ? (
-                        <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Generating Guide…</>
-                    ) : guideSuccess ? (
-                        <><CheckCircle2 className="h-3.5 w-3.5" /> Guide Created!</>
-                    ) : (
-                        <><Sparkles className="h-3.5 w-3.5" /> Generate Guide</>
-                    )}
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => {
-                    if (editingStrategy) { setEditingStrategy(false); }
-                    else { setEditingStrategy(true); setEditStrategyJson(JSON.stringify(strategy, null, 2)); }
-                }} className="gap-1.5">
-                    {editingStrategy ? <><X className="h-3.5 w-3.5" /> Close Editor</> : <><Pencil className="h-3.5 w-3.5" /> Edit Strategy</>}
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => { if (showArticleMgr) setShowArticleMgr(false); else loadArticleManager(); }}
-                    className={cn("gap-1.5", showArticleMgr && "bg-primary/10")}>
-                    <Link2 className="h-3.5 w-3.5" /> {showArticleMgr ? "Close" : "Manage Articles"}
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleInterlink}
-                    disabled={interlinking || generatedCount < 2}
-                    className={cn("gap-1.5", interlinkResult && "text-success border-success")}>
-                    {interlinking ? (
-                        <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Interlinking…</>
-                    ) : interlinkResult ? (
-                        <><CheckCircle2 className="h-3.5 w-3.5" /> +{interlinkResult.links} Links</>
-                    ) : (
-                        <><LinkIcon className="h-3.5 w-3.5" /> Interlink Articles</>
-                    )}
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleDownloadAll}
-                    disabled={generatedCount === 0}
-                    className="gap-1.5">
-                    <Download className="h-3.5 w-3.5" /> Download All
-                </Button>
+
+                {/* Actions dropdown — Generate Guide, Interlink, Download, Share */}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="gap-1.5">
+                            <Zap className="h-3.5 w-3.5" /> Actions
+                            <ChevronDown className="h-3 w-3 opacity-50" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-52">
+                        <DropdownMenuItem
+                            onClick={handleGenerateGuide}
+                            disabled={generatingGuide || generatedCount === 0}
+                            className="gap-2 cursor-pointer"
+                        >
+                            {generatingGuide ? (
+                                <RefreshCw className="h-4 w-4 animate-spin" />
+                            ) : guideSuccess ? (
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            ) : (
+                                <Sparkles className="h-4 w-4" />
+                            )}
+                            {generatingGuide ? "Generating Guide…" : guideSuccess ? "Guide Created!" : "Generate Guide"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={handleInterlink}
+                            disabled={interlinking || generatedCount < 2}
+                            className="gap-2 cursor-pointer"
+                        >
+                            {interlinking ? (
+                                <RefreshCw className="h-4 w-4 animate-spin" />
+                            ) : interlinkResult ? (
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            ) : (
+                                <LinkIcon className="h-4 w-4" />
+                            )}
+                            {interlinking ? "Interlinking…" : interlinkResult ? `+${interlinkResult.links} Links` : "Interlink Articles"}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                            onClick={handleDownloadAll}
+                            disabled={generatedCount === 0}
+                            className="gap-2 cursor-pointer"
+                        >
+                            <Download className="h-4 w-4" />
+                            Download All
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => {
+                                const next = !showSharePanel;
+                                setShowSharePanel(next);
+                                if (next && cluster) loadClusterInvites();
+                            }}
+                            className={cn("gap-2 cursor-pointer", showSharePanel && "text-blue-600")}
+                        >
+                            <UserPlus className="h-4 w-4" />
+                            {showSharePanel ? "Close Share Panel" : "Share Cluster"}
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Refresh */}
                 <Button variant="outline" size="sm" onClick={loadCluster} className="gap-1.5">
                     <RefreshCw className="h-3.5 w-3.5" /> Refresh
                 </Button>
-                {confirmDelete ? (
-                    <div className="flex gap-1.5">
-                        <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
-                            {deleting ? "…" : "Confirm Delete"}
+
+                {/* More overflow dropdown — Edit Strategy, Manage Articles, Delete */}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="px-2">
+                            <MoreHorizontal className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setConfirmDelete(false)}>Cancel</Button>
-                    </div>
-                ) : (
-                    <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(true)} className="text-destructive hover:text-destructive gap-1.5">
-                        <Trash2 className="h-3.5 w-3.5" /> Delete
-                    </Button>
-                )}
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem
+                            onClick={() => {
+                                if (editingStrategy) { setEditingStrategy(false); }
+                                else { setEditingStrategy(true); setEditStrategyJson(JSON.stringify(strategy, null, 2)); }
+                            }}
+                            className={cn("gap-2 cursor-pointer", editingStrategy && "text-primary")}
+                        >
+                            {editingStrategy ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                            {editingStrategy ? "Close Editor" : "Edit Strategy"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => { if (showArticleMgr) setShowArticleMgr(false); else loadArticleManager(); }}
+                            className={cn("gap-2 cursor-pointer", showArticleMgr && "text-primary")}
+                        >
+                            <Link2 className="h-4 w-4" />
+                            {showArticleMgr ? "Close Articles" : "Manage Articles"}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {confirmDelete ? (
+                            <DropdownMenuItem
+                                onClick={handleDelete}
+                                disabled={deleting}
+                                variant="destructive"
+                                className="gap-2 cursor-pointer"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                                {deleting ? "Deleting…" : "Confirm Delete"}
+                            </DropdownMenuItem>
+                        ) : (
+                            <DropdownMenuItem
+                                onClick={() => setConfirmDelete(true)}
+                                variant="destructive"
+                                className="gap-2 cursor-pointer"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                                Delete Cluster
+                            </DropdownMenuItem>
+                        )}
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
 
             {pageGenErr && (
@@ -523,6 +700,83 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
             )}
 
 
+
+            {/* Share Cluster Panel */}
+            {showSharePanel && cluster && (
+                <Card className="border-blue-500/30 bg-blue-500/5">
+                    <CardContent className="p-4 space-y-3">
+                        <h4 className="font-semibold text-sm flex items-center gap-1.5 text-blue-600">
+                            <UserPlus className="h-4 w-4" /> Share Cluster
+                        </h4>
+                        <p className="text-xs text-muted-foreground">
+                            Invite someone to collaborate on this cluster.
+                            They&apos;ll receive an email with a registration link and will land directly in this cluster.
+                        </p>
+
+                        <div className="flex gap-2">
+                            <Input
+                                placeholder="colleague@company.com"
+                                type="email"
+                                value={shareEmail}
+                                onChange={(e) => { setShareEmail(e.target.value); setShareErr(null); setShareSuccess(null); }}
+                                onKeyDown={(e) => { if (e.key === "Enter") handleShareCluster(); }}
+                                className="text-sm"
+                            />
+                            <Button size="sm" onClick={handleShareCluster}
+                                disabled={shareLoading || !shareEmail.includes("@")}
+                                className="gap-1.5 whitespace-nowrap"
+                            >
+                                {shareLoading ? (
+                                    <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Sending&hellip;</>
+                                ) : (
+                                    <><Mail className="h-3.5 w-3.5" /> Send Invite</>
+                                )}
+                            </Button>
+                        </div>
+
+                        {shareSuccess && (
+                            <Alert className="border-green-500/50 bg-green-500/5 py-2">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                                <AlertDescription className="text-xs text-green-700">
+                                    {shareSuccess}
+                                </AlertDescription>
+                            </Alert>
+                        )}
+                        {shareErr && (
+                            <p className="text-xs text-destructive">{shareErr}</p>
+                        )}
+
+                        {/* Pending cluster invitations */}
+                        {loadingInvites ? (
+                            <Skeleton className="h-10 w-full" />
+                        ) : clusterInvites.length > 0 ? (
+                            <div className="space-y-1.5">
+                                <h5 className="text-xs uppercase tracking-wider text-muted-foreground">Pending Invitations</h5>
+                                {clusterInvites.map((inv) => (
+                                    <div key={inv.id} className="flex items-center gap-2 p-2 rounded-md bg-card border border-border text-sm">
+                                        <Mail className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                        <span className="flex-1 truncate">{inv.email}</span>
+                                        <Badge variant="outline" className="text-[10px] shrink-0">Pending</Badge>
+                                        {inv.token && (
+                                            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0"
+                                                title="Copy invite link"
+                                                onClick={() => {
+                                                    const url = `${window.location.origin}/invite/${inv.token}`;
+                                                    handleCopyInviteLink(url);
+                                                }}
+                                            >
+                                                {copiedLink ? <CheckCircle2 className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
+                                            </Button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-xs text-muted-foreground italic">No pending invitations for this cluster.</p>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Strategy Editor */}
             {editingStrategy && (
@@ -649,15 +903,18 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
 
     function renderPageSection(label: string, type: string, pages: ClusterPage[]) {
         const isAddingThisType = addingPageType === type;
+        const isCollapsed = collapsedSections[type] ?? true;
+        const toggleCollapse = () => setCollapsedSections((prev) => ({ ...prev, [type]: !prev[type] }));
         return (
             <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                    <h4 className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                    <button onClick={toggleCollapse} className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2 hover:text-foreground transition-colors">
+                        <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", !isCollapsed && "rotate-90")} />
                         <span className={cn("w-2.5 h-2.5 rounded-full",
                             type === "pillar" ? "bg-primary" : type === "supporting" ? "bg-green-500" : "bg-amber-500"
                         )} />
                         {label} ({pages.length})
-                    </h4>
+                    </button>
                     {/* Hide add button for pillar if one already exists */}
                     {!(type === "pillar" && pages.length > 0) && (
                         <Button variant="ghost" size="sm"
@@ -668,6 +925,8 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                     )}
                 </div>
 
+                {!isCollapsed && (
+                <>
                 {/* Inline add-page form */}
                 {isAddingThisType && (
                     <Card className="border-dashed border-primary/40 bg-primary/5">
@@ -776,6 +1035,8 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                         );
                     })}
                 </div>
+                </>
+                )}
             </div>
         );
     }

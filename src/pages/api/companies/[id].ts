@@ -1,11 +1,15 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getSupabase } from "@/lib/supabase";
+import { createServerSupabase } from "@/lib/supabase";
+import { requireAuth } from "@/lib/auth";
 
 export default async function handler(
     req: NextApiRequest,
     res: NextApiResponse
 ) {
-    const supabase = getSupabase();
+    const user = await requireAuth(req, res);
+    if (!user) return;
+
+    const supabase = createServerSupabase(req, res);
     const { id } = req.query;
 
     if (typeof id !== "string") {

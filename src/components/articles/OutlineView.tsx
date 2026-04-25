@@ -2,10 +2,16 @@
 // Company → Cluster → Role Group → Article
 // Now includes cluster toolbar and cluster selection for ClusterPanel
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import {
     Building2,
@@ -20,6 +26,7 @@ import {
     FolderPlus,
     Sparkles,
     Trash2,
+    Plus,
 } from "lucide-react";
 
 type Article = {
@@ -201,28 +208,68 @@ export default function OutlineView({
         });
     }, [articles, clusters, companies]);
 
+    // Seed default collapsed state: clusters closed, article role groups open
+    useEffect(() => {
+        setCollapsed((prev) => {
+            const next = { ...prev };
+            let changed = false;
+            for (const company of tree) {
+                for (const { cluster } of company.clusters) {
+                    const clusterKey = `cluster-${cluster.id}`;
+                    if (!(clusterKey in next)) {
+                        next[clusterKey] = true;
+                        changed = true;
+                    }
+                }
+            }
+            return changed ? next : prev;
+        });
+    }, [tree]);
+
     const hasClusterActions = onCreateAiCluster || onCreateManualCluster || onAutoCluster;
 
     return (
         <div className="px-1 py-2 space-y-3">
-            {/* Cluster toolbar */}
+            {/* Cluster toolbar — single dropdown replacing 3 buttons */}
             {hasClusterActions && (
-                <div className="flex gap-1.5 px-2 pb-2 border-b border-border">
-                    {onCreateAiCluster && (
-                        <Button variant="outline" size="sm" onClick={onCreateAiCluster} className="gap-1 text-xs h-7 flex-1">
-                            <Wand2 className="h-3 w-3" /> AI Cluster
-                        </Button>
-                    )}
-                    {onCreateManualCluster && (
-                        <Button variant="outline" size="sm" onClick={onCreateManualCluster} className="gap-1 text-xs h-7 flex-1">
-                            <FolderPlus className="h-3 w-3" /> Manual
-                        </Button>
-                    )}
-                    {onAutoCluster && (
-                        <Button variant="outline" size="sm" onClick={onAutoCluster} className="gap-1 text-xs h-7 flex-1">
-                            <Sparkles className="h-3 w-3" /> Auto
-                        </Button>
-                    )}
+                <div className="flex px-2 pb-2 border-b border-border">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" className="gap-1.5 text-xs h-7 w-full">
+                                <Plus className="h-3 w-3" /> New Cluster
+                                <ChevronDown className="h-3 w-3 ml-auto opacity-50" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-64">
+                            {onCreateAiCluster && (
+                                <DropdownMenuItem onClick={onCreateAiCluster} className="gap-2 py-2 cursor-pointer">
+                                    <Wand2 className="h-4 w-4 text-primary" />
+                                    <div>
+                                        <div className="font-medium text-sm">AI Cluster</div>
+                                        <div className="text-xs text-muted-foreground">Generate a full topical strategy with AI</div>
+                                    </div>
+                                </DropdownMenuItem>
+                            )}
+                            {onCreateManualCluster && (
+                                <DropdownMenuItem onClick={onCreateManualCluster} className="gap-2 py-2 cursor-pointer">
+                                    <FolderPlus className="h-4 w-4 text-muted-foreground" />
+                                    <div>
+                                        <div className="font-medium text-sm">Manual Cluster</div>
+                                        <div className="text-xs text-muted-foreground">Create empty and assign articles manually</div>
+                                    </div>
+                                </DropdownMenuItem>
+                            )}
+                            {onAutoCluster && (
+                                <DropdownMenuItem onClick={onAutoCluster} className="gap-2 py-2 cursor-pointer">
+                                    <Sparkles className="h-4 w-4 text-amber-500" />
+                                    <div>
+                                        <div className="font-medium text-sm">Auto-Cluster</div>
+                                        <div className="text-xs text-muted-foreground">Group existing articles by topic similarity</div>
+                                    </div>
+                                </DropdownMenuItem>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             )}
 

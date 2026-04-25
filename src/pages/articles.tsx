@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/router";
 import Link from "next/link";
 import type { GetServerSideProps } from "next";
 import dynamic from "next/dynamic";
@@ -98,6 +99,19 @@ export default function ArticlesPage() {
     }, []);
 
     useEffect(() => { fetchData(); }, [fetchData]);
+
+    // Deep-link: auto-select cluster from ?cluster= query param (e.g. from invitation)
+    const router = useRouter();
+    useEffect(() => {
+        if (!loading && router.query.cluster && typeof router.query.cluster === "string") {
+            const targetCluster = router.query.cluster;
+            // Only auto-select if the cluster exists in the loaded data
+            if (clusters.some((c) => c.id === targetCluster)) {
+                setSelectedClusterId(targetCluster);
+                setSelectedArticleId(null);
+            }
+        }
+    }, [loading, router.query.cluster, clusters]);
 
     function handleSelectArticle(id: string) {
         setSelectedArticleId(id);

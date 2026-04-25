@@ -1,4 +1,4 @@
-# Brand Studio
+# Organic Brand Studio
 
 ## Stack
 Next.js + TypeScript
@@ -6,9 +6,11 @@ Next.js + TypeScript
 ## Structure
 
 src/
-brand/ → brand engine logic
-pages/api/ → API endpoints
+  brand/ → brand engine logic
+  pages/api/ → API endpoints
 public/ → assets
+mcp/
+  organic-brand-mcp/ → unified MCP server (voice, photo style, blog tools)
 
 ## Important Files
 
@@ -17,6 +19,9 @@ Core brand generation logic
 
 src/pages/api/create.ts  
 API route for generating blog content
+
+mcp/organic-brand-mcp/src/index.ts  
+Unified MCP server — 21 tools for voice, photo style, and blog
 
 ## Coding Rules
 

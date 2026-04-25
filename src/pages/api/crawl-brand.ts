@@ -150,47 +150,79 @@ export default async function handler(
     }
 
     try {
-        // 1. Crawl the website
-        const crawlResult = await crawlWebsite(url);
+        // 1. Attempt to crawl the website
+        let crawlContext: string;
+        let crawlSucceeded = true;
+        let pagesCrawled = 0;
 
-        // 2. Build context for AI analysis
-        const { homepage, additionalPages, discoveredColors, allBodyText } = crawlResult;
+        try {
+            const crawlResult = await crawlWebsite(url);
+            const { homepage, additionalPages, discoveredColors, allBodyText } = crawlResult;
+            pagesCrawled = 1 + additionalPages.length;
 
-        const crawlContext = [
-            `## Homepage Meta`,
-            `Title: ${homepage.title}`,
-            `Meta Description: ${homepage.metaDescription}`,
-            `OG Site Name: ${homepage.ogSiteName}`,
-            `OG Title: ${homepage.ogTitle}`,
-            `OG Description: ${homepage.ogDescription}`,
-            `Theme Color: ${homepage.themeColor}`,
-            homepage.ogImage ? `OG Image: ${homepage.ogImage}` : "",
-            ``,
-            `## Headings Found on Homepage`,
-            homepage.headings.slice(0, 15).map((h) => `- ${h}`).join("\n"),
-            ``,
-            `## Hero/Banner Text`,
-            homepage.heroText || "(none detected)",
-            ``,
-            `## Colors Found in CSS/Meta`,
-            discoveredColors.length > 0 ? discoveredColors.join(", ") : "(none detected from meta/CSS — infer from page content or use neutral defaults)",
-            ``,
-            `## Image Signals (alt texts and context from page images)`,
-            crawlResult.allImageSignals.length > 0
-                ? crawlResult.allImageSignals.slice(0, 40).map((img) =>
-                    `- Alt: "${img.alt}"${img.context ? ` | Context: "${img.context.slice(0, 150)}"` : ""}`
-                ).join("\n")
-                : "(no image alt texts found)",
-            ``,
-            `## Pages Crawled`,
-            `Homepage: ${homepage.url}`,
-            ...additionalPages.map((p) => `Additional: ${p.url} — "${p.title}"`),
-            ``,
-            `## Full Page Content`,
-            allBodyText.slice(0, 15000), // Cap at 15k chars for prompt size
-        ].filter(Boolean).join("\n");
+            crawlContext = [
+                `## Homepage Meta`,
+                `Title: ${homepage.title}`,
+                `Meta Description: ${homepage.metaDescription}`,
+                `OG Site Name: ${homepage.ogSiteName}`,
+                `OG Title: ${homepage.ogTitle}`,
+                `OG Description: ${homepage.ogDescription}`,
+                `Theme Color: ${homepage.themeColor}`,
+                homepage.ogImage ? `OG Image: ${homepage.ogImage}` : "",
+                ``,
+                `## Headings Found on Homepage`,
+                homepage.headings.slice(0, 15).map((h) => `- ${h}`).join("\n"),
+                ``,
+                `## Hero/Banner Text`,
+                homepage.heroText || "(none detected)",
+                ``,
+                `## Colors Found in CSS/Meta`,
+                discoveredColors.length > 0 ? discoveredColors.join(", ") : "(none detected from meta/CSS — infer from page content or use neutral defaults)",
+                ``,
+                `## Image Signals (alt texts and context from page images)`,
+                crawlResult.allImageSignals.length > 0
+                    ? crawlResult.allImageSignals.slice(0, 40).map((img) =>
+                        `- Alt: "${img.alt}"${img.context ? ` | Context: "${img.context.slice(0, 150)}"` : ""}`
+                    ).join("\n")
+                    : "(no image alt texts found)",
+                ``,
+                `## Pages Crawled`,
+                `Homepage: ${homepage.url}`,
+                ...additionalPages.map((p) => `Additional: ${p.url} — "${p.title}"`),
+                ``,
+                `## Full Page Content`,
+                allBodyText.slice(0, 15000),
+            ].filter(Boolean).join("\n");
+        } catch (crawlErr) {
+            // Crawl failed — fall back to LLM inference from URL/domain
+            console.warn("Crawl failed, falling back to LLM inference:", crawlErr);
+            crawlSucceeded = false;
 
-        // 3. Send to AI for structured extraction
+            // Extract domain and likely company name from URL
+            let domain = url;
+            try {
+                const parsed = new URL(url.startsWith("http") ? url : `https://${url}`);
+                domain = parsed.hostname.replace(/^www\./, "");
+            } catch {}
+            const likelyName = domain.split(".")[0].replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+            crawlContext = [
+                `## IMPORTANT: Website crawl failed`,
+                `The website at ${url} could not be crawled (it may be unreachable, blocking bots, or require authentication).`,
+                ``,
+                `## Available Information`,
+                `URL: ${url}`,
+                `Domain: ${domain}`,
+                `Likely company name: ${likelyName}`,
+                ``,
+                `## Instructions`,
+                `Since the website could not be crawled, use your knowledge of this company/brand to fill in the profile fields as accurately as possible.`,
+                `If you recognize the brand, provide real information. If not, infer reasonable defaults based on the domain name, industry signals, and common patterns for this type of business.`,
+                `In the confidence_notes field, clearly state that the website could not be crawled and that ALL fields were inferred by the LLM rather than extracted from the site. Flag which fields are likely accurate (if you recognize the brand) vs. which are pure guesses.`,
+            ].join("\n");
+        }
+
+        // 2. Send to AI for structured extraction
         const systemPrompt = `You are an expert brand strategist and web analyst. Given crawled website data (meta tags, headings, body text, CSS colors, and image signals), you extract and synthesize structured brand information.
 
 Your job is to fill out a company brand profile from the website data. Be specific and grounded in what you observe — do not invent or hallucinate information.
@@ -225,8 +257,9 @@ Do not include generic filler. Every field should contain specific, brand-releva
 
         return res.status(200).json({
             brand,
-            pages_crawled: 1 + additionalPages.length,
-            url: homepage.url,
+            pages_crawled: pagesCrawled,
+            url,
+            fallback: !crawlSucceeded,
         });
     } catch (err) {
         console.error("API /api/crawl-brand error:", err);

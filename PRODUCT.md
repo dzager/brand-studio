@@ -1,8 +1,8 @@
-# Boundless Brand Studio — Product Documentation
+# Organic Brand Studio — Product Documentation
 
 ## Overview
 
-Boundless Brand Studio is an AI-powered content creation platform that generates brand-consistent blog articles, editorial images, and SEO-optimized content. It supports multi-company management, allowing each company to maintain its own editorial voice, image style, and content guidelines.
+Organic is an AI-powered content creation platform that generates brand-consistent blog articles, editorial images, and SEO-optimized content. It supports multi-company management, allowing each company to maintain its own editorial voice, image style, and content guidelines.
 
 ---
 
@@ -225,6 +225,41 @@ Applied to every article regardless of company:
 
 ---
 
+## MCP Server — Organic Brand MCP
+
+The platform exposes its complete brand toolkit as a unified [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server at `mcp/organic-brand-mcp/`. This single server replaces the original three separate servers (`voice-mcp`, `photo-style-mcp`, `blog-mcp`) and provides **21 tools** that any MCP-compatible AI client (Claude Desktop, Cursor, ChatGPT, Windsurf, etc.) can use to generate brand-consistent content.
+
+### Tool Groups
+
+| Group | Tools | Purpose |
+|---|---|---|
+| **General** | `list_companies` | List all brands configured in Organic |
+| **Voice** (5) | `get_voice_profile`, `get_banned_words`, `get_style_rules`, `validate_tone`, `compile_voice_prompt` | Voice profile, editorial rules, and tone validation |
+| **Photo Style** (6) | `get_photography_style`, `get_color_palette`, `list_image_styles`, `get_image_style`, `generate_image_prompt`, `get_composite_config` | Photography style, colors, and image prompt generation |
+| **Blog** (9) | `get_blog_system_prompt`, `get_editorial_guidelines`, `get_seo_guidelines`, `get_blog_schema`, `get_user_prompt_template`, `build_cluster_context`, `list_articles`, `get_article`, `create_article` | Full blog generation pipeline, article management, and article creation |
+
+### Setup
+
+```bash
+cd mcp/organic-brand-mcp
+npm install
+SUPABASE_URL=... SUPABASE_ANON_KEY=... npx tsx src/index.ts
+```
+
+See [`mcp/organic-brand-mcp/README.md`](mcp/organic-brand-mcp/README.md) for full configuration (Claude Desktop, Cursor, environment variables) and usage examples.
+
+### Prompt Templates
+
+The server includes guided workflow prompts accessible via `/` in Claude Desktop:
+
+| Prompt | Parameters | Description |
+|---|---|---|
+| `write_article` | company, topic | Full article generation with post-creation follow-ups (fact-check, tone validation, hero image, save) |
+| `brand_review` | company, text | Validate text against brand voice, banned phrases, and editorial rules with alignment rating |
+| `onboard_brand` | company | Step-by-step guided setup for a new brand profile |
+
+---
+
 ## Technology Stack
 
 | Component | Technology |
@@ -232,7 +267,8 @@ Applied to every article regardless of company:
 | **Framework** | Next.js (Pages Router) |
 | **Language** | TypeScript |
 | **Database** | Supabase (PostgreSQL) |
-| **AI Models** | OpenAI GPT-5.1, GPT-4.1, GPT-4.1-nano, GPT-4o-mini, o3, gpt-image-1 |
+| **AI Models** | OpenAI GPT-5.4, GPT-4.1, GPT-4.1-mini, o3, gpt-image-2 |
+| **MCP Server** | `@modelcontextprotocol/sdk` (unified organic-brand-mcp) |
 | **Image Search** | Pexels API |
 | **Publishing** | WordPress REST API |
 | **HTML Parsing** | cheerio (for reference article scraping) |
@@ -244,10 +280,12 @@ Applied to every article regardless of company:
 
 1. **Base Engine vs. Company-Specific**: Universal rules (anti-AI, AEO/GEO, specificity) apply to all companies. Voice, tone, content depth, and formatting are company-specific via editorial guidelines and voice profiles.
 
-2. **Editorial Guidelines Take Precedence**: The base engine's length rules explicitly defer to company editorial guidelines when present, allowing companies like Boundless to demand rich, long-form content while others may prefer brevity.
+2. **Editorial Guidelines Take Precedence**: The base engine's length rules explicitly defer to company editorial guidelines when present, allowing companies to demand rich, long-form content while others may prefer brevity.
 
 3. **Reference Articles as Few-Shot Examples**: Instead of manually copying article excerpts, companies can add URLs. The system auto-fetches, parses (via cheerio), caches (24h TTL), and injects article content as gold-standard references in the system prompt.
 
 4. **Voice Profile as Structured Data**: Voice profiles are not free-text — they're structured JSON with specific fields (tone descriptors, sentence rhythm, banned phrases, specificity rules, etc.) that compile into deterministic prompt instructions.
 
 5. **Image Styles are Company-Owned**: No hardcoded global image styles. Each company defines its own styles via the Custom Image Styles section, giving full control over visual brand identity.
+
+6. **Unified MCP Server**: A single `organic-brand-mcp` server exposes all brand tools (voice, photo style, blog) over the Model Context Protocol. This consolidation from three separate servers simplifies configuration, deployment, and maintenance while keeping all tool names backward-compatible.

@@ -6,6 +6,9 @@ import fs from "fs";
 const projectDir = fs.realpathSync.native(process.cwd());
 
 const nextConfig: NextConfig = {
+  devIndicators: {
+    position: "bottom-right",
+  },
   turbopack: {
     root: projectDir,
   },

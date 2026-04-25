@@ -232,7 +232,11 @@ export default function CompaniesPage() {
                 } : {}),
             }));
             setImportSuccess(true);
-            setImportNotes(b.confidence_notes || null);
+            if (data.fallback) {
+                setImportNotes(`⚠️ Website couldn't be crawled — all fields were pre-filled using AI knowledge of this brand. Review every field carefully. ${b.confidence_notes || ""}`);
+            } else {
+                setImportNotes(b.confidence_notes || null);
+            }
         } catch (e: any) {
             setImportErr(e.message);
         } finally {

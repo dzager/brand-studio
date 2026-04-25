@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import slugify from "slugify";
 import { getSupabase } from "@/lib/supabase";
+import { requireAuth, getUserAccounts } from "@/lib/auth";
+import { checkArticleLimit, incrementArticleCount } from "@/lib/usage";
 import { buildBrandEngine, type CompanyRecord } from "@/lib/buildBrandEngine";
 import { buildAllJsonLd } from "@/lib/jsonld";
 import { compileReferenceArticles } from "@/lib/referenceArticles";
@@ -162,6 +164,33 @@ export default async function handler(
 
         if (typeof company_id !== "string" || !company_id) {
             return res.status(400).json({ error: "company_id is required" });
+        }
+
+        // Auth check
+        const authUser = await requireAuth(req, res);
+        if (!authUser) return;
+
+        // Determine account_id from the company
+        const { data: companyAccountData } = await getSupabase()
+            .from("companies")
+            .select("account_id")
+            .eq("id", company_id)
+            .single();
+
+        let accountId = companyAccountData?.account_id;
+        if (!accountId) {
+            // Fall back to user's first account
+            const accounts = await getUserAccounts(authUser.id);
+            accountId = accounts[0]?.account_id;
+        }
+
+        // Check article usage limits (if we have an account)
+        if (accountId) {
+            const usage = await checkArticleLimit(accountId);
+            // Usage is always allowed (overage billing), but we log it
+            if (usage.overage > 0) {
+                console.log(`[create] Account ${accountId} is in overage: ${usage.used}/${usage.limit} (${usage.overage} over)`);
+            }
         }
 
         // Validate and resolve style AFTER we know the brand
@@ -367,6 +396,7 @@ Which style best fits this article? Respond with JSON only.`;
                 model_used: selectedModel,
                 image_style: styleId,
                 company_id: company_id || null,
+                account_id: accountId || null,
             }).select("id").single();
 
             // Generate and persist embedding (non-blocking on failure)
@@ -381,6 +411,15 @@ Which style best fits this article? Respond with JSON only.`;
                         .eq("id", savedArticle.id);
                 } catch (embErr) {
                     console.warn("Failed to generate/save article embedding:", embErr);
+                }
+
+                // Increment usage counter
+                if (accountId) {
+                    try {
+                        await incrementArticleCount(accountId);
+                    } catch (usageErr) {
+                        console.warn("Failed to increment usage counter:", usageErr);
+                    }
                 }
             }
         } catch (saveErr) {

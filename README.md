@@ -1,36 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🌿 Organic — Brand Studio
+
+AI-powered content creation platform that generates brand-consistent blog articles, editorial images, and SEO-optimized content across multiple companies.
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Framework:** Next.js (Pages Router) + TypeScript
+- **Database:** Supabase (PostgreSQL)
+- **AI:** OpenAI GPT-5.4, GPT-4.1, gpt-image-2
+- **MCP:** Unified Organic Brand MCP server
 
-## Learn More
+## Project Structure
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+  brand/          → Brand engine logic (prompt assembly, voice profiles)
+  pages/          → Next.js pages (studio, articles, companies)
+  pages/api/      → API routes (create, humanize, fact-check, etc.)
+  lib/            → Shared libraries (Supabase client, AI client)
+  components/     → React components
+  hooks/          → Custom hooks
+public/           → Static assets and landing page
+mcp/
+  organic-brand-mcp/  → Unified MCP server (20 tools for voice, photo style, blog)
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## MCP Server
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The `mcp/organic-brand-mcp/` directory contains a unified [Model Context Protocol](https://modelcontextprotocol.io) server that exposes the full brand toolkit — voice profiles, photography styles, and blog generation — to any MCP-compatible AI client (Claude Desktop, Cursor, ChatGPT, Windsurf).
 
-## Deploy on Vercel
+```bash
+cd mcp/organic-brand-mcp
+npm install
+SUPABASE_URL=... SUPABASE_ANON_KEY=... npx tsx src/index.ts
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+See [`mcp/organic-brand-mcp/README.md`](mcp/organic-brand-mcp/README.md) for full setup, client configuration, and tool reference.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Documentation
+
+- [`PRODUCT.md`](PRODUCT.md) — Full product documentation (pages, API, data model, architecture)
+- [`CLAUDE.md`](CLAUDE.md) — AI coding assistant instructions
+- [`mcp/organic-brand-mcp/README.md`](mcp/organic-brand-mcp/README.md) — MCP server setup and 20-tool reference
+
+## Deploy
+
+The app deploys to [Vercel](https://vercel.com). See the [Next.js deployment docs](https://nextjs.org/docs/app/building-your-application/deploying) for details.

@@ -1420,6 +1420,273 @@ server.tool(
   }
 );
 
+server.tool(
+  "create_article",
+  "Save a new article to the Organic database. Accepts pre-generated article data (matching the blog schema from get_blog_schema) and inserts it into the articles table. Use get_blog_system_prompt + get_user_prompt_template to generate the content first, then use this tool to persist it.",
+  {
+    company: z.string().describe("The company/brand name"),
+    title: z.string().describe("Article title"),
+    slug: z.string().describe("URL slug (3-6 words, lowercase, hyphenated)"),
+    excerpt: z.string().describe("1-2 sentence factual excerpt"),
+    html: z.string().describe("Full blog HTML content (publication-ready)"),
+    outline: z
+      .array(z.string())
+      .describe("List of H2 section headings (3-12)"),
+    seo: z
+      .object({
+        meta_title: z.string(),
+        meta_description: z.string(),
+        keywords: z.array(z.string()),
+        primary_keyword: z.string(),
+        secondary_keywords: z.array(z.string()),
+        slug: z.string(),
+      })
+      .describe("SEO metadata"),
+    faq: z
+      .array(
+        z.object({
+          question: z.string(),
+          answer: z.string(),
+        })
+      )
+      .optional()
+      .describe("FAQ pairs (3-5)"),
+    key_takeaways: z
+      .array(z.string())
+      .optional()
+      .describe("3-5 concise factual takeaways"),
+    how_to_steps: z
+      .array(z.string())
+      .optional()
+      .describe("Ordered how-to steps (empty array if none)"),
+    content_type: z
+      .enum(["article", "how_to", "comparison", "listicle"])
+      .optional()
+      .describe("Content type classification"),
+    model_used: z
+      .string()
+      .optional()
+      .describe("Model identifier used for generation (e.g. 'gpt-5.4')"),
+    image_style: z
+      .string()
+      .optional()
+      .describe("Image style category id used"),
+    image_prompt: z
+      .string()
+      .optional()
+      .describe("The image generation prompt used"),
+    image_base64: z
+      .string()
+      .optional()
+      .describe("Base64-encoded hero image (data URI or raw base64)"),
+  },
+  async ({
+    company: companyName,
+    title,
+    slug,
+    excerpt,
+    html,
+    outline,
+    seo,
+    faq,
+    key_takeaways,
+    how_to_steps,
+    content_type,
+    model_used,
+    image_style,
+    image_prompt,
+    image_base64,
+  }) => {
+    const company = await fetchCompany(supabase, companyName);
+    if (!company) {
+      return {
+        content: [
+          { type: "text" as const, text: `Company "${companyName}" not found.` },
+        ],
+        isError: true,
+      };
+    }
+
+    // Merge AEO data into the seo column (matching Organic's convention)
+    const seoWithAeo = {
+      ...seo,
+      faq: faq ?? [],
+      key_takeaways: key_takeaways ?? [],
+      content_type: content_type ?? "article",
+    };
+
+    const { data: savedArticle, error } = await supabase
+      .from("articles")
+      .insert({
+        title,
+        slug,
+        excerpt,
+        html,
+        outline,
+        seo: seoWithAeo,
+        model_used: model_used ?? null,
+        image_style: image_style ?? null,
+        image_prompt: image_prompt ?? null,
+        image_base64: image_base64 ?? null,
+        company_id: company.id,
+      })
+      .select("id, title, slug, created_at")
+      .single();
+
+    if (error) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Failed to save article: ${error.message}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify(
+            {
+              success: true,
+              brand: company.name,
+              article: savedArticle,
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  }
+);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PROMPT TEMPLATES
+// ═══════════════════════════════════════════════════════════════════════════
+
+server.prompt(
+  "write_article",
+  "Generate a brand-consistent blog article using the full Organic pipeline, with post-creation follow-up options.",
+  {
+    company: z.string().describe("The company/brand name (e.g. 'pacific-dental')"),
+    topic: z.string().describe("What the article should be about"),
+  },
+  async ({ company, topic }) => {
+    return {
+      messages: [
+        {
+          role: "user" as const,
+          content: {
+            type: "text" as const,
+            text: `Write a blog article about "${topic}" for the brand "${company}".
+
+**Step 1 — Fetch brand context using these MCP tools:**
+1. Call \`get_blog_system_prompt\` with company="${company}" to get the full system prompt (editorial credibility, anti-AI rules, SEO, voice overlay).
+2. Call \`get_voice_profile\` with company="${company}" to get the brand's tone, rhythm, vocabulary, and sample phrases.
+3. Call \`get_user_prompt_template\` with company="${company}" to get the structured output format and JSON schema.
+4. Call \`get_banned_words\` with company="${company}" to get the full banned phrases list.
+5. Call \`get_editorial_guidelines\` with company="${company}" to get company-specific writing rules.
+
+**Step 2 — Generate the article:**
+Use the system prompt from step 1 as your system instructions. Write the article following the voice profile, editorial guidelines, and banned phrases. Output in the structured format from the user prompt template.
+
+**Step 3 — After the article is complete, ask the user:**
+- "Would you like me to **fact-check** this article? I'll verify all factual claims."
+- "Would you like me to **validate the tone** against ${company}'s brand voice to check for banned phrases?"
+- "Would you like me to **generate a hero image prompt** using ${company}'s photography style?"
+- "Would you like me to **save this article** to your Organic library?"
+
+Wait for the user's response before proceeding with any of these actions.`,
+          },
+        },
+      ],
+    };
+  }
+);
+
+server.prompt(
+  "brand_review",
+  "Review and validate text against a brand's voice, tone, and editorial rules.",
+  {
+    company: z.string().describe("The company/brand name"),
+    text: z.string().describe("The text to review"),
+  },
+  async ({ company, text }) => {
+    return {
+      messages: [
+        {
+          role: "user" as const,
+          content: {
+            type: "text" as const,
+            text: `Review the following text against the "${company}" brand guidelines.
+
+**Text to review:**
+${text}
+
+**Step 1 — Fetch brand context:**
+1. Call \`validate_tone\` with company="${company}" and the text above to find banned phrase violations.
+2. Call \`get_voice_profile\` with company="${company}" to understand the target voice.
+3. Call \`get_style_rules\` with company="${company}" to check editorial and structural rules.
+
+**Step 2 — Provide a brand review report:**
+- List any banned phrase violations found
+- Assess how well the text matches the brand's tone descriptors, sentence rhythm, and vocabulary level
+- Flag any structural patterns that violate the brand's dos/don'ts
+- Rate the overall brand alignment (Strong / Moderate / Weak)
+
+**Step 3 — Offer follow-up actions:**
+- "Would you like me to **rewrite this text** to better match ${company}'s voice?"
+- "Would you like me to **highlight specific sentences** that need revision?"`,
+          },
+        },
+      ],
+    };
+  }
+);
+
+server.prompt(
+  "onboard_brand",
+  "Walk through setting up a new company's brand profile in Organic — voice, style, and editorial guidelines.",
+  {
+    company: z.string().describe("The company/brand name to set up"),
+  },
+  async ({ company }) => {
+    return {
+      messages: [
+        {
+          role: "user" as const,
+          content: {
+            type: "text" as const,
+            text: `I want to set up the brand profile for "${company}" in Organic. Guide me through the process step by step.
+
+**Step 1 — Check if the brand already exists:**
+Call \`list_companies\` to see if "${company}" is already configured.
+
+**Step 2 — If the brand exists, show its current profile:**
+Call \`get_voice_profile\`, \`get_style_rules\`, \`get_photography_style\`, and \`list_image_styles\` to display what's already configured. Ask if they want to update anything.
+
+**Step 3 — If the brand is new (or needs setup), ask these questions one at a time:**
+1. "What is ${company}'s **tagline** and **mission**?"
+2. "Which **brand archetype** best fits? (Pathfinder, Innovator, Caregiver, Sage, Creator, Hero, Explorer, or Rebel)"
+3. "Describe the brand's **tone** in 3-5 adjectives (e.g. confident, clear, modern, helpful)"
+4. "Who are the **target audiences**?"
+5. "Do you have a **sample article** I can analyze to extract a voice profile? (paste the text)"
+6. "Any **words or phrases** the brand should never use?"
+7. "Describe the brand's **photography style** — lighting, mood, composition preferences"
+8. "What are the **primary and secondary brand colors** (hex values)?"
+
+Wait for the user to answer each question before moving to the next. After collecting all answers, summarize the complete brand profile and suggest they create it in the Organic app at the Companies page.`,
+          },
+        },
+      ],
+    };
+  }
+);
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Start Server
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1427,7 +1694,7 @@ server.tool(
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("🌿 Organic Brand MCP server running on stdio — voice + photo + blog");
+  console.error("🌿 Organic Brand MCP server running on stdio — voice + photo + blog + prompts");
 }
 
 main().catch((err) => {

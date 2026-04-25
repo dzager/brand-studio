@@ -1,9 +1,6 @@
-// src/pages/api/clusters/index.ts
-// GET: list clusters (filtered by company_id)
-// POST: generate a new cluster strategy via LLM, embed pages, detect overlaps
-
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getSupabase } from "@/lib/supabase";
+import { getSupabase, createServerSupabase } from "@/lib/supabase";
+import { requireAuth, getUserAccounts, isPlatformAdmin } from "@/lib/auth";
 import { buildBrandEngine, type CompanyRecord } from "@/lib/buildBrandEngine";
 import { compileBlogSystemPrompt } from "@/brand/engine";
 import {
@@ -235,7 +232,21 @@ export default async function handler(
     req: NextApiRequest,
     res: NextApiResponse
 ) {
-    const supabase = getSupabase();
+    const user = await requireAuth(req, res);
+    if (!user) return;
+
+    const supabase = createServerSupabase(req, res);
+    const adminSupabase = getSupabase();
+
+    // Determine if this member is scoped to a specific company
+    let scopedCompanyIds: string[] = [];
+    const isAdminUser = await isPlatformAdmin(user.id);
+    if (!isAdminUser) {
+        const accts = await getUserAccounts(user.id);
+        scopedCompanyIds = accts
+            .filter((a) => a.company_id)
+            .map((a) => a.company_id!);
+    }
 
     try {
         if (req.method === "GET") {
@@ -246,7 +257,10 @@ export default async function handler(
                 .select("*")
                 .order("created_at", { ascending: false });
 
-            if (typeof company_id === "string" && company_id) {
+            // Apply company scope: member-scoped companies OR explicit query param
+            if (scopedCompanyIds.length > 0) {
+                query = query.in("company_id", scopedCompanyIds);
+            } else if (typeof company_id === "string" && company_id) {
                 query = query.eq("company_id", company_id);
             }
 
@@ -373,7 +387,7 @@ export default async function handler(
             }));
 
             // Save cluster with page embeddings
-            const { data: cluster, error: saveErr } = await supabase
+            const { data: cluster, error: saveErr } = await adminSupabase
                 .from("clusters")
                 .insert({
                     company_id,
@@ -382,6 +396,7 @@ export default async function handler(
                     strategy,
                     status: "draft",
                     page_embeddings: storedEmbeddings,
+                    account_id: companyData.account_id || null,
                 })
                 .select()
                 .single();

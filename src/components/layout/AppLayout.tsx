@@ -1,7 +1,7 @@
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Home,
   Building2,
@@ -12,9 +12,16 @@ import {
   PanelLeftClose,
   PanelLeft,
   Settings,
+  Shield,
+  LogOut,
+  ChevronDown,
+  User,
+  UserPlus,
+  Palette,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 import {
   Tooltip,
   TooltipContent,
@@ -24,15 +31,19 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import SettingsDialog from "@/components/layout/SettingsDialog";
+import { useAuth } from "@/hooks/useAuth";
 
 const NAV_ITEMS = [
-  { href: "/studio", label: "Studio", icon: Home, description: "Create content" },
-  { href: "/companies", label: "Companies", icon: Building2, description: "Manage brands" },
-  { href: "/articles", label: "Articles", icon: FileText, description: "Content architecture" },
+  { href: "/studio", label: "Studio", icon: Home, description: "Create content", minRole: "member" },
+  { href: "/company", label: "Company", icon: Palette, description: "Your brand profile", minRole: "member" },
+  { href: "/companies", label: "Companies", icon: Building2, description: "Manage brands", minRole: "member" },
+  { href: "/articles", label: "Articles", icon: FileText, description: "Content architecture", minRole: "member" },
+  { href: "/admin", label: "Admin", icon: Shield, description: "Platform dashboard", minRole: "admin" },
 ];
 
 function ThemeToggle() {
@@ -69,10 +80,48 @@ function ThemeToggle() {
   );
 }
 
+interface UsageSummary {
+  plan: string;
+  planLabel: string;
+  articlesUsed: number;
+  articlesLimit: number;
+  percentUsed: number;
+}
+
 export default function AppLayout({ children, fullWidth }: { children: React.ReactNode; fullWidth?: boolean }) {
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
+  const { user, activeAccount, accounts, isAdmin, signOut, switchAccount } = useAuth();
+
+  // Fetch usage for sidebar widget
+  const fetchUsage = useCallback(async () => {
+    if (!activeAccount?.account_id) return;
+    try {
+      const r = await fetch(`/api/account/usage?account_id=${activeAccount.account_id}`);
+      if (r.ok) setUsage(await r.json());
+    } catch {}
+  }, [activeAccount?.account_id]);
+
+  useEffect(() => {
+    fetchUsage();
+  }, [fetchUsage]);
+
+  // Determine which nav items to show based on role
+  const userRole = isAdmin ? "admin" : (activeAccount?.role || "member");
+  const roleHierarchy: Record<string, number> = { member: 1, owner: 2, admin: 3 };
+  const userRoleLevel = roleHierarchy[userRole] || 1;
+  const isScopedMember = !isAdmin && !!activeAccount?.company_id;
+  const visibleNavItems = NAV_ITEMS.filter(
+    (item) => {
+      // Role check
+      if ((roleHierarchy[item.minRole] || 1) > userRoleLevel) return false;
+      // Company-scoped members don't need the Companies page
+      if (isScopedMember && item.href === "/companies") return false;
+      return true;
+    }
+  );
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -97,7 +146,7 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
 
         {/* Nav Items */}
         <nav className="flex-1 px-2 py-3 space-y-1">
-          {NAV_ITEMS.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive =
               item.href === "/"
                 ? router.pathname === "/"
@@ -145,8 +194,79 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
           })}
         </nav>
 
+        {/* Usage Widget */}
+        {!sidebarCollapsed && usage && (
+          <div
+            className="mx-2 mb-2 rounded-lg border border-border bg-background/50 p-2.5 cursor-pointer hover:bg-accent/50 transition-colors"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[11px] font-medium text-muted-foreground">
+                Articles
+              </span>
+              <span className={cn(
+                "text-[11px] font-semibold",
+                usage.percentUsed >= 100 ? "text-destructive" :
+                usage.percentUsed >= 80 ? "text-amber-500" : "text-foreground"
+              )}>
+                {usage.articlesUsed}/{usage.articlesLimit}
+              </span>
+            </div>
+            <Progress
+              value={Math.min(usage.percentUsed, 100)}
+              className={cn(
+                "h-1.5",
+                usage.percentUsed >= 100 && "[&>[data-slot=progress-indicator]]:bg-destructive",
+                usage.percentUsed >= 80 && usage.percentUsed < 100 && "[&>[data-slot=progress-indicator]]:bg-amber-500"
+              )}
+            />
+          </div>
+        )}
+
         {/* Sidebar Footer */}
-        <div className="border-t border-sidebar-border p-2 flex items-center gap-1">
+        <div className="border-t border-sidebar-border p-2 space-y-1">
+          {/* Account switcher */}
+          {accounts.length > 0 && !sidebarCollapsed && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-xs hover:bg-sidebar-accent transition-colors">
+                  <div className="h-5 w-5 rounded bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary shrink-0">
+                    {(activeAccount?.account_name || "?")[0].toUpperCase()}
+                  </div>
+                  <span className="truncate flex-1 text-left font-medium">
+                    {activeAccount?.account_name || "No account"}
+                  </span>
+                  <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                {accounts.map((acc) => (
+                  <DropdownMenuItem
+                    key={acc.account_id}
+                    onClick={() => switchAccount(acc.account_id)}
+                    className={cn(
+                      acc.account_id === activeAccount?.account_id && "bg-accent"
+                    )}
+                  >
+                    <div className="flex items-center gap-2 w-full">
+                      <div className="h-5 w-5 rounded bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary shrink-0">
+                        {acc.account_name[0].toUpperCase()}
+                      </div>
+                      <span className="truncate flex-1">{acc.account_name}</span>
+                      <span className="text-[10px] text-muted-foreground capitalize">{acc.role}</span>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => signOut()}>
+                  <LogOut className="h-3 w-3 mr-2" />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
+          <div className="flex items-center gap-1">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -160,6 +280,21 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
             </TooltipTrigger>
             <TooltipContent side="right">
               <p>Settings</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn("h-9 w-9", sidebarCollapsed ? "mx-auto" : "")}
+                onClick={() => signOut()}
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>Sign out</p>
             </TooltipContent>
           </Tooltip>
           {!sidebarCollapsed && <div className="flex-1" />}
@@ -182,6 +317,7 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
               <p>{sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}</p>
             </TooltipContent>
           </Tooltip>
+          </div>
         </div>
       </aside>
 
@@ -228,7 +364,7 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
           <div className="flex items-center gap-2">
             {/* Mobile nav links */}
             <nav className="flex md:hidden items-center gap-1">
-              {NAV_ITEMS.map((item) => {
+              {visibleNavItems.map((item) => {
                 const isActive =
                   item.href === "/"
                     ? router.pathname === "/"
@@ -257,6 +393,21 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
               })}
             </nav>
             <ThemeToggle />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={() => signOut()}
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Sign out</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
         </header>
 

@@ -362,6 +362,138 @@
       </div>
 
       <!-- ───────────────────────────────────── -->
+      <!-- April 24, 2026 -->
+      <!-- ───────────────────────────────────── -->
+      <div class="changelog-entry">
+        <div class="changelog-date">April 24, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+          <span class="changelog-tag changelog-tag--infrastructure">Infrastructure</span>
+        </div>
+        <h2 class="changelog-title">Multi-tenant <em>accounts</em></h2>
+        <div class="changelog-body">
+          <p>
+            Organic is now fully multi-tenant. Every user belongs to an account, and all data — companies, articles, clusters — is scoped to that account via Supabase Row Level Security policies.
+          </p>
+          <ul>
+            <li><strong>Account-scoped RLS</strong> — All API routes and database queries filter by the authenticated user's account membership. No cross-tenant data leakage.</li>
+            <li><strong>SECURITY DEFINER helpers</strong> — <code>user_account_ids()</code> and <code>is_platform_admin()</code> functions eliminate recursive RLS policy issues.</li>
+            <li><strong>Role-gated navigation</strong> — Owners see the full Companies editor; scoped members see a read-only brand portal.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">April 24, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+          <span class="changelog-tag changelog-tag--infrastructure">Infrastructure</span>
+        </div>
+        <h2 class="changelog-title">Stripe <em>billing</em></h2>
+        <div class="changelog-body">
+          <p>
+            Full Stripe integration for subscription management, usage-based billing, and self-service account controls.
+          </p>
+          <ul>
+            <li><strong>Subscription tiers</strong> — Starter, Standard, and Scale plans with configurable article limits and overage pricing.</li>
+            <li><strong>Webhook processing</strong> — Real-time event handling for subscription changes, invoice payments, and cancellations.</li>
+            <li><strong>Customer portal</strong> — Self-service billing management, plan upgrades, and payment method updates via Stripe's hosted portal.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">April 24, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+        </div>
+        <h2 class="changelog-title">Platform <em>admin</em></h2>
+        <div class="changelog-body">
+          <p>
+            A dedicated admin dashboard for platform operators. Manage accounts, view usage metrics, and control access — visible only to users in the <code>platform_admins</code> table.
+          </p>
+          <ul>
+            <li><strong>Account management</strong> — Create, edit, and delete accounts. Assign companies and manage team member rosters.</li>
+            <li><strong>Usage dashboard</strong> — Article counts, cluster totals, and billing status across all accounts at a glance.</li>
+            <li><strong>Invitation management</strong> — View and revoke pending invitations from the admin panel.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">April 24, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+        </div>
+        <h2 class="changelog-title">Cluster <em>collaboration</em></h2>
+        <div class="changelog-body">
+          <p>
+            Share content clusters with external collaborators. Team owners can invite new users to specific clusters via email — invitees register through a deep link and land directly in the shared cluster.
+          </p>
+          <ul>
+            <li><strong>Email invitations</strong> — Send branded invite emails with a unique token link for secure registration.</li>
+            <li><strong>Deep-linked onboarding</strong> — New users register and are immediately redirected to the shared cluster.</li>
+            <li><strong>Share UI</strong> — In-panel share button with pending invitation status and collaborator management.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">April 24, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+          <span class="changelog-tag changelog-tag--design">Design</span>
+        </div>
+        <h2 class="changelog-title">Company <em>brand portal</em></h2>
+        <div class="changelog-body">
+          <p>
+            Team members can now view their company's full brand configuration — identity, visual styles, voice profile, and prompt templates — from a dedicated read-only <code>/company</code> page with collapsible sections.
+          </p>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">April 24, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--improvement">Improvement</span>
+        </div>
+        <h2 class="changelog-title">GPT-5.5 + Content Architecture <em>UX</em></h2>
+        <div class="changelog-body">
+          <p>
+            Added GPT-5.5 to the model registry as a writing model option. Also shipped a round of UX improvements to the Content Architecture view.
+          </p>
+          <ul>
+            <li><strong>GPT-5.5 support</strong> — Available as a writing model in global settings and per-generation model selectors.</li>
+            <li><strong>Dropdown action menus</strong> — Replaced clustered button groups in the sidebar and cluster panel with organized dropdown menus.</li>
+            <li><strong>Inline cluster editing</strong> — Double-click a cluster title to rename it in place.</li>
+            <li><strong>Action tooltips</strong> — All toolbar buttons now show descriptive tooltip rollovers on hover.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ───────────────────────────────────── -->
+      <!-- April 23, 2026 -->
+      <!-- ───────────────────────────────────── -->
+      <div class="changelog-entry">
+        <div class="changelog-date">April 23, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+          <span class="changelog-tag changelog-tag--infrastructure">Infrastructure</span>
+        </div>
+        <h2 class="changelog-title">MCP <em>create_article</em></h2>
+        <div class="changelog-body">
+          <p>
+            The Organic Brand MCP server now includes a <code>create_article</code> tool — the 21st tool in the unified server. MCP clients can now generate articles using the prompt-building tools and save the results directly to the Organic database without needing the web app.
+          </p>
+          <ul>
+            <li><strong>End-to-end MCP workflow</strong> — Use <code>get_blog_system_prompt</code> + <code>get_user_prompt_template</code> to generate, then <code>create_article</code> to persist.</li>
+            <li><strong>Full schema support</strong> — Accepts title, HTML, SEO metadata, FAQ, key takeaways, content type, images, and more.</li>
+            <li><strong>AEO data merging</strong> — FAQ, takeaways, and content type are automatically merged into the SEO column, matching Organic's internal convention.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ───────────────────────────────────── -->
       <!-- April 21, 2026 -->
       <!-- ───────────────────────────────────── -->
       <div class="changelog-entry">
@@ -370,18 +502,18 @@
           <span class="changelog-tag changelog-tag--feature">Feature</span>
           <span class="changelog-tag changelog-tag--infrastructure">Infrastructure</span>
         </div>
-        <h2 class="changelog-title">MCP <em>Servers</em></h2>
+        <h2 class="changelog-title">Unified MCP <em>Server</em></h2>
         <div class="changelog-body">
           <p>
-            Organic now exposes your brand configurations as Model Context Protocol (MCP) servers — an open standard that lets any compatible AI client access your brand's voice, photography style, and blog generation pipeline directly.
+            Organic now exposes your complete brand toolkit as a single, unified Model Context Protocol (MCP) server — replacing the original three separate servers with one install, 20 tools.
           </p>
           <ul>
-            <li><strong>Voice MCP</strong> — 6 tools for voice profiles, banned words, tone validation, and compiled prompts.</li>
-            <li><strong>Photo Style MCP</strong> — 6 tools for photography style, color palette, image categories, and prompt generation.</li>
-            <li><strong>Blog MCP</strong> — 7 tools for system prompts, SEO rules, editorial guidelines, cluster strategy, and article access.</li>
+            <li><strong>Organic Brand MCP</strong> — One server with 20 tools spanning voice (5), photo style (6), blog (8), and general (1).</li>
+            <li><strong>Simplified setup</strong> — Single entry in your Claude Desktop or Cursor MCP config instead of three.</li>
+            <li><strong>Backward-compatible</strong> — All tool names are identical to the original servers. No client-side changes needed.</li>
           </ul>
           <p>
-            Compatible with Claude Desktop, Cursor, and any MCP-enabled AI client. Update a voice profile in Organic → every connected client sees the change instantly.
+            Compatible with Claude Desktop, Cursor, ChatGPT, Windsurf, and any MCP-enabled AI client. Update a voice profile in Organic → every connected client sees the change instantly.
           </p>
         </div>
       </div>
