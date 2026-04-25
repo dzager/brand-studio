@@ -2,10 +2,13 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { createBrowserClient, createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { NextApiRequest, NextApiResponse } from "next";
 
-// ── Environment variables ──────────────────────────────────────────
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const NEXT_PUBLIC_SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// ── Environment variables (read lazily to avoid build-time crashes) ─
+function getEnv() {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    return { url, anonKey, serviceRoleKey };
+}
 
 // ── Browser client (for React components) ──────────────────────────
 // Uses @supabase/ssr createBrowserClient so the session is stored in
@@ -16,11 +19,12 @@ let _browserClient: SupabaseClient | null = null;
 export function createBrowserSupabase(): SupabaseClient {
     if (_browserClient) return _browserClient;
 
-    if (!SUPABASE_URL || !NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    const { url, anonKey } = getEnv();
+    if (!url || !anonKey) {
         throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
     }
 
-    _browserClient = createBrowserClient(SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY);
+    _browserClient = createBrowserClient(url, anonKey);
     return _browserClient;
 }
 
@@ -29,11 +33,12 @@ export function createServerSupabase(
     req: NextApiRequest,
     res: NextApiResponse
 ): SupabaseClient {
-    if (!SUPABASE_URL || !NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    const { url, anonKey } = getEnv();
+    if (!url || !anonKey) {
         throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
     }
 
-    return createServerClient(SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+    return createServerClient(url, anonKey, {
         cookies: {
             getAll() {
                 const cookies: { name: string; value: string }[] = [];
@@ -73,17 +78,18 @@ let _adminClient: SupabaseClient | null = null;
 export function getAdminSupabase(): SupabaseClient {
     if (_adminClient) return _adminClient;
 
-    if (!SUPABASE_URL) {
+    const { url, anonKey, serviceRoleKey } = getEnv();
+    if (!url) {
         throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
     }
 
     // Use service role key if available, otherwise fall back to anon key
-    const key = SUPABASE_SERVICE_ROLE_KEY || NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const key = serviceRoleKey || anonKey;
     if (!key) {
         throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY and NEXT_PUBLIC_SUPABASE_ANON_KEY");
     }
 
-    _adminClient = createClient(SUPABASE_URL, key, {
+    _adminClient = createClient(url, key, {
         auth: {
             persistSession: false,
             autoRefreshToken: false,
