@@ -724,7 +724,7 @@ export default function AdminDashboard() {
                                                     <div className="font-medium truncate">
                                                         {u.full_name || "—"}
                                                         {u.is_platform_admin && (
-                                                            <ShieldCheck className="h-3.5 w-3.5 inline-block ml-1.5 text-amber-500" title="Platform Admin" />
+                                                            <span title="Platform Admin"><ShieldCheck className="h-3.5 w-3.5 inline-block ml-1.5 text-amber-500" /></span>
                                                         )}
                                                     </div>
                                                     <div className="text-xs text-muted-foreground truncate">{u.email}</div>

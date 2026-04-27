@@ -131,6 +131,19 @@ export default async function handler(
 
         if (companyError) throw companyError;
 
+        // ── 4b. Scope owner to their company ───────────────────────
+        // Set company_id on the account_members row so the owner is
+        // restricted to only the company they just created.
+        const { error: scopeError } = await admin
+            .from("account_members")
+            .update({ company_id: newCompany.id })
+            .eq("account_id", account.id)
+            .eq("user_id", userId);
+
+        if (scopeError) {
+            console.warn("Failed to scope owner to company:", scopeError);
+        }
+
         // ── 5. Create initial usage period ─────────────────────────
         const today = new Date();
         const periodStart = today.toISOString().split("T")[0];

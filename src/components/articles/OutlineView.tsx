@@ -221,10 +221,10 @@ export default function OutlineView({
     const hasClusterActions = onCreateAiCluster || onCreateManualCluster || onAutoCluster;
 
     return (
-        <div className="px-1 py-2 space-y-1">
+        <div className="py-2 space-y-1">
             {/* Compact cluster creation */}
             {hasClusterActions && (
-                <div className="flex px-2 pb-1">
+                <div className="flex pb-1">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm" className="gap-1 text-xs h-7 text-muted-foreground hover:text-foreground">
@@ -265,7 +265,7 @@ export default function OutlineView({
                         {/* Company header */}
                         <button
                             onClick={() => toggle(companyKey)}
-                            className="flex items-center gap-2 w-full px-2 py-2 rounded-md hover:bg-muted/60 transition-colors text-left"
+                            className="flex items-center gap-2 w-full py-2 rounded-md hover:bg-muted/60 transition-colors text-left"
                         >
                             <ChevronDown className={cn(
                                 "h-3 w-3 text-muted-foreground transition-transform duration-200",

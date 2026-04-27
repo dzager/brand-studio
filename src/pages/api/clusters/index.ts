@@ -240,26 +240,30 @@ export default async function handler(
 
     // Determine if this member is scoped to a specific company
     let scopedCompanyIds: string[] = [];
+    let accountIds: string[] = [];
     const isAdminUser = await isPlatformAdmin(user.id);
     if (!isAdminUser) {
         const accts = await getUserAccounts(user.id);
         scopedCompanyIds = accts
             .filter((a) => a.company_id)
             .map((a) => a.company_id!);
+        accountIds = accts.map((a) => a.account_id);
     }
 
     try {
         if (req.method === "GET") {
             const { company_id } = req.query;
 
-            let query = supabase
+            let query = adminSupabase
                 .from("clusters")
                 .select("*")
                 .order("created_at", { ascending: false });
 
-            // Apply company scope: member-scoped companies OR explicit query param
+            // Apply company scope: member-scoped companies OR account fallback OR explicit query param
             if (scopedCompanyIds.length > 0) {
                 query = query.in("company_id", scopedCompanyIds);
+            } else if (!isAdminUser && accountIds.length > 0) {
+                query = query.in("account_id", accountIds);
             } else if (typeof company_id === "string" && company_id) {
                 query = query.eq("company_id", company_id);
             }

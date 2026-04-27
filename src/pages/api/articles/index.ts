@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { createServerSupabase, getAdminSupabase } from "@/lib/supabase";
+import { getAdminSupabase } from "@/lib/supabase";
 import { requireAuth, getUserAccounts, isPlatformAdmin } from "@/lib/auth";
 
 export default async function handler(
@@ -9,17 +9,18 @@ export default async function handler(
     const user = await requireAuth(req, res);
     if (!user) return;
 
-    const supabase = createServerSupabase(req, res);
     const admin = getAdminSupabase();
 
     // Determine if this user is scoped to specific companies
     let scopedCompanyIds: string[] = [];
+    let accountIds: string[] = [];
     const isAdmin = await isPlatformAdmin(user.id);
     if (!isAdmin) {
         const accounts = await getUserAccounts(user.id);
         scopedCompanyIds = accounts
             .filter((a) => a.company_id)
             .map((a) => a.company_id!);
+        accountIds = accounts.map((a) => a.account_id);
     }
 
     try {
@@ -28,20 +29,28 @@ export default async function handler(
 
             // If requesting a specific article with full content
             if (typeof qId === "string" && qId) {
-                let query = supabase.from("articles").select("*").eq("id", qId);
-                if (scopedCompanyIds.length > 0) query = query.in("company_id", scopedCompanyIds);
+                let query = admin.from("articles").select("*").eq("id", qId);
+                if (scopedCompanyIds.length > 0) {
+                    query = query.in("company_id", scopedCompanyIds);
+                } else if (!isAdmin && accountIds.length > 0) {
+                    query = query.in("account_id", accountIds);
+                }
                 const { data, error } = await query.single();
                 if (error) throw error;
                 return res.status(200).json(data);
             }
 
             // List mode: exclude heavy columns (image_base64, html) to avoid Supabase timeout.
-            let listQuery = supabase
+            let listQuery = admin
                 .from("articles")
                 .select("id,title,slug,excerpt,image_prompt,seo,outline,model_used,image_style,company_id,cluster_id,cluster_role,humanized,created_at,updated_at")
                 .order("created_at", { ascending: false });
 
-            if (scopedCompanyIds.length > 0) listQuery = listQuery.in("company_id", scopedCompanyIds);
+            if (scopedCompanyIds.length > 0) {
+                listQuery = listQuery.in("company_id", scopedCompanyIds);
+            } else if (!isAdmin && accountIds.length > 0) {
+                listQuery = listQuery.in("account_id", accountIds);
+            }
 
             const { data, error } = await listQuery;
             if (error) throw error;

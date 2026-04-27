@@ -41,8 +41,22 @@ export default async function handler(
                 return res.status(200).json(data || []);
             }
 
-            console.log("[companies/GET] UNSCOPED — returning all RLS-visible companies");
-            // Unscoped users and platform admins see all companies (RLS-scoped)
+            // If user is not an admin, scope to companies belonging to their accounts
+            if (!isAdmin) {
+                const accountIds = accounts.map((a) => a.account_id);
+                console.log("[companies/GET] ACCOUNT-SCOPED — returning companies for accounts:", accountIds);
+                const { data, error } = await admin
+                    .from("companies")
+                    .select("*")
+                    .in("account_id", accountIds)
+                    .order("created_at", { ascending: false });
+
+                if (error) throw error;
+                return res.status(200).json(data || []);
+            }
+
+            console.log("[companies/GET] ADMIN — returning all companies");
+            // Platform admins see all companies
             const { data, error } = await supabase
                 .from("companies")
                 .select("*")
