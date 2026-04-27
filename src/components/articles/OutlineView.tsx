@@ -1,9 +1,7 @@
-// OutlineView.tsx — Collapsible tree hierarchy for content management
-// Company → Cluster → Role Group → Article
-// Now includes cluster toolbar and cluster selection for ClusterPanel
+// OutlineView.tsx — Clean tree hierarchy for content management
+// Company → Cluster → Article (flat, with role indicators)
 
 import { useState, useMemo, useEffect } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,17 +13,12 @@ import {
 import { cn } from "@/lib/utils";
 import {
     Building2,
-    Network,
     ChevronDown,
     FileText,
-    Crown,
-    BookOpen,
-    Scroll,
     FolderOpen,
     Wand2,
     FolderPlus,
     Sparkles,
-    Trash2,
     Plus,
 } from "lucide-react";
 
@@ -64,10 +57,10 @@ type Props = {
 };
 
 const ROLE_ORDER = ["pillar", "supporting", "long_tail"];
-const ROLE_META: Record<string, { label: string; icon: typeof Crown }> = {
-    pillar: { label: "Pillar", icon: Crown },
-    supporting: { label: "Supporting", icon: BookOpen },
-    long_tail: { label: "Long-tail", icon: Scroll },
+const ROLE_COLORS: Record<string, string> = {
+    pillar: "bg-primary",
+    supporting: "bg-green-500",
+    long_tail: "bg-amber-500",
 };
 
 type TreeData = {
@@ -93,7 +86,6 @@ export default function OutlineView({
     const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
     const [editingClusterId, setEditingClusterId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState("");
-    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
     const toggle = (key: string) => {
         setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -229,43 +221,33 @@ export default function OutlineView({
     const hasClusterActions = onCreateAiCluster || onCreateManualCluster || onAutoCluster;
 
     return (
-        <div className="px-1 py-2 space-y-3">
-            {/* Cluster toolbar — single dropdown replacing 3 buttons */}
+        <div className="px-1 py-2 space-y-1">
+            {/* Compact cluster creation */}
             {hasClusterActions && (
-                <div className="flex px-2 pb-2 border-b border-border">
+                <div className="flex px-2 pb-1">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="gap-1.5 text-xs h-7 w-full">
-                                <Plus className="h-3 w-3" /> New Cluster
-                                <ChevronDown className="h-3 w-3 ml-auto opacity-50" />
+                            <Button variant="ghost" size="sm" className="gap-1 text-xs h-7 text-muted-foreground hover:text-foreground">
+                                <Plus className="h-3.5 w-3.5" /> New Cluster
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="w-64">
+                        <DropdownMenuContent align="start" className="w-56">
                             {onCreateAiCluster && (
-                                <DropdownMenuItem onClick={onCreateAiCluster} className="gap-2 py-2 cursor-pointer">
+                                <DropdownMenuItem onClick={onCreateAiCluster} className="gap-2 cursor-pointer">
                                     <Wand2 className="h-4 w-4 text-primary" />
-                                    <div>
-                                        <div className="font-medium text-sm">AI Cluster</div>
-                                        <div className="text-xs text-muted-foreground">Generate a full topical strategy with AI</div>
-                                    </div>
+                                    AI Cluster
                                 </DropdownMenuItem>
                             )}
                             {onCreateManualCluster && (
-                                <DropdownMenuItem onClick={onCreateManualCluster} className="gap-2 py-2 cursor-pointer">
+                                <DropdownMenuItem onClick={onCreateManualCluster} className="gap-2 cursor-pointer">
                                     <FolderPlus className="h-4 w-4 text-muted-foreground" />
-                                    <div>
-                                        <div className="font-medium text-sm">Manual Cluster</div>
-                                        <div className="text-xs text-muted-foreground">Create empty and assign articles manually</div>
-                                    </div>
+                                    Manual Cluster
                                 </DropdownMenuItem>
                             )}
                             {onAutoCluster && (
-                                <DropdownMenuItem onClick={onAutoCluster} className="gap-2 py-2 cursor-pointer">
+                                <DropdownMenuItem onClick={onAutoCluster} className="gap-2 cursor-pointer">
                                     <Sparkles className="h-4 w-4 text-amber-500" />
-                                    <div>
-                                        <div className="font-medium text-sm">Auto-Cluster</div>
-                                        <div className="text-xs text-muted-foreground">Group existing articles by topic similarity</div>
-                                    </div>
+                                    Auto-Cluster
                                 </DropdownMenuItem>
                             )}
                         </DropdownMenuContent>
@@ -283,37 +265,37 @@ export default function OutlineView({
                         {/* Company header */}
                         <button
                             onClick={() => toggle(companyKey)}
-                            className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-left group"
+                            className="flex items-center gap-2 w-full px-2 py-2 rounded-md hover:bg-muted/60 transition-colors text-left"
                         >
                             <ChevronDown className={cn(
-                                "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200",
+                                "h-3 w-3 text-muted-foreground transition-transform duration-200",
                                 isCompanyCollapsed && "-rotate-90"
                             )} />
-                            <Building2 className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-semibold text-sm">{company.companyName}</span>
-                            <span className="ml-auto text-xs text-muted-foreground">
+                            <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="font-medium text-[13px]">{company.companyName}</span>
+                            <span className="ml-auto text-xs text-muted-foreground/60">
                                 {totalArticles}
                             </span>
                         </button>
 
                         {!isCompanyCollapsed && (
-                            <div className="pl-4 mt-1 space-y-1.5">
+                            <div className="pl-3 mt-0.5 space-y-px">
                                 {/* Clusters */}
                                 {company.clusters.map(({ cluster, roles }) => {
                                     const clusterKey = `cluster-${cluster.id}`;
                                     const isClusterCollapsed = collapsed[clusterKey];
-                                    const clusterArticleCount = roles.reduce((sum, r) => sum + r.articles.length, 0);
+                                    const clusterArticles = roles.flatMap((r) => r.articles.map((a) => ({ ...a, _role: r.role })));
                                     const isSelected = selectedClusterId === cluster.id;
 
                                     return (
                                         <div key={cluster.id}>
                                             <div className={cn(
-                                                "flex items-center gap-2 w-full px-3 py-2 rounded-md border transition-colors text-left text-sm group",
+                                                "flex items-center gap-1.5 w-full px-2 py-1.5 rounded-md transition-colors text-left text-[13px] group",
                                                 isSelected
-                                                    ? "border-primary bg-primary/10"
-                                                    : "border-border bg-card hover:bg-accent/50"
+                                                    ? "bg-primary/8 border-l-2 border-primary"
+                                                    : "hover:bg-muted/40 border-l-2 border-transparent"
                                             )}>
-                                                <button onClick={() => toggle(clusterKey)} className="shrink-0">
+                                                <button onClick={() => toggle(clusterKey)} className="shrink-0 p-0.5">
                                                     <ChevronDown className={cn(
                                                         "h-3 w-3 text-muted-foreground transition-transform duration-200",
                                                         isClusterCollapsed && "-rotate-90"
@@ -330,7 +312,7 @@ export default function OutlineView({
                                                             if (e.key === "Escape") setEditingClusterId(null);
                                                         }}
                                                         onClick={(e) => e.stopPropagation()}
-                                                        className="h-6 text-sm font-medium max-w-[180px]"
+                                                        className="h-6 text-[13px] font-medium max-w-[200px]"
                                                     />
                                                 ) : (
                                                     <button
@@ -340,83 +322,35 @@ export default function OutlineView({
                                                             setEditingClusterId(cluster.id);
                                                             setEditingName(cluster.name);
                                                         }}
-                                                        className="font-medium cursor-pointer flex items-center gap-1.5 flex-1 min-w-0 text-left"
+                                                        className="font-medium cursor-pointer flex-1 min-w-0 text-left truncate"
                                                         title="Click to view · Double-click to rename"
                                                     >
-                                                        <Network className="h-3.5 w-3.5 text-primary shrink-0" />
-                                                        <span className="truncate">{cluster.name}</span>
+                                                        {cluster.name}
                                                     </button>
                                                 )}
-                                                <Badge variant={
-                                                    cluster.status === "complete" ? "default" :
-                                                    cluster.status === "in_progress" ? "secondary" : "outline"
-                                                } className="text-[10px] px-1.5 py-0 h-4 shrink-0">
-                                                    {cluster.status}
-                                                </Badge>
-                                                <span className="text-xs text-muted-foreground shrink-0">
-                                                    {clusterArticleCount}
+                                                <span className="text-xs text-muted-foreground/50 shrink-0 ml-auto">
+                                                    {clusterArticles.length}
                                                 </span>
-                                                {/* Delete cluster action */}
-                                                {onDeleteCluster && (
-                                                    confirmDeleteId === cluster.id ? (
-                                                        <div className="flex gap-0.5 shrink-0 opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
-                                                            <button onClick={() => { onDeleteCluster(cluster.id); setConfirmDeleteId(null); }}
-                                                                className="text-[10px] text-destructive font-semibold hover:underline">Yes</button>
-                                                            <span className="text-[10px] text-muted-foreground">/</span>
-                                                            <button onClick={() => setConfirmDeleteId(null)}
-                                                                className="text-[10px] text-muted-foreground hover:underline">No</button>
-                                                        </div>
-                                                    ) : (
-                                                        <button onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(cluster.id); }}
-                                                            className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 text-muted-foreground hover:text-destructive">
-                                                            <Trash2 className="h-3 w-3" />
-                                                        </button>
-                                                    )
-                                                )}
                                             </div>
 
-                                            {!isClusterCollapsed && (
-                                                <div className="pl-5 mt-1 space-y-0.5">
-                                                    {roles.map(({ role, articles: roleArticles }) => {
-                                                        const roleKey = `role-${cluster.id}-${role}`;
-                                                        const isRoleCollapsed = collapsed[roleKey];
-                                                        const meta = ROLE_META[role] || { label: role, icon: FileText };
-                                                        const Icon = meta.icon;
-
+                                            {!isClusterCollapsed && clusterArticles.length > 0 && (
+                                                <div className="pl-5 mt-0.5 space-y-px">
+                                                    {clusterArticles.map((article) => {
+                                                        const roleColor = ROLE_COLORS[(article as any)._role] || "bg-muted-foreground";
                                                         return (
-                                                            <div key={roleKey}>
-                                                                <button
-                                                                    onClick={() => toggle(roleKey)}
-                                                                    className="flex items-center gap-1.5 w-full px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                                                                >
-                                                                    <ChevronDown className={cn(
-                                                                        "h-2.5 w-2.5 transition-transform duration-200",
-                                                                        isRoleCollapsed && "-rotate-90"
-                                                                    )} />
-                                                                    <Icon className="h-3 w-3" />
-                                                                    {meta.label}
-                                                                    <span className="text-muted-foreground/60">({roleArticles.length})</span>
-                                                                </button>
-
-                                                                {!isRoleCollapsed && (
-                                                                    <div className="pl-4 space-y-px">
-                                                                        {roleArticles.map((article) => (
-                                                                            <button
-                                                                                key={article.id}
-                                                                                onClick={() => onSelectArticle(article.id)}
-                                                                                className={cn(
-                                                                                    "block w-full px-2.5 py-1.5 text-left rounded-md transition-colors text-sm",
-                                                                                    selectedArticleId === article.id
-                                                                                        ? "bg-primary/10 text-primary border-l-2 border-primary font-medium"
-                                                                                        : "text-foreground/80 hover:bg-accent border-l-2 border-transparent"
-                                                                                )}
-                                                                            >
-                                                                                <div className="truncate">/{article.slug}</div>
-                                                                            </button>
-                                                                        ))}
-                                                                    </div>
+                                                            <button
+                                                                key={article.id}
+                                                                onClick={() => onSelectArticle(article.id)}
+                                                                className={cn(
+                                                                    "flex items-center gap-2 w-full px-2 py-1 text-left rounded-md transition-colors text-[13px]",
+                                                                    selectedArticleId === article.id
+                                                                        ? "bg-primary/10 text-primary font-medium"
+                                                                        : "text-foreground/70 hover:bg-muted/40"
                                                                 )}
-                                                            </div>
+                                                            >
+                                                                <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", roleColor)} />
+                                                                <span className="truncate">{article.title}</span>
+                                                            </button>
                                                         );
                                                     })}
                                                 </div>
@@ -430,31 +364,32 @@ export default function OutlineView({
                                     <div>
                                         <button
                                             onClick={() => toggle(`unclustered-${company.companyId}`)}
-                                            className="flex items-center gap-2 w-full px-3 py-2 rounded-md border border-dashed border-border bg-muted/30 hover:bg-muted/60 transition-colors text-left text-sm text-muted-foreground"
+                                            className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded-md hover:bg-muted/40 transition-colors text-left text-[13px] text-muted-foreground"
                                         >
                                             <ChevronDown className={cn(
                                                 "h-3 w-3 transition-transform duration-200",
                                                 collapsed[`unclustered-${company.companyId}`] && "-rotate-90"
                                             )} />
-                                            <FolderOpen className="h-3.5 w-3.5" />
+                                            <FolderOpen className="h-3 w-3" />
                                             Unclustered
-                                            <span className="text-xs ml-auto">{company.unclustered.length}</span>
+                                            <span className="text-xs ml-auto text-muted-foreground/50">{company.unclustered.length}</span>
                                         </button>
 
                                         {!collapsed[`unclustered-${company.companyId}`] && (
-                                            <div className="pl-7 mt-1 space-y-px">
+                                            <div className="pl-5 mt-0.5 space-y-px">
                                                 {company.unclustered.map((article) => (
                                                     <button
                                                         key={article.id}
                                                         onClick={() => onSelectArticle(article.id)}
                                                         className={cn(
-                                                            "block w-full px-2.5 py-1.5 text-left rounded-md transition-colors text-sm",
+                                                            "flex items-center gap-2 w-full px-2 py-1 text-left rounded-md transition-colors text-[13px]",
                                                             selectedArticleId === article.id
-                                                                ? "bg-primary/10 text-primary border-l-2 border-primary font-medium"
-                                                                : "text-foreground/80 hover:bg-accent border-l-2 border-transparent"
+                                                                ? "bg-primary/10 text-primary font-medium"
+                                                                : "text-foreground/70 hover:bg-muted/40"
                                                         )}
                                                     >
-                                                        <div className="truncate">/{article.slug}</div>
+                                                        <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-muted-foreground/40" />
+                                                        <span className="truncate">{article.title}</span>
                                                     </button>
                                                 ))}
                                             </div>

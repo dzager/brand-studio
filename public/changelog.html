@@ -119,42 +119,42 @@
     }
 
     /* ─── Nav ─── */
-    .nav {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      background: var(--bg);
-      border-bottom: 1px solid var(--border);
-    }
-    .nav-inner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 64px;
-    }
-    .nav-logo {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-family: var(--font-display);
-      font-size: 20px;
-      font-weight: 500;
+    .nav { padding: 24px 0; border-bottom: 1px solid var(--border); }
+    .nav-inner { display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
+    .nav-logo-text { font-family: var(--font-display); font-size: 22px; font-weight: 500; }
+    .nav-links { display: flex; align-items: center; gap: 32px; }
+    .nav-link {
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 400;
       color: var(--ink);
       text-decoration: none;
-    }
-    .nav-links {
-      display: flex;
-      align-items: center;
-      gap: 32px;
-      list-style: none;
-    }
-    .nav-links a {
-      font-size: 14px;
-      color: var(--muted);
       transition: color 0.2s;
     }
-    .nav-links a:hover,
-    .nav-links a.active { color: var(--ink); text-decoration: none; }
+    .nav-link:hover { color: var(--primary); }
+    .nav-actions { display: flex; align-items: center; gap: 16px; }
+    .nav-signin {
+      font-size: 14px;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .nav-signin:hover { color: var(--ink); }
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 12px 24px;
+      background: var(--ink);
+      color: var(--bg);
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.2s;
+    }
+    .btn-primary:hover { opacity: 0.85; }
 
     /* ─── Changelog Layout ─── */
     .changelog-layout {
@@ -326,6 +326,10 @@
     }
 
     /* ─── Responsive ─── */
+    @media (max-width: 640px) {
+      .nav-links { display: none; }
+      .nav-actions { display: none; }
+    }
     @media (max-width: 900px) {
       :root { --px: 24px; }
       .changelog-header h1 { font-size: 36px; }
@@ -340,13 +344,19 @@
     <div class="container">
       <div class="nav-inner">
         <a href="index.html" class="nav-logo">
-          <img src="organic-logo.png" alt="Organic" style="height: 28px; width: auto;" />
+          <img src="organic-logo.png" alt="Organic" style="height: 36px; width: auto;" />
         </a>
-        <ul class="nav-links">
-          <li><a href="index.html">Home</a></li>
-          <li><a href="docs.html">Docs</a></li>
-          <li><a href="changelog.html" class="active">Changelog</a></li>
-        </ul>
+        <div class="nav-links">
+          <a href="index.html#why" class="nav-link">Product</a>
+          <a href="index.html#pipeline" class="nav-link">Pipeline</a>
+          <a href="index.html#pricing" class="nav-link">Pricing</a>
+          <a href="docs.html" class="nav-link">Docs</a>
+          <a href="changelog.html" class="nav-link">Changelog</a>
+        </div>
+        <div class="nav-actions">
+          <a href="/login" class="nav-signin">Sign in</a>
+          <a href="/register" class="btn-primary">Start creating →</a>
+        </div>
       </div>
     </div>
   </nav>

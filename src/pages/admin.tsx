@@ -17,6 +17,12 @@ import {
     Loader2,
     Receipt,
     Trash2,
+    Search,
+    Shield,
+    ShieldCheck,
+    Mail,
+    Calendar,
+    UserX,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -58,16 +64,39 @@ interface AccountDetail {
     invitations: any[];
 }
 
+interface UserRow {
+    id: string;
+    email: string;
+    full_name: string;
+    avatar_url: string | null;
+    created_at: string;
+    last_sign_in_at: string | null;
+    email_confirmed_at: string | null;
+    is_platform_admin: boolean;
+    accounts: {
+        role: string;
+        account_id: string;
+        account_name: string;
+        plan: string;
+    }[];
+}
+
+type AdminTab = "accounts" | "users";
+
 export default function AdminDashboard() {
     const { isAdmin, loading: authLoading } = useAuth();
     const router = useRouter();
 
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [accounts, setAccounts] = useState<AccountRow[]>([]);
+    const [users, setUsers] = useState<UserRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
     const [detail, setDetail] = useState<AccountDetail | null>(null);
     const [detailLoading, setDetailLoading] = useState(false);
+    const [activeTab, setActiveTab] = useState<AdminTab>("accounts");
+    const [userSearch, setUserSearch] = useState("");
+    const [deletingUser, setDeletingUser] = useState<string | null>(null);
 
     // Redirect non-admins
     useEffect(() => {
@@ -82,18 +111,21 @@ export default function AdminDashboard() {
 
         async function fetchData() {
             try {
-                const [statsRes, accountsRes] = await Promise.all([
+                const [statsRes, accountsRes, usersRes] = await Promise.all([
                     fetch("/api/admin/dashboard"),
                     fetch("/api/admin/accounts"),
+                    fetch("/api/admin/users"),
                 ]);
 
-                const [statsData, accountsData] = await Promise.all([
+                const [statsData, accountsData, usersData] = await Promise.all([
                     statsRes.json(),
                     accountsRes.json(),
+                    usersRes.json(),
                 ]);
 
                 setStats(statsData);
                 setAccounts(accountsData);
+                if (Array.isArray(usersData)) setUsers(usersData);
             } catch (err) {
                 console.error("Failed to load admin data:", err);
             } finally {
@@ -147,6 +179,38 @@ export default function AdminDashboard() {
             console.error("Admin action failed:", err);
         }
     }
+
+    async function handleDeleteUser(userId: string, email: string) {
+        if (!confirm(`Permanently delete user "${email}"? This removes all memberships and cannot be undone.`)) return;
+        setDeletingUser(userId);
+        try {
+            const r = await fetch(`/api/admin/users?id=${userId}`, { method: "DELETE" });
+            const data = await r.json();
+            if (!r.ok) { alert(data.error || "Delete failed"); return; }
+            setUsers((prev) => prev.filter((u) => u.id !== userId));
+        } catch (err) {
+            console.error("Delete user failed:", err);
+        } finally {
+            setDeletingUser(null);
+        }
+    }
+
+    async function handleToggleAdmin(userId: string, currentlyAdmin: boolean) {
+        // Toggle platform_admin status via a simple fetch
+        // We'll need a small API for this — for now just update local state
+        // This is handled server-side through supabase directly
+        alert(currentlyAdmin ? "Remove admin via Supabase dashboard" : "Add admin via Supabase dashboard");
+    }
+
+    const filteredUsers = users.filter((u) => {
+        if (!userSearch) return true;
+        const q = userSearch.toLowerCase();
+        return (
+            u.email.toLowerCase().includes(q) ||
+            u.full_name.toLowerCase().includes(q) ||
+            u.accounts.some((a) => a.account_name.toLowerCase().includes(q))
+        );
+    });
 
     if (authLoading || (!isAdmin && !authLoading)) {
         return null;
@@ -223,7 +287,37 @@ export default function AdminDashboard() {
                     </div>
                 ) : null}
 
+                {/* ── Tab Navigation ────────────────────────────────── */}
+                <div className="flex items-center gap-1 border-b border-border">
+                    <button
+                        onClick={() => setActiveTab("accounts")}
+                        className={cn(
+                            "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px",
+                            activeTab === "accounts"
+                                ? "border-foreground text-foreground"
+                                : "border-transparent text-muted-foreground hover:text-foreground"
+                        )}
+                    >
+                        <Building2 className="h-3.5 w-3.5 inline-block mr-1.5 -mt-0.5" />
+                        Accounts
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("users")}
+                        className={cn(
+                            "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px",
+                            activeTab === "users"
+                                ? "border-foreground text-foreground"
+                                : "border-transparent text-muted-foreground hover:text-foreground"
+                        )}
+                    >
+                        <Users className="h-3.5 w-3.5 inline-block mr-1.5 -mt-0.5" />
+                        Users
+                        <span className="ml-1.5 text-xs text-muted-foreground">({users.length})</span>
+                    </button>
+                </div>
+
                 {/* ── Accounts Table ────────────────────────────────── */}
+                {activeTab === "accounts" && (
                 <div className="rounded-xl border border-border bg-card overflow-hidden">
                     <div className="px-5 py-4 border-b border-border">
                         <h2 className="font-semibold text-sm">All Accounts</h2>
@@ -358,6 +452,7 @@ export default function AdminDashboard() {
                         </table>
                     </div>
                 </div>
+                )}
 
                 {/* ── Account Detail Slide-out ──────────────────────── */}
                 {selectedAccount && (
@@ -586,6 +681,124 @@ export default function AdminDashboard() {
                         ) : null}
                     </div>
                 )}
+
+                {/* ── Users Table ──────────────────────────────────── */}
+                {activeTab === "users" && (
+                <div className="rounded-xl border border-border bg-card overflow-hidden">
+                    <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+                        <h2 className="font-semibold text-sm">All Users</h2>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                            <input
+                                type="text"
+                                placeholder="Search by name, email, or account…"
+                                value={userSearch}
+                                onChange={(e) => setUserSearch(e.target.value)}
+                                className="pl-9 pr-3 py-1.5 text-sm rounded-lg border border-border bg-background w-72 focus:outline-none focus:ring-1 focus:ring-ring"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-border bg-muted/30">
+                                    <th className="text-left px-5 py-3 font-medium text-muted-foreground">User</th>
+                                    <th className="text-left px-3 py-3 font-medium text-muted-foreground">Account(s)</th>
+                                    <th className="text-left px-3 py-3 font-medium text-muted-foreground">Role</th>
+                                    <th className="text-left px-3 py-3 font-medium text-muted-foreground">Status</th>
+                                    <th className="text-left px-3 py-3 font-medium text-muted-foreground">Last Sign In</th>
+                                    <th className="text-left px-3 py-3 font-medium text-muted-foreground">Joined</th>
+                                    <th className="text-right px-5 py-3 font-medium text-muted-foreground">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredUsers.map((u) => (
+                                    <tr key={u.id} className="border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors">
+                                        <td className="px-5 py-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground shrink-0">
+                                                    {(u.full_name || u.email).charAt(0).toUpperCase()}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-medium truncate">
+                                                        {u.full_name || "—"}
+                                                        {u.is_platform_admin && (
+                                                            <ShieldCheck className="h-3.5 w-3.5 inline-block ml-1.5 text-amber-500" title="Platform Admin" />
+                                                        )}
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground truncate">{u.email}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-3">
+                                            {u.accounts.length > 0 ? (
+                                                <div className="flex flex-wrap gap-1">
+                                                    {u.accounts.map((a, i) => (
+                                                        <Badge key={i} variant="outline" className="text-xs">
+                                                            {a.account_name || "Unnamed"}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <span className="text-muted-foreground text-xs">No account</span>
+                                            )}
+                                        </td>
+                                        <td className="px-3 py-3">
+                                            {u.accounts.length > 0 ? (
+                                                <div className="flex flex-wrap gap-1">
+                                                    {u.accounts.map((a, i) => (
+                                                        <span key={i} className="text-xs capitalize text-muted-foreground">{a.role}</span>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <span className="text-muted-foreground text-xs">—</span>
+                                            )}
+                                        </td>
+                                        <td className="px-3 py-3">
+                                            {u.email_confirmed_at ? (
+                                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">Confirmed</span>
+                                            ) : (
+                                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400">Pending</span>
+                                            )}
+                                        </td>
+                                        <td className="px-3 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                                            {u.last_sign_in_at
+                                                ? new Date(u.last_sign_in_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                                                : "Never"}
+                                        </td>
+                                        <td className="px-3 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                                            {new Date(u.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                        </td>
+                                        <td className="px-5 py-3 text-right">
+                                            <button
+                                                onClick={() => handleDeleteUser(u.id, u.email)}
+                                                disabled={deletingUser === u.id}
+                                                className="rounded-md p-1.5 hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-40"
+                                                title="Delete user"
+                                            >
+                                                {deletingUser === u.id ? (
+                                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                ) : (
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                )}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {filteredUsers.length === 0 && (
+                                    <tr>
+                                        <td colSpan={7} className="px-5 py-12 text-center text-muted-foreground text-sm">
+                                            {userSearch ? "No users match your search." : "No users found."}
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                )}
+
             </div>
         </AppLayout>
     );

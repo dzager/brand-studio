@@ -2,21 +2,20 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import type { GetServerSideProps } from "next";
-import dynamic from "next/dynamic";
+
 import AppLayout from "@/components/layout/AppLayout";
 import OutlineView from "@/components/articles/OutlineView";
 import PanelView from "@/components/articles/PanelView";
 import ClusterPanel from "@/components/articles/ClusterPanel";
 import { AiClusterModal, ManualClusterModal, AutoClusterModal } from "@/components/articles/ClusterModals";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { BarChart3, List, FileText, AlertCircle, Network } from "lucide-react";
+import { List, FileText, AlertCircle } from "lucide-react";
 
-// Dynamic import for GraphView (uses canvas/ResizeObserver — SSR-incompatible)
-const GraphView = dynamic(() => import("@/components/articles/GraphView"), { ssr: false });
+
 
 export const getServerSideProps: GetServerSideProps = async () => {
     return { props: {} };
@@ -50,7 +49,7 @@ type Cluster = {
     company_id: string;
 };
 
-type ViewMode = "graph" | "outline";
+
 
 export default function ArticlesPage() {
     const [articles, setArticles] = useState<Article[]>([]);
@@ -59,7 +58,7 @@ export default function ArticlesPage() {
     const [companyList, setCompanyList] = useState<{ id: string; name: string }[]>([]);
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState<string | null>(null);
-    const [viewMode, setViewMode] = useState<ViewMode>("outline");
+
     const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
     const [selectedClusterId, setSelectedClusterId] = useState<string | null>(null);
 
@@ -179,19 +178,7 @@ export default function ArticlesPage() {
                     </div>
                 </div>
 
-                {/* View Tabs */}
-                <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)} className="shrink-0 mb-4">
-                    <TabsList className="grid w-full max-w-xs grid-cols-2">
-                        <TabsTrigger value="graph" className="gap-1.5">
-                            <BarChart3 className="h-3.5 w-3.5" />
-                            Graph
-                        </TabsTrigger>
-                        <TabsTrigger value="outline" className="gap-1.5">
-                            <List className="h-3.5 w-3.5" />
-                            Outline
-                        </TabsTrigger>
-                    </TabsList>
-                </Tabs>
+
 
                 {loading && (
                     <div className="space-y-3 p-4">
@@ -222,21 +209,13 @@ export default function ArticlesPage() {
 
                 {!loading && (articles.length > 0 || clusters.length > 0) && (
                     <div className="flex-1 min-h-0 overflow-hidden">
-                        {/* Graph View */}
-                        {viewMode === "graph" && (
-                            <GraphView
-                                articles={articles}
-                                clusters={clusters}
-                                companies={companies}
-                                onSelectArticle={handleSelectArticle}
-                            />
-                        )}
+
 
                         {/* Outline View — sidebar tree + detail pane */}
-                        {viewMode === "outline" && (
+                        {(
                             <div className="flex h-full gap-0">
                                 {/* Sidebar tree */}
-                                <div className="w-96 shrink-0 border-r border-border overflow-y-auto pr-2 bg-muted/30">
+                                <div className="w-80 shrink-0 border-r border-border overflow-y-auto pr-1">
                                     <OutlineView
                                         articles={articles}
                                         clusters={clusters}

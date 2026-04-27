@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -20,11 +21,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
     Play, RefreshCw, Pencil, X, Trash2,
-    AlertCircle, CheckCircle2, Link2, Network,
-    Crown, BookOpen, Scroll, FileText, Sparkles,
-    Download, LinkIcon, Plus, ImageIcon, ChevronRight,
-    UserPlus, Mail, Copy, ExternalLink,
-    Zap, MoreHorizontal, ChevronDown,
+    AlertCircle, CheckCircle2, Link2,
+    FileText, Sparkles,
+    Download, LinkIcon, Plus, ImageIcon,
+    UserPlus, Mail, Copy,
+    MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -500,7 +501,6 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
             {/* Header */}
             <div>
                 <div className="flex items-center gap-2 mb-1">
-                    <Network className="h-5 w-5 text-primary" />
                     {editingName ? (
                         <Input
                             autoFocus
@@ -509,72 +509,59 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                             onKeyDown={(e) => { if (e.key === "Enter") saveClusterName(); if (e.key === "Escape") setEditingName(false); }}
                             onBlur={saveClusterName}
                             disabled={savingName}
-                            className="text-xl font-semibold tracking-tight h-auto py-0 px-1 border-primary/50"
+                            className="text-lg font-semibold tracking-tight h-auto py-0 px-1 border-primary/50"
                         />
                     ) : (
                         <>
-                            <h2 className="text-xl font-semibold tracking-tight">{cluster.name}</h2>
+                            <h2 className="text-lg font-semibold tracking-tight">{cluster.name}</h2>
                             <button onClick={() => { setEditNameValue(cluster.name); setEditingName(true); }}
                                 className="text-muted-foreground hover:text-foreground transition-colors" title="Edit cluster name">
-                                <Pencil className="h-3.5 w-3.5" />
+                                <Pencil className="h-3 w-3" />
                             </button>
                         </>
                     )}
                 </div>
-                <div className="flex gap-2 flex-wrap mt-2">
-                    <Badge variant="secondary">
-                        {companies[cluster.company_id] || "Unknown"}
-                    </Badge>
-                    <Badge variant={cluster.status === "complete" ? "default" : cluster.status === "in_progress" ? "secondary" : "outline"} className="uppercase text-[10px]">
-                        {cluster.status}
-                    </Badge>
-                    <Badge variant="outline">{generatedCount}/{totalPages} pages</Badge>
-                    <span className="text-xs text-muted-foreground self-center">
-                        {new Date(cluster.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                    </span>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{companies[cluster.company_id] || "Unknown"}</span>
+                    <span>·</span>
+                    <span className="uppercase">{cluster.status}</span>
+                    <span>·</span>
+                    <span>{generatedCount}/{totalPages} pages</span>
                 </div>
             </div>
 
-            {/* Actions — consolidated into primary buttons + dropdown menus */}
-            <div className="flex gap-2 flex-wrap items-center pb-4 border-b border-border">
-                {/* Primary: Generate All */}
+            {/* Actions — Generate All + single overflow menu */}
+            <div className="flex gap-2 items-center pb-3 border-b border-border">
                 <Button size="sm" onClick={batchGenerate} disabled={batchGenerating || generatedCount >= totalPages || !strategy} className="gap-1.5">
                     {batchGenerating ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> {batchProgress?.current}/{batchProgress?.total}…</>
                         : generatedCount >= totalPages ? <><CheckCircle2 className="h-3.5 w-3.5" /> All Generated</>
                             : <><Play className="h-3.5 w-3.5" /> Generate All ({totalPages - generatedCount})</>}
                 </Button>
 
-                {/* Image mode selector */}
-                <div className="flex items-center gap-1 border rounded-md px-1.5 bg-muted/30">
-                    <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                    <select value={imageMode} onChange={(e) => setImageMode(e.target.value as "ai" | "search")}
-                        className="text-xs bg-transparent border-0 py-1 pr-1 focus:outline-none cursor-pointer">
-                        <option value="ai">🎨 AI Generated</option>
-                        <option value="search">🔍 Image Search</option>
-                    </select>
-                </div>
-
-                {/* Actions dropdown — Generate Guide, Interlink, Download, Share */}
+                <div className="ml-auto">
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" className="gap-1.5">
-                            <Zap className="h-3.5 w-3.5" /> Actions
-                            <ChevronDown className="h-3 w-3 opacity-50" />
+                        <Button variant="ghost" size="sm" className="px-2">
+                            <MoreHorizontal className="h-4 w-4" />
                         </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-52">
+                    <DropdownMenuContent align="end" className="w-52">
+                        {/* Image mode */}
+                        <DropdownMenuItem
+                            onClick={() => setImageMode(imageMode === "ai" ? "search" : "ai")}
+                            className="gap-2 cursor-pointer"
+                        >
+                            <ImageIcon className="h-4 w-4" />
+                            {imageMode === "ai" ? "🎨 AI Images" : "🔍 Search Images"}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {/* Tools */}
                         <DropdownMenuItem
                             onClick={handleGenerateGuide}
                             disabled={generatingGuide || generatedCount === 0}
                             className="gap-2 cursor-pointer"
                         >
-                            {generatingGuide ? (
-                                <RefreshCw className="h-4 w-4 animate-spin" />
-                            ) : guideSuccess ? (
-                                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                            ) : (
-                                <Sparkles className="h-4 w-4" />
-                            )}
+                            <Sparkles className="h-4 w-4" />
                             {generatingGuide ? "Generating Guide…" : guideSuccess ? "Guide Created!" : "Generate Guide"}
                         </DropdownMenuItem>
                         <DropdownMenuItem
@@ -582,16 +569,9 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                             disabled={interlinking || generatedCount < 2}
                             className="gap-2 cursor-pointer"
                         >
-                            {interlinking ? (
-                                <RefreshCw className="h-4 w-4 animate-spin" />
-                            ) : interlinkResult ? (
-                                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                            ) : (
-                                <LinkIcon className="h-4 w-4" />
-                            )}
+                            <LinkIcon className="h-4 w-4" />
                             {interlinking ? "Interlinking…" : interlinkResult ? `+${interlinkResult.links} Links` : "Interlink Articles"}
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
                         <DropdownMenuItem
                             onClick={handleDownloadAll}
                             disabled={generatedCount === 0}
@@ -600,73 +580,55 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                             <Download className="h-4 w-4" />
                             Download All
                         </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {/* Manage */}
                         <DropdownMenuItem
                             onClick={() => {
                                 const next = !showSharePanel;
                                 setShowSharePanel(next);
                                 if (next && cluster) loadClusterInvites();
                             }}
-                            className={cn("gap-2 cursor-pointer", showSharePanel && "text-blue-600")}
+                            className="gap-2 cursor-pointer"
                         >
                             <UserPlus className="h-4 w-4" />
-                            {showSharePanel ? "Close Share Panel" : "Share Cluster"}
+                            Share Cluster
                         </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-
-                {/* Refresh */}
-                <Button variant="outline" size="sm" onClick={loadCluster} className="gap-1.5">
-                    <RefreshCw className="h-3.5 w-3.5" /> Refresh
-                </Button>
-
-                {/* More overflow dropdown — Edit Strategy, Manage Articles, Delete */}
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="px-2">
-                            <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
                         <DropdownMenuItem
                             onClick={() => {
                                 if (editingStrategy) { setEditingStrategy(false); }
                                 else { setEditingStrategy(true); setEditStrategyJson(JSON.stringify(strategy, null, 2)); }
                             }}
-                            className={cn("gap-2 cursor-pointer", editingStrategy && "text-primary")}
+                            className="gap-2 cursor-pointer"
                         >
-                            {editingStrategy ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                            <Pencil className="h-4 w-4" />
                             {editingStrategy ? "Close Editor" : "Edit Strategy"}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                             onClick={() => { if (showArticleMgr) setShowArticleMgr(false); else loadArticleManager(); }}
-                            className={cn("gap-2 cursor-pointer", showArticleMgr && "text-primary")}
+                            className="gap-2 cursor-pointer"
                         >
                             <Link2 className="h-4 w-4" />
                             {showArticleMgr ? "Close Articles" : "Manage Articles"}
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={loadCluster} className="gap-2 cursor-pointer">
+                            <RefreshCw className="h-4 w-4" />
+                            Refresh
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         {confirmDelete ? (
-                            <DropdownMenuItem
-                                onClick={handleDelete}
-                                disabled={deleting}
-                                variant="destructive"
-                                className="gap-2 cursor-pointer"
-                            >
+                            <DropdownMenuItem onClick={handleDelete} disabled={deleting} variant="destructive" className="gap-2 cursor-pointer">
                                 <Trash2 className="h-4 w-4" />
                                 {deleting ? "Deleting…" : "Confirm Delete"}
                             </DropdownMenuItem>
                         ) : (
-                            <DropdownMenuItem
-                                onClick={() => setConfirmDelete(true)}
-                                variant="destructive"
-                                className="gap-2 cursor-pointer"
-                            >
+                            <DropdownMenuItem onClick={() => setConfirmDelete(true)} variant="destructive" className="gap-2 cursor-pointer">
                                 <Trash2 className="h-4 w-4" />
                                 Delete Cluster
                             </DropdownMenuItem>
                         )}
                     </DropdownMenuContent>
                 </DropdownMenu>
+                </div>
             </div>
 
             {pageGenErr && (
@@ -883,151 +845,56 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                 </Card>
             )}
 
-            {/* Strategy Pages */}
+            {/* Strategy Pages — flat list */}
             {strategy && (
-                <div className="space-y-5">
-                    {strategy.pillar?.title && renderPageSection("Pillar Page", "pillar", [strategy.pillar])}
-                    {strategy.supporting?.length > 0 && renderPageSection("Supporting Pages", "supporting", strategy.supporting)}
-                    {strategy.long_tail?.length > 0 && renderPageSection("Long-Tail Pages", "long_tail", strategy.long_tail)}
-                </div>
-            )}
-
-            {!strategy && (
-                <div className="text-center py-10 text-muted-foreground">
-                    <Network className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                    <p className="text-sm">This cluster has no strategy yet. Use "Edit Strategy" to add one.</p>
-                </div>
-            )}
-        </div>
-    );
-
-    function renderPageSection(label: string, type: string, pages: ClusterPage[]) {
-        const isAddingThisType = addingPageType === type;
-        const isCollapsed = collapsedSections[type] ?? true;
-        const toggleCollapse = () => setCollapsedSections((prev) => ({ ...prev, [type]: !prev[type] }));
-        return (
-            <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                    <button onClick={toggleCollapse} className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2 hover:text-foreground transition-colors">
-                        <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", !isCollapsed && "rotate-90")} />
-                        <span className={cn("w-2.5 h-2.5 rounded-full",
-                            type === "pillar" ? "bg-primary" : type === "supporting" ? "bg-green-500" : "bg-amber-500"
-                        )} />
-                        {label} ({pages.length})
-                    </button>
-                    {/* Hide add button for pillar if one already exists */}
-                    {!(type === "pillar" && pages.length > 0) && (
-                        <Button variant="ghost" size="sm"
-                            onClick={() => isAddingThisType ? setAddingPageType(null) : openAddPageForm(type)}
-                            className="h-6 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground">
-                            {isAddingThisType ? <><X className="h-3 w-3" /> Cancel</> : <><Plus className="h-3 w-3" /> Add Page</>}
-                        </Button>
-                    )}
-                </div>
-
-                {!isCollapsed && (
-                <>
-                {/* Inline add-page form */}
-                {isAddingThisType && (
-                    <Card className="border-dashed border-primary/40 bg-primary/5">
-                        <CardContent className="p-3 space-y-2.5">
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <Label className="text-xs">Title</Label>
-                                    <Input placeholder="Page title" value={newPage.title}
-                                        onChange={(e) => {
-                                            handleNewPageFieldChange("title", e.target.value);
-                                            if (!newPage.slug || newPage.slug === autoSlug(newPage.title.slice(0, -1))) {
-                                                handleNewPageFieldChange("slug", autoSlug(e.target.value));
-                                            }
-                                        }}
-                                        className="h-8 text-sm" />
-                                </div>
-                                <div>
-                                    <Label className="text-xs">Keyword</Label>
-                                    <Input placeholder="Target keyword" value={newPage.keyword}
-                                        onChange={(e) => handleNewPageFieldChange("keyword", e.target.value)}
-                                        className="h-8 text-sm" />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <Label className="text-xs">Slug</Label>
-                                    <Input placeholder="url-slug" value={newPage.slug}
-                                        onChange={(e) => handleNewPageFieldChange("slug", e.target.value)}
-                                        className="h-8 text-sm font-mono" />
-                                </div>
-                                <div>
-                                    <Label className="text-xs">Word Count</Label>
-                                    <Input placeholder="1,500" value={newPage.word_count}
-                                        onChange={(e) => handleNewPageFieldChange("word_count", e.target.value)}
-                                        className="h-8 text-sm" />
-                                </div>
-                            </div>
-                            <div>
-                                <Label className="text-xs">Description</Label>
-                                <Textarea placeholder="Brief description of this page…" value={newPage.description}
-                                    onChange={(e) => handleNewPageFieldChange("description", e.target.value)}
-                                    rows={2} className="text-sm resize-none" />
-                            </div>
-                            <div className="flex gap-2 justify-end">
-                                <Button variant="ghost" size="sm" onClick={() => setAddingPageType(null)} className="h-7 text-xs">
-                                    Cancel
-                                </Button>
-                                <Button size="sm" onClick={saveNewPage} disabled={savingNewPage || !newPage.title.trim()}
-                                    className="h-7 text-xs gap-1">
-                                    {savingNewPage ? <><RefreshCw className="h-3 w-3 animate-spin" /> Saving…</>
-                                        : <><Plus className="h-3 w-3" /> Add {type === "pillar" ? "Pillar" : type === "supporting" ? "Supporting" : "Long-Tail"} Page</>}
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-
-                <div className="space-y-1.5">
-                    {pages.map((page, idx) => {
+                <div className="space-y-1">
+                    {[...(strategy.pillar?.title ? [{ page: strategy.pillar, type: "pillar", idx: 0 }] : []),
+                      ...(strategy.supporting || []).map((p: any, i: number) => ({ page: p, type: "supporting", idx: i })),
+                      ...(strategy.long_tail || []).map((p: any, i: number) => ({ page: p, type: "long_tail", idx: i })),
+                    ].map(({ page, type, idx }) => {
                         const generated = isPageGenerated(page.slug);
                         const pageKey = `${type}-${idx}`;
                         const isGeneratingThis = generatingPage === pageKey;
                         const articleMatch = (cluster?.articles ?? []).find((a) => a.slug === page.slug);
+                        const roleColor = type === "pillar" ? "bg-primary" : type === "supporting" ? "bg-green-500" : "bg-amber-500";
+                        const roleLabel = type === "pillar" ? "P" : type === "supporting" ? "S" : "L";
+                        const roleTooltip = type === "pillar" ? "Pillar — The comprehensive cornerstone article that anchors this cluster" : type === "supporting" ? "Supporting — A mid-depth article that expands on a subtopic of the pillar" : "Long-tail — A focused, niche article targeting a specific long-tail keyword";
 
                         return (
-                            <div key={idx} className={cn(
-                                "flex items-center gap-3 p-3 rounded-lg border",
-                                generated ? "border-green-500/50 bg-green-500/5" : "border-border bg-card"
+                            <div key={pageKey} className={cn(
+                                "flex items-center gap-2.5 px-3 py-2 rounded-md transition-colors",
+                                generated ? "bg-green-500/5" : "hover:bg-muted/40"
                             )}>
-                                <span className={cn(
-                                    "w-6 h-6 flex items-center justify-center rounded-full text-xs font-semibold shrink-0",
-                                    generated ? "bg-green-500 text-white" : "bg-muted text-muted-foreground"
-                                )}>
-                                    {generated ? "✓" : idx + 1}
-                                </span>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <span className={cn("w-5 h-5 flex items-center justify-center rounded text-[10px] font-bold shrink-0 text-white cursor-help", roleColor)}>
+                                                {roleLabel}
+                                            </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top">
+                                            {roleTooltip}
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                                 <div className="flex-1 min-w-0">
                                     {generated && articleMatch ? (
                                         <button onClick={() => onSelectArticle(articleMatch.id)}
-                                            className="text-sm font-medium text-left hover:text-primary transition-colors truncate block w-full">
+                                            className="text-[13px] font-medium text-left hover:text-primary transition-colors truncate block w-full">
                                             {page.title}
                                         </button>
                                     ) : (
-                                        <div className="text-sm font-medium">{page.title}</div>
+                                        <div className="text-[13px] font-medium truncate">{page.title}</div>
                                     )}
-                                    <div className="flex gap-2 text-[11px] text-muted-foreground flex-wrap mt-0.5">
-                                        <Badge variant={ROLE_VARIANTS[type] ?? "secondary"} className="text-[10px] px-1.5 py-0">
-                                            {page.keyword}
-                                        </Badge>
-                                        <span>/{page.slug}</span>
-                                        <span>{page.word_count} words</span>
-                                        {page.links_to.length > 0 && <span>→ {page.links_to.length} links</span>}
-                                    </div>
-                                    {page.description && <div className="text-xs text-muted-foreground mt-1">{page.description}</div>}
+                                    <div className="text-[11px] text-muted-foreground truncate">{page.keyword}</div>
                                 </div>
                                 <div className="shrink-0">
                                     {generated ? (
-                                        <span className="text-xs text-green-600 dark:text-green-400 font-semibold">✓ Generated</span>
+                                        <span className="text-[11px] text-green-600 dark:text-green-400 font-medium">✓</span>
                                     ) : (
-                                        <Button variant="outline" size="sm" onClick={() => generatePage(type, idx, pageKey)}
-                                            disabled={!!generatingPage || batchGenerating} className="gap-1">
-                                            {isGeneratingThis ? <><RefreshCw className="h-3 w-3 animate-spin" /> Generating…</> : <><Play className="h-3 w-3" /> Generate</>}
+                                        <Button variant="ghost" size="sm" onClick={() => generatePage(type, idx, pageKey)}
+                                            disabled={!!generatingPage || batchGenerating} className="h-6 px-2 text-xs">
+                                            {isGeneratingThis ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
                                         </Button>
                                     )}
                                 </div>
@@ -1035,12 +902,11 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                         );
                     })}
                 </div>
-                </>
-                )}
-            </div>
-        );
-    }
+            )}
+        </div>
+    );
 }
+
 
 function renderOverlapWarnings(warnings: OverlapWarnings) {
     const hasIntra = warnings.intra_cluster.length > 0;

@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { GetServerSideProps } from "next";
+import { useRouter } from "next/router";
 import type { ImageStyleCategory, VoiceProfile } from "@/brand/engine";
 import AppLayout from "@/components/layout/AppLayout";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,8 +15,10 @@ import { Label } from "@/components/ui/label";
 import {
     ChevronDown, ChevronRight, AlertCircle, Mic, FileText,
     Palette, Eye, BookOpen, Search as SearchIcon, Settings2,
-    Layers, Copy as CopyIcon, CheckCircle2, Pencil, Save, X,
+    Layers, Copy as CopyIcon, CheckCircle2, Pencil, Save, X, Plus,
+    Camera, ImagePlus, Loader2, Sparkles,
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -109,6 +112,9 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
     const [saving, setSaving] = useState(false);
     const [saveErr, setSaveErr] = useState<string | null>(null);
     const [saved, setSaved] = useState(false);
+    const [newRefUrl, setNewRefUrl] = useState("");
+    const [expandedStyles, setExpandedStyles] = useState<Set<number>>(new Set());
+    const hasCustomStyles = Array.isArray(company.image_style_categories) && company.image_style_categories.length > 0;
     const [form, setForm] = useState(() => ({
         name: company.name, tagline: company.tagline ?? "", mission: company.mission ?? "",
         archetype: company.archetype ?? "guide", tone: company.tone ?? "",
@@ -119,9 +125,86 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
         editorial_guidelines: company.editorial_guidelines ?? "",
         seo_content_guidelines: company.seo_content_guidelines ?? "",
         auto_humanize: company.auto_humanize !== false, include_toc: company.include_toc === true,
+        reference_articles: company.reference_articles ?? [] as string[],
+        useCustomStyles: hasCustomStyles,
+        image_style_categories: hasCustomStyles ? company.image_style_categories! : [] as ImageStyleCategory[],
     }));
 
+    // Image Style Extraction state
+    type ImageStyleAnalysis = {
+        style_name: string;
+        image_prompt_style: string;
+        narrative: string;
+        storytelling_cues: string[];
+        analysis: {
+            color_palette: string;
+            dominant_colors: string[];
+            tone_mood: string;
+            subject_matter: string;
+            photo_style_type: string;
+            lens_characteristics: string;
+            film_quality: string;
+            contrast: string;
+            hue_temperature: string;
+            lighting: string;
+            composition: string;
+            depth_of_field: string;
+            texture_grain: string;
+            saturation: string;
+            post_processing: string;
+            era_aesthetic: string;
+        };
+    };
+    const [showImageExtract, setShowImageExtract] = useState(false);
+    const [extractPreviewUrl, setExtractPreviewUrl] = useState<string | null>(null);
+    const [extractBase64, setExtractBase64] = useState<string | null>(null);
+    const [extracting, setExtracting] = useState(false);
+    const [extractErr, setExtractErr] = useState<string | null>(null);
+    const [extractResult, setExtractResult] = useState<ImageStyleAnalysis | null>(null);
+    const [extractStyleName, setExtractStyleName] = useState("");
+    const imageInputRef = useRef<HTMLInputElement>(null);
+
+    function openImageExtract() {
+        setShowImageExtract(true); setExtractPreviewUrl(null); setExtractBase64(null);
+        setExtracting(false); setExtractErr(null); setExtractResult(null); setExtractStyleName("");
+    }
+    function closeImageExtract() {
+        setShowImageExtract(false); setExtractPreviewUrl(null); setExtractBase64(null);
+        setExtracting(false); setExtractErr(null); setExtractResult(null); setExtractStyleName("");
+    }
+    function handleImageFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith("image/")) { setExtractErr("Please select an image file (JPEG, PNG, WebP)."); return; }
+        if (file.size > 10 * 1024 * 1024) { setExtractErr("Image must be under 10MB."); return; }
+        setExtractErr(null); setExtractResult(null);
+        const reader = new FileReader();
+        reader.onload = (ev) => { const dataUrl = ev.target?.result as string; setExtractPreviewUrl(dataUrl); setExtractBase64(dataUrl); };
+        reader.readAsDataURL(file);
+    }
+    async function handleImageExtract() {
+        if (!extractBase64) return;
+        setExtracting(true); setExtractErr(null);
+        try {
+            const r = await fetch("/api/analyze-image-style", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image_base64: extractBase64 }) });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || "Analysis failed");
+            setExtractResult(data.style); setExtractStyleName(data.style.style_name || "");
+        } catch (e: any) { setExtractErr(e.message); }
+        finally { setExtracting(false); }
+    }
+    function addExtractedStyle() {
+        if (!extractResult) return;
+        const name = extractStyleName.trim() || extractResult.style_name;
+        const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+        const newStyle: ImageStyleCategory = { id, label: name, narrative: extractResult.narrative, storytelling_cues: extractResult.storytelling_cues, image_prompt_style: extractResult.image_prompt_style };
+        setForm(prev => ({ ...prev, useCustomStyles: true, image_style_categories: [...prev.image_style_categories, newStyle] }));
+        setExpandedStyles(prev => { const next = new Set(prev); next.add(form.image_style_categories.length); return next; });
+        closeImageExtract();
+    }
+
     function startEdit() {
+        const hcs = Array.isArray(company.image_style_categories) && company.image_style_categories.length > 0;
         setForm({
             name: company.name, tagline: company.tagline ?? "", mission: company.mission ?? "",
             archetype: company.archetype ?? "guide", tone: company.tone ?? "",
@@ -132,8 +215,11 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
             editorial_guidelines: company.editorial_guidelines ?? "",
             seo_content_guidelines: company.seo_content_guidelines ?? "",
             auto_humanize: company.auto_humanize !== false, include_toc: company.include_toc === true,
+            reference_articles: company.reference_articles ?? [],
+            useCustomStyles: hcs,
+            image_style_categories: hcs ? company.image_style_categories! : [],
         });
-        setEditing(true); setSaveErr(null); setSaved(false);
+        setEditing(true); setSaveErr(null); setSaved(false); setNewRefUrl("");
     }
 
     function cancelEdit() { setEditing(false); setSaveErr(null); }
@@ -141,7 +227,12 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
     async function handleSave() {
         setSaving(true); setSaveErr(null);
         try {
-            const payload = { ...form, target_audiences: form.target_audiences };
+            const { useCustomStyles, ...rest } = form;
+            const payload = {
+                ...rest,
+                target_audiences: form.target_audiences,
+                image_style_categories: useCustomStyles && form.image_style_categories.length > 0 ? form.image_style_categories : null,
+            };
             const r = await fetch(`/api/companies/${company.id}`, {
                 method: "PUT", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
@@ -231,17 +322,101 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
                 </div>
             </Section>
 
-            {/* Image Styles (read-only — managed via Companies page) */}
+            {/* Image Styles */}
             <Section
                 title="Image Styles"
                 icon={Layers}
-                badge={hasStyles ? <Badge variant="secondary" className="text-[10px] ml-1">{styles!.length}</Badge> : <Badge variant="outline" className="text-[10px] ml-1 text-muted-foreground">Default</Badge>}
+                badge={(() => {
+                    const s = editing ? form.image_style_categories : styles;
+                    const h = Array.isArray(s) && s.length > 0;
+                    return h ? <Badge variant="secondary" className="text-[10px] ml-1">{s!.length}</Badge> : <Badge variant="outline" className="text-[10px] ml-1 text-muted-foreground">Default</Badge>;
+                })()}
             >
                 <div className="space-y-3 pt-3">
-                    {!hasStyles && <p className="text-sm text-muted-foreground italic">Using default image styles. No custom styles configured.</p>}
-                    {hasStyles && styles!.map((cat, idx) => (
-                        <ImageStyleCard key={idx} style={cat} />
-                    ))}
+                    {editing ? (
+                        <>
+                            <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                <input type="checkbox" checked={form.useCustomStyles} onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    setForm(prev => ({ ...prev, useCustomStyles: checked, image_style_categories: checked && prev.image_style_categories.length === 0 ? [{ id: "default", label: "Default", narrative: "", storytelling_cues: [], image_prompt_style: "" }] : prev.image_style_categories }));
+                                }} className="h-4 w-4 rounded" />
+                                Use custom styles
+                            </label>
+                            {form.useCustomStyles && form.image_style_categories.map((cat, idx) => {
+                                const isExpanded = expandedStyles.has(idx);
+                                return (
+                                    <Card key={idx} className="bg-muted/20">
+                                        <div className="flex items-center justify-between px-4 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors" onClick={() => setExpandedStyles(prev => { const next = new Set(prev); if (next.has(idx)) next.delete(idx); else next.add(idx); return next; })}>
+                                            <span className="text-sm font-medium flex items-center gap-1.5">
+                                                {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                                                {cat.label || `Style #${idx + 1}`}
+                                                {cat.id && <span className="text-xs text-muted-foreground">({cat.id})</span>}
+                                                {cat.type === "composite" && <Badge variant="outline" className="text-[10px] h-4 gap-0.5">🧩 Composite</Badge>}
+                                            </span>
+                                            <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); setForm(prev => ({ ...prev, image_style_categories: prev.image_style_categories.filter((_, i) => i !== idx) })); }}>
+                                                <X className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                        {isExpanded && (
+                                            <CardContent className="pt-0 pb-4 px-4 space-y-3 border-t border-border">
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div className="space-y-1"><Label className="text-xs">Label *</Label><Input value={cat.label} onChange={(e) => { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], label: e.target.value, id: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") }; setForm(prev => ({ ...prev, image_style_categories: nc })); }} placeholder="e.g. Families" /></div>
+                                                    <div className="space-y-1"><Label className="text-xs">ID</Label><Input value={cat.id} disabled className="bg-muted" /></div>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">Style Type</Label>
+                                                    <div className="flex items-center gap-4">
+                                                        <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                                                            <input type="radio" name={`style-type-${idx}`} checked={cat.type !== "composite"} onChange={() => { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], type: "prompt" }; setForm(prev => ({ ...prev, image_style_categories: nc })); }} />
+                                                            🎨 AI Prompt
+                                                        </label>
+                                                        <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                                                            <input type="radio" name={`style-type-${idx}`} checked={cat.type === "composite"} onChange={() => { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], type: "composite" }; setForm(prev => ({ ...prev, image_style_categories: nc })); }} />
+                                                            🧩 Composite Blend
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-1"><Label className="text-xs">Narrative</Label><Textarea value={cat.narrative} onChange={(e) => { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], narrative: e.target.value }; setForm(prev => ({ ...prev, image_style_categories: nc })); }} placeholder="Context for this style..." rows={2} /></div>
+                                                <div className="space-y-1"><Label className="text-xs">Storytelling Cues</Label><Input value={cat.storytelling_cues.join(", ")} onChange={(e) => { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], storytelling_cues: e.target.value.split(",").map(s => s.trim()).filter(Boolean) }; setForm(prev => ({ ...prev, image_style_categories: nc })); }} placeholder="emphasizes warmth, collaboration" /></div>
+                                                <div className="space-y-1"><Label className="text-xs">Image Prompt Style</Label><Textarea value={cat.image_prompt_style} onChange={(e) => { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], image_prompt_style: e.target.value }; setForm(prev => ({ ...prev, image_style_categories: nc })); }} placeholder="Detailed style direction..." rows={3} /></div>
+                                                {cat.type === "composite" && (
+                                                    <fieldset className="border border-border rounded-lg p-3.5 space-y-3 bg-muted/30">
+                                                        <legend className="text-xs font-semibold px-1.5">🧩 Composite Blend Defaults</legend>
+                                                        <div className="space-y-1"><Label className="text-xs">Default Background Prompt</Label><Textarea value={cat.composite_bg_prompt ?? ""} onChange={(e) => { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], composite_bg_prompt: e.target.value }; setForm(prev => ({ ...prev, image_style_categories: nc })); }} placeholder="e.g. Modern kitchen countertop with soft natural lighting" rows={2} /></div>
+                                                        <div className="space-y-1"><Label className="text-xs">Default Product Search Query</Label><Input value={cat.composite_product_query ?? ""} onChange={(e) => { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], composite_product_query: e.target.value }; setForm(prev => ({ ...prev, image_style_categories: nc })); }} placeholder="e.g. stainless steel blender product photo" /></div>
+                                                        {cat.composite_bg_image_url && (
+                                                            <div className="flex items-center gap-2 p-1.5 rounded-md bg-card border border-border">
+                                                                <img src={cat.composite_bg_image_url} alt="Background" className="w-16 h-10 object-cover rounded" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                                                                <Input value={cat.composite_bg_image_url} onChange={(e) => { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], composite_bg_image_url: e.target.value }; setForm(prev => ({ ...prev, image_style_categories: nc })); }} className="text-xs flex-1 h-7" />
+                                                                <Button type="button" variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], composite_bg_image_url: "" }; setForm(prev => ({ ...prev, image_style_categories: nc })); }}><X className="h-3 w-3" /></Button>
+                                                            </div>
+                                                        )}
+                                                    </fieldset>
+                                                )}
+                                            </CardContent>
+                                        )}
+                                    </Card>
+                                );
+                            })}
+                            {form.useCustomStyles && (
+                                <div className="flex gap-2">
+                                    <Button variant="outline" className="border-dashed gap-1" onClick={() => setForm(prev => ({ ...prev, image_style_categories: [...prev.image_style_categories, { id: "", label: "", narrative: "", storytelling_cues: [], image_prompt_style: "" }] }))}>
+                                        <Plus className="h-3.5 w-3.5" /> Add Style
+                                    </Button>
+                                    <Button variant="outline" className="gap-1.5 border-primary/30 text-primary hover:bg-primary/5" onClick={openImageExtract}>
+                                        <Camera className="h-3.5 w-3.5" /> Extract from Image
+                                    </Button>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            {!hasStyles && <p className="text-sm text-muted-foreground italic">Using default image styles. No custom styles configured.</p>}
+                            {hasStyles && styles!.map((cat, idx) => (
+                                <ImageStyleCard key={idx} style={cat} />
+                            ))}
+                        </>
+                    )}
                 </div>
             </Section>
 
@@ -378,7 +553,24 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
                         </div>
                     </button>
                     <Field label="Avoid Phrases" value={editing ? form.avoid_phrases : company.avoid_phrases} editing={editing} onChange={v => setField("avoid_phrases", v)} rows={2} />
-                    {company.reference_articles && company.reference_articles.length > 0 && (
+                    {editing ? (
+                        <div className="space-y-2">
+                            <Label className="text-xs font-medium text-muted-foreground">Reference Articles</Label>
+                            <p className="text-xs text-muted-foreground">Add URLs of gold-standard articles used as style references.</p>
+                            {form.reference_articles.map((url, idx) => (
+                                <div key={idx} className="flex items-center gap-2">
+                                    <a href={url} target="_blank" rel="noopener noreferrer" className="flex-1 text-sm text-primary break-all">{url}</a>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive shrink-0" onClick={() => setForm(prev => ({ ...prev, reference_articles: prev.reference_articles.filter((_, i) => i !== idx) }))}><X className="h-3 w-3" /></Button>
+                                </div>
+                            ))}
+                            <div className="flex gap-2">
+                                <Input type="url" value={newRefUrl} onChange={(e) => setNewRefUrl(e.target.value)} placeholder="https://example.com/blog/article" onKeyDown={(e) => { if (e.key === "Enter" && newRefUrl.trim()) { e.preventDefault(); setForm(prev => ({ ...prev, reference_articles: [...prev.reference_articles, newRefUrl.trim()] })); setNewRefUrl(""); } }} />
+                                <Button variant="outline" size="sm" disabled={!newRefUrl.trim()} onClick={() => { if (newRefUrl.trim()) { setForm(prev => ({ ...prev, reference_articles: [...prev.reference_articles, newRefUrl.trim()] })); setNewRefUrl(""); } }}>
+                                    <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                                </Button>
+                            </div>
+                        </div>
+                    ) : company.reference_articles && company.reference_articles.length > 0 ? (
                         <div className="space-y-1">
                             <div className="text-xs font-medium text-muted-foreground">Reference Articles</div>
                             <div className="space-y-1">
@@ -387,9 +579,134 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
                                 ))}
                             </div>
                         </div>
-                    )}
+                    ) : null}
                 </div>
             </Section>
+
+            {/* Image Style Extraction Modal */}
+            <Dialog open={showImageExtract} onOpenChange={(open) => { if (!open) closeImageExtract(); }}>
+                <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Camera className="h-5 w-5 text-primary" />
+                            Extract Style from Image
+                        </DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-muted-foreground mt-1">
+                        Upload a reference image and our AI art director will analyze its visual characteristics — color palette, tone, lighting, lens, film quality, contrast, and more — to create a reusable image style prompt.
+                    </p>
+                    <div className="mt-4">
+                        <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/jpg" className="hidden" onChange={handleImageFileSelect} />
+                        {!extractPreviewUrl ? (
+                            <button type="button" onClick={() => imageInputRef.current?.click()} className="w-full rounded-xl border-2 border-dashed border-border hover:border-primary/50 bg-muted/20 hover:bg-muted/40 transition-all p-10 flex flex-col items-center gap-3 cursor-pointer group">
+                                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                                    <ImagePlus className="h-7 w-7 text-primary" />
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-sm font-medium">Click to upload a reference image</p>
+                                    <p className="text-xs text-muted-foreground mt-0.5">JPEG, PNG, or WebP — up to 10MB</p>
+                                </div>
+                            </button>
+                        ) : (
+                            <div className="space-y-3">
+                                <div className="relative rounded-xl overflow-hidden border border-border bg-black/5">
+                                    <img src={extractPreviewUrl} alt="Uploaded reference" className="w-full max-h-72 object-contain" />
+                                    <Button variant="secondary" size="sm" className="absolute top-2 right-2 h-7 gap-1 text-xs opacity-80 hover:opacity-100" onClick={() => { setExtractPreviewUrl(null); setExtractBase64(null); setExtractResult(null); setExtractErr(null); if (imageInputRef.current) imageInputRef.current.value = ""; }}>
+                                        <X className="h-3 w-3" /> Replace
+                                    </Button>
+                                </div>
+                                {!extractResult && (
+                                    <Button onClick={handleImageExtract} disabled={extracting} className="w-full gap-2">
+                                        {extracting ? (<><Loader2 className="h-4 w-4 animate-spin" /> Analyzing image — this takes 15–30 seconds…</>) : (<><Sparkles className="h-4 w-4" /> Analyze Visual Style</>)}
+                                    </Button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                    {extractErr && (
+                        <Alert variant="destructive" className="mt-3">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>{extractErr}</AlertDescription>
+                        </Alert>
+                    )}
+                    {extractResult && (
+                        <div className="mt-4 space-y-4">
+                            <Alert className="border-success bg-success/5">
+                                <CheckCircle2 className="h-4 w-4 text-success" />
+                                <AlertDescription className="text-success">Style extracted successfully! Review the details below and add it to your company.</AlertDescription>
+                            </Alert>
+                            <div className="space-y-1.5">
+                                <Label className="text-sm font-semibold">Style Name</Label>
+                                <Input value={extractStyleName} onChange={(e) => setExtractStyleName(e.target.value)} placeholder="e.g. Warm Editorial Glow" className="text-sm" />
+                            </div>
+                            <fieldset className="border border-border rounded-lg p-3.5 space-y-3">
+                                <legend className="text-xs font-semibold px-1.5">🎨 Visual Analysis</legend>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                                    {([
+                                        ["Photo Style", extractResult.analysis.photo_style_type],
+                                        ["Color Palette", extractResult.analysis.color_palette],
+                                        ["Tone / Mood", extractResult.analysis.tone_mood],
+                                        ["Lighting", extractResult.analysis.lighting],
+                                        ["Lens", extractResult.analysis.lens_characteristics],
+                                        ["Film Quality", extractResult.analysis.film_quality],
+                                        ["Contrast", extractResult.analysis.contrast],
+                                        ["Hue / Temperature", extractResult.analysis.hue_temperature],
+                                        ["Composition", extractResult.analysis.composition],
+                                        ["Depth of Field", extractResult.analysis.depth_of_field],
+                                        ["Texture / Grain", extractResult.analysis.texture_grain],
+                                        ["Saturation", extractResult.analysis.saturation],
+                                        ["Post Processing", extractResult.analysis.post_processing],
+                                        ["Era / Aesthetic", extractResult.analysis.era_aesthetic],
+                                        ["Subject", extractResult.analysis.subject_matter],
+                                    ] as [string, string][]).map(([label, value]) => (
+                                        <div key={label} className="space-y-0.5">
+                                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{label}</span>
+                                            <p className="text-xs leading-snug">{value}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                                {extractResult.analysis.dominant_colors?.length > 0 && (
+                                    <div className="space-y-1">
+                                        <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Dominant Colors</span>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {extractResult.analysis.dominant_colors.map((color, i) => {
+                                                const hexMatch = color.match(/#[0-9a-fA-F]{6}/);
+                                                return (
+                                                    <Badge key={i} variant="secondary" className="gap-1.5 text-xs font-normal">
+                                                        {hexMatch && <span className="inline-block w-3 h-3 rounded-full border border-border" style={{ backgroundColor: hexMatch[0] }} />}
+                                                        {color}
+                                                    </Badge>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </fieldset>
+                            <fieldset className="border border-border rounded-lg p-3.5 space-y-1.5">
+                                <legend className="text-xs font-semibold px-1.5">📝 Generated Image Prompt Style</legend>
+                                <p className="text-xs text-muted-foreground">This prompt will be used to replicate this visual style in AI-generated images:</p>
+                                <pre className="whitespace-pre-wrap break-words text-xs bg-muted p-3 rounded-md max-h-48 overflow-y-auto leading-relaxed">{extractResult.image_prompt_style}</pre>
+                            </fieldset>
+                            {extractResult.storytelling_cues?.length > 0 && (
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Storytelling Cues</Label>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {extractResult.storytelling_cues.map((cue, i) => <Badge key={i} variant="outline" className="text-xs font-normal">{cue}</Badge>)}
+                                    </div>
+                                </div>
+                            )}
+                            <div className="space-y-1">
+                                <Label className="text-xs">Narrative</Label>
+                                <p className="text-xs text-muted-foreground leading-relaxed">{extractResult.narrative}</p>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                                <Button variant="outline" onClick={closeImageExtract}>Cancel</Button>
+                                <Button onClick={addExtractedStyle} className="gap-1.5"><Plus className="h-4 w-4" /> Add Style to Company</Button>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
@@ -436,6 +753,7 @@ function ImageStyleCard({ style: cat }: { style: ImageStyleCategory }) {
 
 /* ── Main Page ───────────────────────────────────────────────────── */
 export default function CompanyPage() {
+    const router = useRouter();
     const { activeAccount } = useAuth();
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState<string | null>(null);
@@ -444,7 +762,27 @@ export default function CompanyPage() {
     const [companies, setCompanies] = useState<CompanyData[]>([]);
     const [selectedId, setSelectedId] = useState<string | null>(null);
 
+    // Direct company ID from query param (e.g. /company?id=xxx)
+    const directId = router.query.id as string | undefined;
+
     useEffect(() => {
+        // If a direct company ID is provided, load it directly
+        if (directId) {
+            setLoading(true); setErr(null);
+            Promise.all([
+                fetch(`/api/companies/${directId}`).then(r => r.json()),
+                fetch(`/api/prompts?company_id=${directId}`).then(r => r.json()).catch(() => []),
+            ])
+                .then(([companyData, promptsData]) => {
+                    if (companyData.error) throw new Error(companyData.error);
+                    setMode("single");
+                    setCompany({ ...companyData, prompts: Array.isArray(promptsData) ? promptsData : [] });
+                })
+                .catch((e) => setErr(e.message))
+                .finally(() => setLoading(false));
+            return;
+        }
+
         if (!activeAccount) return;
         setLoading(true); setErr(null);
         const url = `/api/account/company?account_id=${activeAccount.account_id}`;
@@ -465,7 +803,7 @@ export default function CompanyPage() {
             })
             .catch((e) => setErr(e.message))
             .finally(() => setLoading(false));
-    }, [activeAccount]);
+    }, [activeAccount, directId]);
 
     const activeCompany = mode === "single" ? company : companies.find((c) => c.id === selectedId) ?? null;
 

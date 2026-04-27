@@ -40,7 +40,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 const NAV_ITEMS = [
   { href: "/studio", label: "Studio", icon: Home, description: "Create content", minRole: "member" },
-  { href: "/company", label: "Company", icon: Palette, description: "Your brand profile", minRole: "member" },
+  { href: "/company", label: "Company", icon: Palette, description: "Brand profile", minRole: "member", hidden: true },
   { href: "/companies", label: "Companies", icon: Building2, description: "Manage brands", minRole: "member" },
   { href: "/articles", label: "Articles", icon: FileText, description: "Content architecture", minRole: "member" },
   { href: "/admin", label: "Admin", icon: Shield, description: "Platform dashboard", minRole: "admin" },
@@ -119,6 +119,8 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
       if ((roleHierarchy[item.minRole] || 1) > userRoleLevel) return false;
       // Company-scoped members don't need the Companies page
       if (isScopedMember && item.href === "/companies") return false;
+      // Hidden items only show in the top bar title, not sidebar/mobile nav
+      if ((item as any).hidden) return false;
       return true;
     }
   );

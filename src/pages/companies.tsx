@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { GetServerSideProps } from "next";
+import { useRouter } from "next/router";
 import type { ImageStyleCategory, VoiceProfile, BrandEngine } from "@/brand/engine";
 import AppLayout from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -11,11 +12,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
     Pencil, Trash2, Mic, FileText, Plus, ChevronDown, ChevronRight,
     Copy as CopyIcon, X, AlertCircle, CheckCircle2, Save, Sparkles, Search,
-    Globe, Loader2,
+    Globe, Loader2, ImagePlus, Camera,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +45,7 @@ const EMPTY_FORM = {
 };
 
 export default function CompaniesPage() {
+    const router = useRouter();
     const [companies, setCompanies] = useState<Company[]>([]);
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState<string | null>(null);
@@ -55,6 +57,40 @@ export default function CompaniesPage() {
     const [newRefUrl, setNewRefUrl] = useState("");
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+
+    // Image Style Extraction state
+    type ImageStyleAnalysis = {
+        style_name: string;
+        image_prompt_style: string;
+        narrative: string;
+        storytelling_cues: string[];
+        analysis: {
+            color_palette: string;
+            dominant_colors: string[];
+            tone_mood: string;
+            subject_matter: string;
+            photo_style_type: string;
+            lens_characteristics: string;
+            film_quality: string;
+            contrast: string;
+            hue_temperature: string;
+            lighting: string;
+            composition: string;
+            depth_of_field: string;
+            texture_grain: string;
+            saturation: string;
+            post_processing: string;
+            era_aesthetic: string;
+        };
+    };
+    const [showImageExtract, setShowImageExtract] = useState(false);
+    const [extractPreviewUrl, setExtractPreviewUrl] = useState<string | null>(null);
+    const [extractBase64, setExtractBase64] = useState<string | null>(null);
+    const [extracting, setExtracting] = useState(false);
+    const [extractErr, setExtractErr] = useState<string | null>(null);
+    const [extractResult, setExtractResult] = useState<ImageStyleAnalysis | null>(null);
+    const [extractStyleName, setExtractStyleName] = useState("");
+    const imageInputRef = useRef<HTMLInputElement>(null);
 
     // URL import state
     const [importUrl, setImportUrl] = useState("");
@@ -96,6 +132,95 @@ export default function CompaniesPage() {
             setCsProductSearchResults((prev) => ({ ...prev, [idx]: data.images ?? [] }));
         } catch { setCsProductSearchResults((prev) => ({ ...prev, [idx]: [] })); }
         finally { setCsProductSearching((prev) => ({ ...prev, [idx]: false })); }
+    }
+
+    // Image Style Extraction handlers
+    function openImageExtract() {
+        setShowImageExtract(true);
+        setExtractPreviewUrl(null);
+        setExtractBase64(null);
+        setExtracting(false);
+        setExtractErr(null);
+        setExtractResult(null);
+        setExtractStyleName("");
+    }
+    function closeImageExtract() {
+        setShowImageExtract(false);
+        setExtractPreviewUrl(null);
+        setExtractBase64(null);
+        setExtracting(false);
+        setExtractErr(null);
+        setExtractResult(null);
+        setExtractStyleName("");
+    }
+
+    function handleImageFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith("image/")) {
+            setExtractErr("Please select an image file (JPEG, PNG, WebP).");
+            return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            setExtractErr("Image must be under 10MB.");
+            return;
+        }
+        setExtractErr(null);
+        setExtractResult(null);
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const dataUrl = ev.target?.result as string;
+            setExtractPreviewUrl(dataUrl);
+            setExtractBase64(dataUrl);
+        };
+        reader.readAsDataURL(file);
+    }
+
+    async function handleImageExtract() {
+        if (!extractBase64) return;
+        setExtracting(true);
+        setExtractErr(null);
+        try {
+            const r = await fetch("/api/analyze-image-style", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image_base64: extractBase64 }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || "Analysis failed");
+            setExtractResult(data.style);
+            setExtractStyleName(data.style.style_name || "");
+        } catch (e: any) {
+            setExtractErr(e.message);
+        } finally {
+            setExtracting(false);
+        }
+    }
+
+    function addExtractedStyle() {
+        if (!extractResult) return;
+        const name = extractStyleName.trim() || extractResult.style_name;
+        const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+        const newStyle: ImageStyleCategory = {
+            id,
+            label: name,
+            narrative: extractResult.narrative,
+            storytelling_cues: extractResult.storytelling_cues,
+            image_prompt_style: extractResult.image_prompt_style,
+        };
+        setForm((prev) => ({
+            ...prev,
+            useCustomStyles: true,
+            image_style_categories: [...prev.image_style_categories, newStyle],
+        }));
+        // Auto-expand the newly added style
+        setExpandedStyles((prev) => {
+            const next = new Set(prev);
+            next.add(form.image_style_categories.length);
+            return next;
+        });
+        closeImageExtract();
     }
 
     // Voice
@@ -603,9 +728,14 @@ export default function CompaniesPage() {
                                                 </Card>
                                             );
                                         })}
-                                        <Button variant="outline" className="border-dashed gap-1" onClick={() => setForm((prev) => ({ ...prev, image_style_categories: [...prev.image_style_categories, { id: "", label: "", narrative: "", storytelling_cues: [], image_prompt_style: "" }] }))}>
-                                            <Plus className="h-3.5 w-3.5" /> Add Style
-                                        </Button>
+                                        <div className="flex gap-2">
+                                            <Button variant="outline" className="border-dashed gap-1" onClick={() => setForm((prev) => ({ ...prev, image_style_categories: [...prev.image_style_categories, { id: "", label: "", narrative: "", storytelling_cues: [], image_prompt_style: "" }] }))}>
+                                                <Plus className="h-3.5 w-3.5" /> Add Style
+                                            </Button>
+                                            <Button variant="outline" className="gap-1.5 border-primary/30 text-primary hover:bg-primary/5" onClick={openImageExtract}>
+                                                <Camera className="h-3.5 w-3.5" /> Extract from Image
+                                            </Button>
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -624,48 +754,36 @@ export default function CompaniesPage() {
                     <p className="text-muted-foreground">No companies yet. Click "New Company" to get started.</p>
                 )}
 
-                <div className="space-y-3">
+                <div className="space-y-1.5">
                     {companies.map((c) => (
-                        <Card key={c.id} className="overflow-visible">
-                            <CardContent className="p-4 space-y-3">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-lg shrink-0 border border-border" style={{ backgroundColor: c.color_primary ?? "#000" }} />
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="font-semibold">{c.name}</h3>
-                                        {c.tagline && <p className="text-sm text-muted-foreground italic">{c.tagline}</p>}
-                                        <div className="flex gap-1.5 flex-wrap mt-1.5">
-                                            {c.archetype && <Badge variant="secondary" className="text-xs">{c.archetype}</Badge>}
-                                            {c.tone && <Badge variant="secondary" className="text-xs">{c.tone}</Badge>}
-                                            {c.voice_profile && <Badge variant="outline" className="text-xs gap-1"><Mic className="h-3 w-3" /> Voice</Badge>}
-                                            {c.auto_humanize !== false && <Badge variant="outline" className="text-xs text-success border-success/50">🧹 Auto</Badge>}
-                                            <span className="text-xs text-muted-foreground self-center">{new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
-                                        </div>
+                        <div key={c.id} className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors">
+                            <div className="flex-1 min-w-0 flex items-center gap-3">
+                                <h3 className="text-sm font-medium truncate">{c.name}</h3>
+                                <span className="text-xs text-muted-foreground shrink-0">{new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                                <Button variant="ghost" size="sm" onClick={() => router.push(`/company?id=${c.id}`)} className="h-7 px-2 gap-1 text-xs"><Pencil className="h-3 w-3" /> Edit</Button>
+                                <Button variant="ghost" size="sm" onClick={() => openVoicePanel(c.id)} className={cn("h-7 px-2 gap-1 text-xs", c.voice_profile && "text-primary")}><Mic className="h-3 w-3" /> Voice</Button>
+                                <Button variant="ghost" size="sm" onClick={() => openPromptPanel(c.id)} className="h-7 px-2 gap-1 text-xs"><FileText className="h-3 w-3" /> Prompts</Button>
+                                {confirmDeleteId === c.id ? (
+                                    <div className="flex gap-1">
+                                        <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => deleteCompany(c.id)} disabled={deletingId === c.id}>{deletingId === c.id ? "…" : "Confirm"}</Button>
+                                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setConfirmDeleteId(null)}>Cancel</Button>
                                     </div>
-                                </div>
-                                <div className="flex gap-1.5 flex-wrap items-center justify-end relative z-10">
-                                    <Button variant="outline" size="sm" onClick={() => openEdit(c)} className="gap-1"><Pencil className="h-3 w-3" /> Edit</Button>
-                                    <Button variant="outline" size="sm" onClick={() => openVoicePanel(c.id)} className={cn("gap-1", c.voice_profile && "text-primary")}><Mic className="h-3 w-3" /> Voice</Button>
-                                    <Button variant="outline" size="sm" onClick={() => openPromptPanel(c.id)} className="gap-1"><FileText className="h-3 w-3" /> Prompts</Button>
-                                    {confirmDeleteId === c.id ? (
-                                        <div className="flex gap-1">
-                                            <Button variant="destructive" size="sm" onClick={() => deleteCompany(c.id)} disabled={deletingId === c.id}>{deletingId === c.id ? "…" : "Confirm"}</Button>
-                                            <Button variant="outline" size="sm" onClick={() => setConfirmDeleteId(null)}>Cancel</Button>
-                                        </div>
-                                    ) : (
-                                        <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteId(c.id)} className="text-destructive hover:text-destructive gap-1"><Trash2 className="h-3 w-3" /></Button>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
+                                ) : (
+                                    <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteId(c.id)} className="h-7 px-2 text-destructive hover:text-destructive"><Trash2 className="h-3 w-3" /></Button>
+                                )}
+                            </div>
+                        </div>
                     ))}
                 </div>
 
-                {/* Voice Profile Sheet */}
-                <Sheet open={!!voiceCompanyId} onOpenChange={(open) => { if (!open) closeVoicePanel(); }}>
-                    <SheetContent className="w-[540px] sm:max-w-[540px] overflow-y-auto">
-                        <SheetHeader>
-                            <SheetTitle>🎙️ Voice Profile — {vc?.name}</SheetTitle>
-                        </SheetHeader>
+                {/* Voice Profile Modal */}
+                <Dialog open={!!voiceCompanyId} onOpenChange={(open) => { if (!open) closeVoicePanel(); }}>
+                    <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle>🎙️ Voice Profile — {vc?.name}</DialogTitle>
+                        </DialogHeader>
 
                         {editingVoiceProfile && (
                             <div className="space-y-4 mt-4">
@@ -756,15 +874,15 @@ export default function CompaniesPage() {
                             </div>
                             {voiceErr && <p className="text-sm text-destructive">{voiceErr}</p>}
                         </div>
-                    </SheetContent>
-                </Sheet>
+                    </DialogContent>
+                </Dialog>
 
-                {/* Prompt Templates Sheet */}
-                <Sheet open={!!promptCompanyId} onOpenChange={(open) => { if (!open) closePromptPanel(); }}>
-                    <SheetContent className="w-[580px] sm:max-w-[580px] overflow-y-auto">
-                        <SheetHeader>
-                            <SheetTitle>📝 Prompt Templates — {pc?.name}</SheetTitle>
-                        </SheetHeader>
+                {/* Prompt Templates Modal */}
+                <Dialog open={!!promptCompanyId} onOpenChange={(open) => { if (!open) closePromptPanel(); }}>
+                    <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle>📝 Prompt Templates — {pc?.name}</DialogTitle>
+                        </DialogHeader>
                         {promptErr && <Alert variant="destructive" className="mt-4"><AlertCircle className="h-4 w-4" /><AlertDescription>{promptErr}</AlertDescription></Alert>}
 
                         {/* Add */}
@@ -817,8 +935,211 @@ export default function CompaniesPage() {
                                 </Card>
                             ))}
                         </div>
-                    </SheetContent>
-                </Sheet>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Image Style Extraction Modal */}
+                <Dialog open={showImageExtract} onOpenChange={(open) => { if (!open) closeImageExtract(); }}>
+                    <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <Camera className="h-5 w-5 text-primary" />
+                                Extract Style from Image
+                            </DialogTitle>
+                        </DialogHeader>
+
+                        <p className="text-sm text-muted-foreground mt-1">
+                            Upload a reference image and our AI art director will analyze its visual characteristics — color palette, tone, lighting, lens, film quality, contrast, and more — to create a reusable image style prompt.
+                        </p>
+
+                        {/* Upload Area */}
+                        <div className="mt-4">
+                            <input
+                                ref={imageInputRef}
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp,image/jpg"
+                                className="hidden"
+                                onChange={handleImageFileSelect}
+                            />
+                            {!extractPreviewUrl ? (
+                                <button
+                                    type="button"
+                                    onClick={() => imageInputRef.current?.click()}
+                                    className="w-full rounded-xl border-2 border-dashed border-border hover:border-primary/50 bg-muted/20 hover:bg-muted/40 transition-all p-10 flex flex-col items-center gap-3 cursor-pointer group"
+                                >
+                                    <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                                        <ImagePlus className="h-7 w-7 text-primary" />
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-sm font-medium">Click to upload a reference image</p>
+                                        <p className="text-xs text-muted-foreground mt-0.5">JPEG, PNG, or WebP — up to 10MB</p>
+                                    </div>
+                                </button>
+                            ) : (
+                                <div className="space-y-3">
+                                    <div className="relative rounded-xl overflow-hidden border border-border bg-black/5">
+                                        <img
+                                            src={extractPreviewUrl}
+                                            alt="Uploaded reference"
+                                            className="w-full max-h-72 object-contain"
+                                        />
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            className="absolute top-2 right-2 h-7 gap-1 text-xs opacity-80 hover:opacity-100"
+                                            onClick={() => {
+                                                setExtractPreviewUrl(null);
+                                                setExtractBase64(null);
+                                                setExtractResult(null);
+                                                setExtractErr(null);
+                                                if (imageInputRef.current) imageInputRef.current.value = "";
+                                            }}
+                                        >
+                                            <X className="h-3 w-3" /> Replace
+                                        </Button>
+                                    </div>
+
+                                    {!extractResult && (
+                                        <Button
+                                            onClick={handleImageExtract}
+                                            disabled={extracting}
+                                            className="w-full gap-2"
+                                        >
+                                            {extracting ? (
+                                                <>
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                    Analyzing image — this takes 15–30 seconds…
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Sparkles className="h-4 w-4" />
+                                                    Analyze Visual Style
+                                                </>
+                                            )}
+                                        </Button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {extractErr && (
+                            <Alert variant="destructive" className="mt-3">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription>{extractErr}</AlertDescription>
+                            </Alert>
+                        )}
+
+                        {/* Analysis Results */}
+                        {extractResult && (
+                            <div className="mt-4 space-y-4">
+                                <Alert className="border-success bg-success/5">
+                                    <CheckCircle2 className="h-4 w-4 text-success" />
+                                    <AlertDescription className="text-success">
+                                        Style extracted successfully! Review the details below and add it to your company.
+                                    </AlertDescription>
+                                </Alert>
+
+                                {/* Style Name */}
+                                <div className="space-y-1.5">
+                                    <Label className="text-sm font-semibold">Style Name</Label>
+                                    <Input
+                                        value={extractStyleName}
+                                        onChange={(e) => setExtractStyleName(e.target.value)}
+                                        placeholder="e.g. Warm Editorial Glow"
+                                        className="text-sm"
+                                    />
+                                </div>
+
+                                {/* Visual Analysis Grid */}
+                                <fieldset className="border border-border rounded-lg p-3.5 space-y-3">
+                                    <legend className="text-xs font-semibold px-1.5">🎨 Visual Analysis</legend>
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                                        {([
+                                            ["Photo Style", extractResult.analysis.photo_style_type],
+                                            ["Color Palette", extractResult.analysis.color_palette],
+                                            ["Tone / Mood", extractResult.analysis.tone_mood],
+                                            ["Lighting", extractResult.analysis.lighting],
+                                            ["Lens", extractResult.analysis.lens_characteristics],
+                                            ["Film Quality", extractResult.analysis.film_quality],
+                                            ["Contrast", extractResult.analysis.contrast],
+                                            ["Hue / Temperature", extractResult.analysis.hue_temperature],
+                                            ["Composition", extractResult.analysis.composition],
+                                            ["Depth of Field", extractResult.analysis.depth_of_field],
+                                            ["Texture / Grain", extractResult.analysis.texture_grain],
+                                            ["Saturation", extractResult.analysis.saturation],
+                                            ["Post Processing", extractResult.analysis.post_processing],
+                                            ["Era / Aesthetic", extractResult.analysis.era_aesthetic],
+                                            ["Subject", extractResult.analysis.subject_matter],
+                                        ] as [string, string][]).map(([label, value]) => (
+                                            <div key={label} className="space-y-0.5">
+                                                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{label}</span>
+                                                <p className="text-xs leading-snug">{value}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Dominant Colors */}
+                                    {extractResult.analysis.dominant_colors?.length > 0 && (
+                                        <div className="space-y-1">
+                                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Dominant Colors</span>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {extractResult.analysis.dominant_colors.map((color, i) => {
+                                                    const hexMatch = color.match(/#[0-9a-fA-F]{6}/);
+                                                    return (
+                                                        <Badge key={i} variant="secondary" className="gap-1.5 text-xs font-normal">
+                                                            {hexMatch && (
+                                                                <span
+                                                                    className="inline-block w-3 h-3 rounded-full border border-border"
+                                                                    style={{ backgroundColor: hexMatch[0] }}
+                                                                />
+                                                            )}
+                                                            {color}
+                                                        </Badge>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+                                </fieldset>
+
+                                {/* Generated Prompt */}
+                                <fieldset className="border border-border rounded-lg p-3.5 space-y-1.5">
+                                    <legend className="text-xs font-semibold px-1.5">📝 Generated Image Prompt Style</legend>
+                                    <p className="text-xs text-muted-foreground">This prompt will be used to replicate this visual style in AI-generated images:</p>
+                                    <pre className="whitespace-pre-wrap break-words text-xs bg-muted p-3 rounded-md max-h-48 overflow-y-auto leading-relaxed">
+                                        {extractResult.image_prompt_style}
+                                    </pre>
+                                </fieldset>
+
+                                {/* Storytelling Cues */}
+                                {extractResult.storytelling_cues?.length > 0 && (
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Storytelling Cues</Label>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {extractResult.storytelling_cues.map((cue, i) => (
+                                                <Badge key={i} variant="outline" className="text-xs font-normal">{cue}</Badge>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Narrative */}
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Narrative</Label>
+                                    <p className="text-xs text-muted-foreground leading-relaxed">{extractResult.narrative}</p>
+                                </div>
+
+                                {/* Add Button */}
+                                <div className="flex justify-end gap-2 pt-2">
+                                    <Button variant="outline" onClick={closeImageExtract}>Cancel</Button>
+                                    <Button onClick={addExtractedStyle} className="gap-1.5">
+                                        <Plus className="h-4 w-4" /> Add Style to Company
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </DialogContent>
+                </Dialog>
             </div>
         </AppLayout>
     );
