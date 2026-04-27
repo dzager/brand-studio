@@ -167,72 +167,28 @@ export default function OutlineView({
             for (const clusterId of allClusterIds) {
                 const cl = clusterMap[clusterId] || { id: clusterId, name: "Unknown Cluster", status: "draft", strategy: null, company_id: companyId };
                 const generatedArticles = clusterArticleGroups[clusterId] || [];
-                const articlesBySlug = new Map<string, Article>();
-                generatedArticles.forEach((a) => articlesBySlug.set(a.slug, a));
 
                 const pages: StrategyPage[] = [];
-                const strategy = cl.strategy;
 
-                if (strategy) {
-                    // Add pillar page
-                    if (strategy.pillar) {
-                        const match = articlesBySlug.get(strategy.pillar.slug);
-                        pages.push({
-                            title: match?.title || strategy.pillar.title,
-                            slug: strategy.pillar.slug,
-                            role: "pillar",
-                            articleId: match?.id,
-                            generated: !!match,
-                        });
-                    }
-                    // Add supporting pages
-                    for (const sp of (strategy.supporting || [])) {
-                        const match = articlesBySlug.get(sp.slug);
-                        pages.push({
-                            title: match?.title || sp.title,
-                            slug: sp.slug,
-                            role: "supporting",
-                            articleId: match?.id,
-                            generated: !!match,
-                        });
-                    }
-                    // Add long-tail pages
-                    for (const lt of (strategy.long_tail || [])) {
-                        const match = articlesBySlug.get(lt.slug);
-                        pages.push({
-                            title: match?.title || lt.title,
-                            slug: lt.slug,
-                            role: "long_tail",
-                            articleId: match?.id,
-                            generated: !!match,
-                        });
-                    }
-
-                    // Add any generated articles that aren't in the strategy (manually assigned)
-                    const strategySlugs = new Set(pages.map((p) => p.slug));
-                    for (const a of generatedArticles) {
-                        if (!strategySlugs.has(a.slug)) {
-                            pages.push({
-                                title: a.title,
-                                slug: a.slug,
-                                role: a.cluster_role || "other",
-                                articleId: a.id,
-                                generated: true,
-                            });
-                        }
-                    }
-                } else {
-                    // No strategy — just list generated articles
-                    for (const a of generatedArticles) {
-                        pages.push({
-                            title: a.title,
-                            slug: a.slug,
-                            role: a.cluster_role || "other",
-                            articleId: a.id,
-                            generated: true,
-                        });
-                    }
+                // Simply list all generated articles in this cluster — cluster_id is the
+                // reliable join key. Previous approach tried slug-matching against the
+                // strategy JSON but failed when slugify altered the slug at save time.
+                for (const a of generatedArticles) {
+                    pages.push({
+                        title: a.title,
+                        slug: a.slug,
+                        role: a.cluster_role || "supporting",
+                        articleId: a.id,
+                        generated: true,
+                    });
                 }
+
+                // Sort by role order: pillar → supporting → long_tail → other
+                pages.sort((a, b) => {
+                    const ai = ROLE_ORDER.indexOf(a.role);
+                    const bi = ROLE_ORDER.indexOf(b.role);
+                    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+                });
 
                 clusterEntries.push({ cluster: cl, pages });
             }
@@ -380,46 +336,28 @@ export default function OutlineView({
                                                     </button>
                                                 )}
                                                 <span className="text-xs text-muted-foreground/50 shrink-0 ml-auto">
-                                                    {generatedCount < totalCount ? `${generatedCount}/${totalCount}` : totalCount}
+                                                    {generatedCount}
                                                 </span>
                                             </div>
 
-                                            {!isClusterCollapsed && pages.length > 0 && (
+                                            {!isClusterCollapsed && generatedCount > 0 && (
                                                 <div className="pl-5 mt-0.5 space-y-px">
-                                                    {pages.map((page) => {
+                                                    {pages.filter((p) => p.generated && p.articleId).map((page) => {
                                                         const roleColor = ROLE_COLORS[page.role] || "bg-muted-foreground";
-                                                        if (page.generated && page.articleId) {
-                                                            return (
-                                                                <button
-                                                                    key={page.slug}
-                                                                    onClick={() => onSelectArticle(page.articleId!)}
-                                                                    className={cn(
-                                                                        "flex items-center gap-2 w-full px-2 py-1 text-left rounded-md transition-colors text-[13px]",
-                                                                        selectedArticleId === page.articleId
-                                                                            ? "bg-primary/10 text-primary font-medium"
-                                                                            : "text-foreground/70 hover:bg-muted/40"
-                                                                    )}
-                                                                >
-                                                                    <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", roleColor)} />
-                                                                    <span className="truncate">{page.title}</span>
-                                                                </button>
-                                                            );
-                                                        }
-                                                        // Ungenerated strategy page — dimmed, not clickable
                                                         return (
-                                                            <div
+                                                            <button
                                                                 key={page.slug}
-                                                                className="flex items-center gap-2 w-full px-2 py-1 text-left text-[13px] text-muted-foreground/50"
-                                                                title={`Not yet generated · ${page.role}`}
+                                                                onClick={() => onSelectArticle(page.articleId!)}
+                                                                className={cn(
+                                                                    "flex items-center gap-2 w-full px-2 py-1 text-left rounded-md transition-colors text-[13px]",
+                                                                    selectedArticleId === page.articleId
+                                                                        ? "bg-primary/10 text-primary font-medium"
+                                                                        : "text-foreground/70 hover:bg-muted/40"
+                                                                )}
                                                             >
-                                                                <span className={cn("w-1.5 h-1.5 rounded-full shrink-0 border", {
-                                                                    "border-primary/40": page.role === "pillar",
-                                                                    "border-green-500/40": page.role === "supporting",
-                                                                    "border-amber-500/40": page.role === "long_tail",
-                                                                    "border-muted-foreground/40": !ROLE_COLORS[page.role],
-                                                                })} />
+                                                                <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", roleColor)} />
                                                                 <span className="truncate">{page.title}</span>
-                                                            </div>
+                                                            </button>
                                                         );
                                                     })}
                                                 </div>
