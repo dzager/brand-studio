@@ -707,7 +707,7 @@ export default function AdminDashboard() {
                                     <th className="text-left px-3 py-3 font-medium text-muted-foreground">Account(s)</th>
                                     <th className="text-left px-3 py-3 font-medium text-muted-foreground">Role</th>
                                     <th className="text-left px-3 py-3 font-medium text-muted-foreground">Status</th>
-                                    <th className="text-left px-3 py-3 font-medium text-muted-foreground">Last Sign In</th>
+                                    <th className="text-left px-3 py-3 font-medium text-muted-foreground">Last Login</th>
                                     <th className="text-left px-3 py-3 font-medium text-muted-foreground">Joined</th>
                                     <th className="text-right px-5 py-3 font-medium text-muted-foreground">Actions</th>
                                 </tr>
@@ -764,8 +764,17 @@ export default function AdminDashboard() {
                                         </td>
                                         <td className="px-3 py-3 text-xs text-muted-foreground whitespace-nowrap">
                                             {u.last_sign_in_at
-                                                ? new Date(u.last_sign_in_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                                                : "Never"}
+                                                ? (
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <span>
+                                                            {new Date(u.last_sign_in_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                                            {" "}
+                                                            {new Date(u.last_sign_in_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
+                                                        </span>
+                                                        <span className="text-[10px] text-muted-foreground/70">{formatRelativeTime(u.last_sign_in_at)}</span>
+                                                    </div>
+                                                )
+                                                : <span className="text-muted-foreground/50 italic">Never</span>}
                                         </td>
                                         <td className="px-3 py-3 text-xs text-muted-foreground whitespace-nowrap">
                                             {new Date(u.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
@@ -802,6 +811,26 @@ export default function AdminDashboard() {
             </div>
         </AppLayout>
     );
+}
+
+// ── Relative Time Formatter ─────────────────────────────────────────
+function formatRelativeTime(dateStr: string): string {
+    const now = Date.now();
+    const then = new Date(dateStr).getTime();
+    const diff = now - then;
+
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (seconds < 60) return "just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 30) return `${days}d ago`;
+    const months = Math.floor(days / 30);
+    if (months < 12) return `${months}mo ago`;
+    return `${Math.floor(months / 12)}y ago`;
 }
 
 // ── Stat Card Component ────────────────────────────────────────────

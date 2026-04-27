@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { createServerSupabase, getAdminSupabase } from "@/lib/supabase";
 import { requireAuth, getUserAccounts, isPlatformAdmin, getUserAccountById } from "@/lib/auth";
 import { getPlanLimits } from "@/lib/plans";
+import { generateBrandDefaults } from "@/lib/generateBrandDefaults";
 
 export default async function handler(
     req: NextApiRequest,
@@ -175,7 +176,56 @@ export default async function handler(
                 .single();
 
             if (error) throw error;
-            return res.status(201).json(data);
+
+            // ── Async Brand Defaults Generation ─────────────────────────
+            // If any of editorial guidelines, SEO guidelines, or voice profile
+            // is empty, generate best-in-class defaults in the background.
+            // Only writes the fields that were originally missing.
+            const missingEditorial = !insertPayload.editorial_guidelines;
+            const missingSeo = !insertPayload.seo_content_guidelines;
+            const missingVoice = !insertPayload.voice_profile;
+            const needsDefaults = missingEditorial || missingSeo || missingVoice;
+
+            if (needsDefaults && data?.id) {
+                const companyId = data.id;
+                // Fire-and-forget — don't block the response
+                generateBrandDefaults({
+                    name: name.trim(),
+                    tagline: tagline?.trim() || null,
+                    mission: mission?.trim() || null,
+                    archetype: archetype?.trim() || "guide",
+                    tone: tone?.trim() || "confident, clear, modern",
+                    target_audiences: target_audiences ?? [],
+                    photography_style: photography_style?.trim() || null,
+                    avoid_phrases: avoid_phrases?.trim() || null,
+                })
+                    .then(async (defaults) => {
+                        // Only write fields that were originally missing
+                        const updatePayload: Record<string, unknown> = {};
+                        if (missingEditorial) updatePayload.editorial_guidelines = defaults.editorial_guidelines;
+                        if (missingSeo) updatePayload.seo_content_guidelines = defaults.seo_content_guidelines;
+                        if (missingVoice) updatePayload.voice_profile = defaults.voice_profile;
+
+                        const { error: updateErr } = await admin
+                            .from("companies")
+                            .update(updatePayload)
+                            .eq("id", companyId);
+
+                        if (updateErr) {
+                            console.error(`[companies/POST] Failed to save brand defaults for ${companyId}:`, updateErr);
+                        } else {
+                            console.log(`[companies/POST] ✅ Brand defaults generated and saved for ${companyId} (editorial: ${missingEditorial}, seo: ${missingSeo}, voice: ${missingVoice})`);
+                        }
+                    })
+                    .catch((err) => {
+                        console.error(`[companies/POST] Brand defaults generation failed for ${companyId}:`, err);
+                    });
+            }
+
+            return res.status(201).json({
+                ...data,
+                _generating_defaults: needsDefaults,
+            });
         }
 
         return res.status(405).json({ error: "Method not allowed" });

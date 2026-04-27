@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
     Pencil, Trash2, Mic, FileText, Plus, ChevronDown, ChevronRight,
     Copy as CopyIcon, X, AlertCircle, CheckCircle2, Save, Sparkles, Search,
-    Globe, Loader2, ImagePlus, Camera,
+    Globe, Loader2, ImagePlus, Camera, Link2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -55,7 +55,13 @@ export default function CompaniesPage() {
     const [saving, setSaving] = useState(false);
     const [expandedStyles, setExpandedStyles] = useState<Set<number>>(new Set());
     const [newRefUrl, setNewRefUrl] = useState("");
+    const [styleCompanyId, setStyleCompanyId] = useState<string | null>(null);
+    const [savingExtractedStyle, setSavingExtractedStyle] = useState(false);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+    // Brand defaults generation tracking
+    const [generatingDefaultsIds, setGeneratingDefaultsIds] = useState<Set<string>>(new Set());
+    const [defaultsReadyId, setDefaultsReadyId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
     // Image Style Extraction state
@@ -135,7 +141,8 @@ export default function CompaniesPage() {
     }
 
     // Image Style Extraction handlers
-    function openImageExtract() {
+    function openImageExtract(companyId?: string) {
+        if (companyId) setStyleCompanyId(companyId);
         setShowImageExtract(true);
         setExtractPreviewUrl(null);
         setExtractBase64(null);
@@ -146,12 +153,14 @@ export default function CompaniesPage() {
     }
     function closeImageExtract() {
         setShowImageExtract(false);
+        setStyleCompanyId(null);
         setExtractPreviewUrl(null);
         setExtractBase64(null);
         setExtracting(false);
         setExtractErr(null);
         setExtractResult(null);
         setExtractStyleName("");
+        setSavingExtractedStyle(false);
     }
 
     function handleImageFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -198,7 +207,7 @@ export default function CompaniesPage() {
         }
     }
 
-    function addExtractedStyle() {
+    async function addExtractedStyle() {
         if (!extractResult) return;
         const name = extractStyleName.trim() || extractResult.style_name;
         const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
@@ -209,6 +218,32 @@ export default function CompaniesPage() {
             storytelling_cues: extractResult.storytelling_cues,
             image_prompt_style: extractResult.image_prompt_style,
         };
+
+        // Standalone mode — save directly to company via API
+        if (styleCompanyId && !showForm) {
+            setSavingExtractedStyle(true);
+            try {
+                const company = companies.find((c) => c.id === styleCompanyId);
+                const existingStyles = Array.isArray(company?.image_style_categories) ? company!.image_style_categories : [];
+                const updatedStyles = [...existingStyles, newStyle];
+                const r = await fetch(`/api/companies/${styleCompanyId}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ image_style_categories: updatedStyles }),
+                });
+                const data = await r.json();
+                if (!r.ok) throw new Error(data.error || "Save failed");
+                setCompanies((prev) => prev.map((c) => c.id === styleCompanyId ? { ...c, image_style_categories: updatedStyles } : c));
+                closeImageExtract();
+            } catch (e: any) {
+                setExtractErr(e.message);
+            } finally {
+                setSavingExtractedStyle(false);
+            }
+            return;
+        }
+
+        // Edit form mode — add to form state
         setForm((prev) => ({
             ...prev,
             useCustomStyles: true,
@@ -233,6 +268,11 @@ export default function CompaniesPage() {
     const [voiceSaved, setVoiceSaved] = useState(false);
     const [editingVoiceProfile, setEditingVoiceProfile] = useState<VoiceProfile | null>(null);
     const [voiceDirty, setVoiceDirty] = useState(false);
+    const [voiceUrl, setVoiceUrl] = useState("");
+    const [fetchingUrl, setFetchingUrl] = useState(false);
+    const [fetchUrlErr, setFetchUrlErr] = useState<string | null>(null);
+    type VoiceInputMode = "paste" | "url";
+    const [voiceInputMode, setVoiceInputMode] = useState<VoiceInputMode>("paste");
 
     // Prompts
     const [promptCompanyId, setPromptCompanyId] = useState<string | null>(null);
@@ -248,10 +288,10 @@ export default function CompaniesPage() {
 
     function openVoicePanel(companyId: string) {
         const company = companies.find((c) => c.id === companyId);
-        setVoiceCompanyId(companyId); setVoiceInput(""); setVoiceErr(null); setPendingVoiceProfile(null); setVoiceSaved(false); setVoiceDirty(false);
+        setVoiceCompanyId(companyId); setVoiceInput(""); setVoiceErr(null); setPendingVoiceProfile(null); setVoiceSaved(false); setVoiceDirty(false); setVoiceUrl(""); setFetchUrlErr(null); setVoiceInputMode("paste");
         setEditingVoiceProfile(company?.voice_profile ? { ...company.voice_profile } : null);
     }
-    function closeVoicePanel() { setVoiceCompanyId(null); setVoiceInput(""); setVoiceErr(null); setPendingVoiceProfile(null); setVoiceSaved(false); setEditingVoiceProfile(null); setVoiceDirty(false); }
+    function closeVoicePanel() { setVoiceCompanyId(null); setVoiceInput(""); setVoiceErr(null); setPendingVoiceProfile(null); setVoiceSaved(false); setEditingVoiceProfile(null); setVoiceDirty(false); setVoiceUrl(""); setFetchUrlErr(null); }
     function updateVoiceField(key: keyof VoiceProfile, value: string | string[]) { setEditingVoiceProfile((prev) => prev ? { ...prev, [key]: value } : prev); setVoiceDirty(true); }
 
     function compileVoiceToPrompt(vp: VoiceProfile): string {
@@ -399,8 +439,49 @@ export default function CompaniesPage() {
             const r = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
             const data = await r.json(); if (!r.ok) throw new Error(data.error || "Save failed");
             if (editingId) { setCompanies((prev) => prev.map((c) => (c.id === editingId ? data : c))); } else { setCompanies((prev) => [data, ...prev]); }
+
+            // If defaults are being generated in background, start polling
+            if (!editingId && data._generating_defaults && data.id) {
+                const newId = data.id;
+                setGeneratingDefaultsIds((prev) => new Set(prev).add(newId));
+                pollForDefaults(newId);
+            }
+
             closeForm();
         } catch (e: any) { alert(e.message); } finally { setSaving(false); }
+    }
+
+    function pollForDefaults(companyId: string) {
+        let attempts = 0;
+        const maxAttempts = 20; // ~160s max
+        const interval = setInterval(async () => {
+            attempts++;
+            try {
+                const r = await fetch(`/api/companies/${companyId}`);
+                if (!r.ok) return;
+                const updated = await r.json();
+                // Check if defaults have been populated
+                if (updated.editorial_guidelines || updated.seo_content_guidelines || updated.voice_profile) {
+                    clearInterval(interval);
+                    setCompanies((prev) => prev.map((c) => c.id === companyId ? updated : c));
+                    setGeneratingDefaultsIds((prev) => {
+                        const next = new Set(prev);
+                        next.delete(companyId);
+                        return next;
+                    });
+                    setDefaultsReadyId(companyId);
+                    setTimeout(() => setDefaultsReadyId(null), 5000);
+                }
+            } catch {}
+            if (attempts >= maxAttempts) {
+                clearInterval(interval);
+                setGeneratingDefaultsIds((prev) => {
+                    const next = new Set(prev);
+                    next.delete(companyId);
+                    return next;
+                });
+            }
+        }, 8000);
     }
 
     async function deleteCompany(id: string) {
@@ -422,6 +503,26 @@ export default function CompaniesPage() {
 
                 {loading && <div className="space-y-3">{[1,2,3].map((i) => <Skeleton key={i} className="h-20 w-full" />)}</div>}
                 {err && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{err}</AlertDescription></Alert>}
+
+                {/* Brand Defaults Generation Banner */}
+                {generatingDefaultsIds.size > 0 && (
+                    <Alert className="border-primary/30 bg-primary/5">
+                        <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+                        <AlertDescription className="text-primary">
+                            <span className="font-medium">Generating brand defaults</span>
+                            <span className="text-muted-foreground"> — AI is creating editorial guidelines, SEO strategy, and voice profile for {Array.from(generatingDefaultsIds).map((id) => companies.find((c) => c.id === id)?.name).filter(Boolean).join(", ") || "your new company"}. This takes 20–40 seconds.</span>
+                        </AlertDescription>
+                    </Alert>
+                )}
+                {defaultsReadyId && (
+                    <Alert className="border-success bg-success/5">
+                        <CheckCircle2 className="h-4 w-4 text-success" />
+                        <AlertDescription className="text-success">
+                            <span className="font-medium">Brand defaults ready!</span>
+                            <span className="text-muted-foreground"> — Editorial guidelines, SEO guidelines, and voice profile have been generated for {companies.find((c) => c.id === defaultsReadyId)?.name || "your company"}. Click Edit to review.</span>
+                        </AlertDescription>
+                    </Alert>
+                )}
 
                 {/* Company Form */}
                 {showForm && (
@@ -755,16 +856,33 @@ export default function CompaniesPage() {
                 )}
 
                 <div className="space-y-1.5">
-                    {companies.map((c) => (
-                        <div key={c.id} className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors">
+                    {companies.map((c) => {
+                        const styleCount = Array.isArray(c.image_style_categories) ? c.image_style_categories.length : 0;
+                        return (
+                        <div
+                            key={c.id}
+                            className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors cursor-pointer group"
+                            onClick={() => router.push(`/company?id=${c.id}`)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); router.push(`/company?id=${c.id}`); } }}
+                        >
                             <div className="flex-1 min-w-0 flex items-center gap-3">
-                                <h3 className="text-sm font-medium truncate">{c.name}</h3>
+                                <h3 className="text-sm font-medium truncate group-hover:text-primary transition-colors">{c.name}</h3>
+                                {generatingDefaultsIds.has(c.id) && (
+                                    <Badge variant="outline" className="text-[10px] h-4 gap-0.5 border-primary/40 text-primary animate-pulse shrink-0">
+                                        <Sparkles className="h-2.5 w-2.5" /> Generating defaults…
+                                    </Badge>
+                                )}
                                 <span className="text-xs text-muted-foreground shrink-0">{new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                                <Button variant="ghost" size="sm" onClick={() => router.push(`/company?id=${c.id}`)} className="h-7 px-2 gap-1 text-xs"><Pencil className="h-3 w-3" /> Edit</Button>
+                            <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                                 <Button variant="ghost" size="sm" onClick={() => openVoicePanel(c.id)} className={cn("h-7 px-2 gap-1 text-xs", c.voice_profile && "text-primary")}><Mic className="h-3 w-3" /> Voice</Button>
                                 <Button variant="ghost" size="sm" onClick={() => openPromptPanel(c.id)} className="h-7 px-2 gap-1 text-xs"><FileText className="h-3 w-3" /> Prompts</Button>
+                                <Button variant="ghost" size="sm" onClick={() => openImageExtract(c.id)} className={cn("h-7 px-2 gap-1 text-xs", styleCount > 0 && "text-primary")}>
+                                    <ImagePlus className="h-3 w-3" /> Styles
+                                    {styleCount > 0 && <Badge variant="secondary" className="h-4 min-w-[16px] px-1 text-[10px] ml-0.5">{styleCount}</Badge>}
+                                </Button>
                                 {confirmDeleteId === c.id ? (
                                     <div className="flex gap-1">
                                         <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => deleteCompany(c.id)} disabled={deletingId === c.id}>{deletingId === c.id ? "…" : "Confirm"}</Button>
@@ -775,7 +893,8 @@ export default function CompaniesPage() {
                                 )}
                             </div>
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
 
                 {/* Voice Profile Modal */}
@@ -858,9 +977,111 @@ export default function CompaniesPage() {
                         )}
 
                         {/* Analysis input */}
-                        <div className="space-y-2 mt-6">
-                            <Label className="text-sm">{vc?.voice_profile ? "Analyze a new article to update:" : "Paste sample article to analyze:"}</Label>
-                            <Textarea value={voiceInput} onChange={(e) => setVoiceInput(e.target.value)} placeholder="Paste article text or HTML..." rows={10} />
+                        <div className="space-y-3 mt-6">
+                            <Label className="text-sm font-medium">{vc?.voice_profile ? "Analyze a new article to update:" : "Provide a writing sample to analyze:"}</Label>
+
+                            {/* Input mode tabs */}
+                            <div className="flex gap-1 p-0.5 rounded-lg bg-muted w-fit">
+                                <button
+                                    onClick={() => setVoiceInputMode("paste")}
+                                    className={cn(
+                                        "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+                                        voiceInputMode === "paste" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <FileText className="h-3.5 w-3.5" /> Paste Text
+                                </button>
+                                <button
+                                    onClick={() => setVoiceInputMode("url")}
+                                    className={cn(
+                                        "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+                                        voiceInputMode === "url" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <Link2 className="h-3.5 w-3.5" /> Import from URL
+                                </button>
+                            </div>
+
+                            {/* URL import */}
+                            {voiceInputMode === "url" && (
+                                <div className="space-y-2">
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="url"
+                                            value={voiceUrl}
+                                            onChange={(e) => { setVoiceUrl(e.target.value); setFetchUrlErr(null); }}
+                                            placeholder="https://example.com/blog/article-to-analyze"
+                                            disabled={fetchingUrl}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter" && voiceUrl.trim()) {
+                                                    e.preventDefault();
+                                                    (async () => {
+                                                        setFetchingUrl(true); setFetchUrlErr(null);
+                                                        try {
+                                                            const r = await fetch("/api/fetch-article-text", {
+                                                                method: "POST",
+                                                                headers: { "Content-Type": "application/json" },
+                                                                body: JSON.stringify({ url: voiceUrl.trim() }),
+                                                            });
+                                                            const data = await r.json();
+                                                            if (!r.ok) throw new Error(data.error || "Failed to fetch article");
+                                                            setVoiceInput(data.text);
+                                                            setVoiceInputMode("paste");
+                                                            setVoiceUrl("");
+                                                        } catch (e: any) { setFetchUrlErr(e.message); }
+                                                        finally { setFetchingUrl(false); }
+                                                    })();
+                                                }
+                                            }}
+                                        />
+                                        <Button
+                                            variant="outline"
+                                            onClick={async () => {
+                                                if (!voiceUrl.trim()) return;
+                                                setFetchingUrl(true); setFetchUrlErr(null);
+                                                try {
+                                                    const r = await fetch("/api/fetch-article-text", {
+                                                        method: "POST",
+                                                        headers: { "Content-Type": "application/json" },
+                                                        body: JSON.stringify({ url: voiceUrl.trim() }),
+                                                    });
+                                                    const data = await r.json();
+                                                    if (!r.ok) throw new Error(data.error || "Failed to fetch article");
+                                                    setVoiceInput(data.text);
+                                                    setVoiceInputMode("paste");
+                                                    setVoiceUrl("");
+                                                } catch (e: any) { setFetchUrlErr(e.message); }
+                                                finally { setFetchingUrl(false); }
+                                            }}
+                                            disabled={fetchingUrl || !voiceUrl.trim()}
+                                            className="gap-1.5 whitespace-nowrap"
+                                        >
+                                            {fetchingUrl
+                                                ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Fetching…</>
+                                                : <><Globe className="h-3.5 w-3.5" /> Fetch Article</>}
+                                        </Button>
+                                    </div>
+                                    {fetchingUrl && (
+                                        <p className="text-xs text-muted-foreground animate-pulse">Fetching and extracting article content…</p>
+                                    )}
+                                    {fetchUrlErr && (
+                                        <p className="text-sm text-destructive">{fetchUrlErr}</p>
+                                    )}
+                                    <p className="text-xs text-muted-foreground">Paste a link to any article or blog post. We'll extract the text content and populate the field below for analysis.</p>
+                                </div>
+                            )}
+
+                            {/* Text input (always visible) */}
+                            <Textarea
+                                value={voiceInput}
+                                onChange={(e) => setVoiceInput(e.target.value)}
+                                placeholder={voiceInputMode === "url" ? "Article content will appear here after fetching…" : "Paste article text, blog post, or any writing sample…"}
+                                rows={10}
+                            />
+                            {voiceInput.trim().length > 0 && (
+                                <p className="text-xs text-muted-foreground">{voiceInput.trim().length.toLocaleString()} characters</p>
+                            )}
+
                             <div className="flex gap-2 items-center">
                                 <Button onClick={async () => {
                                     if (voiceInput.trim().length < 50) { setVoiceErr("Please paste at least 50 characters."); return; }
@@ -945,6 +1166,9 @@ export default function CompaniesPage() {
                             <DialogTitle className="flex items-center gap-2">
                                 <Camera className="h-5 w-5 text-primary" />
                                 Extract Style from Image
+                                {styleCompanyId && !showForm && (
+                                    <span className="text-sm font-normal text-muted-foreground">— {companies.find((c) => c.id === styleCompanyId)?.name}</span>
+                                )}
                             </DialogTitle>
                         </DialogHeader>
 
@@ -1132,8 +1356,12 @@ export default function CompaniesPage() {
                                 {/* Add Button */}
                                 <div className="flex justify-end gap-2 pt-2">
                                     <Button variant="outline" onClick={closeImageExtract}>Cancel</Button>
-                                    <Button onClick={addExtractedStyle} className="gap-1.5">
-                                        <Plus className="h-4 w-4" /> Add Style to Company
+                                    <Button onClick={addExtractedStyle} disabled={savingExtractedStyle} className="gap-1.5">
+                                        {savingExtractedStyle ? (
+                                            <><Loader2 className="h-4 w-4 animate-spin" /> Saving…</>
+                                        ) : (
+                                            <><Plus className="h-4 w-4" /> Add Style to Company</>
+                                        )}
                                     </Button>
                                 </div>
                             </div>

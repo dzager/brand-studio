@@ -409,6 +409,7 @@
           <ul class="docs-sidebar-list">
             <li><a href="#studio">Studio</a></li>
             <li><a href="#companies">Companies</a></li>
+            <li><a href="#brand-portal">Brand Portal</a></li>
             <li><a href="#brand-engine">Brand Engine</a></li>
             <li><a href="#voice-analysis">Voice Analysis</a></li>
             <li><a href="#humanization">Humanization</a></li>
@@ -418,6 +419,7 @@
             <li><a href="#content-architecture">Content Architecture</a></li>
             <li><a href="#topical-clusters">Topical Clusters</a></li>
             <li><a href="#seo-optimization">SEO & GEO</a></li>
+            <li><a href="#admin-dashboard">Admin Dashboard</a></li>
             <li><a href="#settings">Settings</a></li>
           </ul>
         </div>
@@ -530,6 +532,26 @@
         <p>
           Each company can define multiple image style categories with unique narratives, storytelling cues, and prompt directives. Styles can be either <strong>AI Prompt</strong> (standard image generation) or <strong>Composite Blend</strong> (product-on-background compositing with built-in background removal).
         </p>
+        <h3>Extract Style from Image</h3>
+        <p>
+          Upload any reference photo and Organic will use GPT-5.4 vision to reverse-engineer its visual characteristics — color palette, lighting, lens, film quality, mood, composition, depth of field, texture, saturation, and post-processing — into a structured image style category. Review the AI analysis grid, name the style, and save it for future use across all article generations.
+        </p>
+        <h3>Voice &amp; Prompt Actions</h3>
+        <p>
+          Voice analysis and prompt template management are accessible via modal overlays from the company list. Click the microphone icon to open the Voice Analyzer modal, or the document icon to view and manage prompt templates.
+        </p>
+
+        <!-- Brand Portal -->
+        <h2 id="brand-portal">Brand <em>Portal</em></h2>
+        <p>
+          The Brand Portal (<code>/company</code>) provides a dedicated view for team members to explore and edit their company's full brand configuration — identity, visual styles, voice profile, editorial guidelines, and prompt templates.
+        </p>
+        <ul>
+          <li><strong>Inline editing</strong> — Toggle into edit mode to modify any field directly from the portal. An Edit/Save/Cancel header bar manages form state and persistence.</li>
+          <li><strong>Reference article management</strong> — Add and remove gold-standard reference URLs used as style benchmarks during content generation.</li>
+          <li><strong>Image style extraction</strong> — Upload reference images directly from the portal to extract and save new visual style categories.</li>
+          <li><strong>Collapsible sections</strong> — Voice profile, editorial guidelines, SEO rules, and image styles are organized into expandable panels for clean navigation.</li>
+        </ul>
 
         <!-- Brand Engine -->
         <h2 id="brand-engine">Brand <em>Engine</em></h2>
@@ -669,7 +691,7 @@
         </p>
         <h3>Outline View</h3>
         <p>
-          A sidebar tree + detail panel layout. Browse articles organized by cluster with a full article detail pane showing the generated content, metadata, SEO data, and inline actions (humanize, fact-check, shorten, delete).
+          A two-level sidebar tree (Cluster → Article) with a full detail panel. Each article displays its human-readable title with a compact role indicator badge — <strong>P</strong> (Pillar), <strong>S</strong> (Supporting), or <strong>L</strong> (Long Tail) — with descriptive tooltips on hover. The cluster panel uses a consolidated action bar: a primary "Generate" button plus a single overflow menu for interlinking, export, sharing, and deletion.
         </p>
 
         <!-- Topical Clusters -->
@@ -707,15 +729,33 @@
           Every article must include original analysis, decision frameworks, statistical breakdowns, edge case coverage, and practitioner-level guidance that cannot be easily synthesized from other sources — making content more likely to be cited by AI answer engines.
         </div>
 
+        <!-- Admin Dashboard -->
+        <h2 id="admin-dashboard">Admin <em>Dashboard</em></h2>
+        <p>
+          A dedicated admin dashboard for platform operators — visible only to users in the <code>platform_admins</code> table. Provides full oversight and management of all accounts and users.
+        </p>
+        <h3>Accounts Tab</h3>
+        <ul>
+          <li><strong>Account management</strong> — Create, edit, and delete accounts. Assign companies and manage team member rosters.</li>
+          <li><strong>Usage dashboard</strong> — Article counts, cluster totals, and billing status across all accounts at a glance.</li>
+          <li><strong>Invitation management</strong> — View and revoke pending invitations from the admin panel.</li>
+        </ul>
+        <h3>Users Tab</h3>
+        <ul>
+          <li><strong>User directory</strong> — Searchable list of all users with email, name, registration date, last sign-in, and email confirmation status.</li>
+          <li><strong>Account associations</strong> — Each user row shows linked accounts with role, plan, and account name.</li>
+          <li><strong>User deletion</strong> — Admins can remove users directly from the dashboard with confirmation.</li>
+        </ul>
+
         <!-- Settings -->
         <h2 id="settings"><em>Settings</em></h2>
         <p>
           Access Settings from the sidebar gear icon. Configure default AI models for three process categories:
         </p>
         <ul>
-          <li><strong>Writing Model</strong> — The primary model for article generation (default: GPT-5.3).</li>
-          <li><strong>Image Generation</strong> — The model used for hero images (default: Gemini 3 Pro Image).</li>
-          <li><strong>Utility Model</strong> — Used for SEO analysis, style recommendations, and other utility tasks (default: GPT-4.1 Nano).</li>
+          <li><strong>Writing Model</strong> — The primary model for article generation (default: GPT-5.4).</li>
+          <li><strong>Image Generation</strong> — The model used for hero images (default: GPT Image 2).</li>
+          <li><strong>Utility Model</strong> — Used for SEO analysis, style recommendations, and other utility tasks (default: GPT-4.1 Mini).</li>
         </ul>
         <p>Settings are persisted in your browser's localStorage and applied automatically to all future generations.</p>
 
@@ -861,6 +901,8 @@
           <span class="model-chip">GPT-5.2</span>
           <span class="model-chip">GPT-5.3</span>
           <span class="model-chip">GPT-5.4</span>
+          <span class="model-chip">GPT-5.5</span>
+          <span class="model-chip">GPT Image 2</span>
         </p>
         <h3>Anthropic</h3>
         <p>

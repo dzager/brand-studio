@@ -372,6 +372,125 @@
       </div>
 
       <!-- ───────────────────────────────────── -->
+      <!-- April 26, 2026 -->
+      <!-- ───────────────────────────────────── -->
+      <div class="changelog-entry">
+        <div class="changelog-date">April 26, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+        </div>
+        <h2 class="changelog-title">Image style <em>extraction</em></h2>
+        <div class="changelog-body">
+          <p>
+            Upload any reference image and let AI reverse-engineer its visual characteristics into a reusable image style category. Available from both the Companies editor and the Brand Portal.
+          </p>
+          <ul>
+            <li><strong>One-click extraction</strong> — Upload a photo and GPT-5.4 vision analyzes color palette, lighting, lens, film quality, mood, composition, depth of field, texture, saturation, and post-processing style.</li>
+            <li><strong>Editable results</strong> — Review the AI-generated analysis grid, rename the style, and inspect the generated prompt before saving.</li>
+            <li><strong>Instant reuse</strong> — Extracted styles are saved as full <code>ImageStyleCategory</code> entries, immediately available in the Studio image style selector.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">April 26, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+          <span class="changelog-tag changelog-tag--design">Design</span>
+        </div>
+        <h2 class="changelog-title">Editable brand <em>portal</em></h2>
+        <div class="changelog-body">
+          <p>
+            The read-only brand portal (<code>/company</code>) now supports full inline editing for authenticated team members. Toggle into edit mode to modify any brand configuration field — identity, tone, guidelines, image styles, and reference articles — then save changes directly from the portal.
+          </p>
+          <ul>
+            <li><strong>Edit/Save/Cancel header</strong> — Persistent action bar controls editing state with optimistic save feedback.</li>
+            <li><strong>Reference article management</strong> — Add and remove gold-standard reference URLs inline.</li>
+            <li><strong>Image style extraction</strong> — Upload reference images directly from the portal to extract and add new styles.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">April 26, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+          <span class="changelog-tag changelog-tag--infrastructure">Infrastructure</span>
+        </div>
+        <h2 class="changelog-title">Admin user <em>management</em></h2>
+        <div class="changelog-body">
+          <p>
+            The admin dashboard now includes a Users tab alongside Accounts. Platform administrators can browse, search, and manage all registered users from a single view.
+          </p>
+          <ul>
+            <li><strong>User directory</strong> — Searchable list of all users with email, name, registration date, last sign-in, and email confirmation status.</li>
+            <li><strong>Account associations</strong> — Each user row shows linked accounts with role, plan, and account name.</li>
+            <li><strong>User deletion</strong> — Admins can remove users directly from the dashboard with confirmation.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ───────────────────────────────────── -->
+      <!-- April 25, 2026 -->
+      <!-- ───────────────────────────────────── -->
+      <div class="changelog-entry">
+        <div class="changelog-date">April 25, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--design">Design</span>
+          <span class="changelog-tag changelog-tag--improvement">Improvement</span>
+        </div>
+        <h2 class="changelog-title">Content Architecture <em>refinements</em></h2>
+        <div class="changelog-body">
+          <p>
+            Overhauled the Content Architecture view for cleaner navigation and reduced visual density across both the sidebar and cluster panel.
+          </p>
+          <ul>
+            <li><strong>Flattened sidebar tree</strong> — Reduced from four nesting levels (Company → Cluster → Role → Article) to two (Cluster → Article) with inline role indicator badges (P, S, L).</li>
+            <li><strong>Human-readable titles</strong> — Navigation tree now displays article titles instead of raw slugs.</li>
+            <li><strong>Consolidated action bar</strong> — Cluster panel actions collapsed into a single primary "Generate" button plus a secondary overflow menu for interlink, export, share, and delete.</li>
+            <li><strong>Compact strategy cards</strong> — Strategy page list uses single-line cards, eliminating collapsible section layout shifts.</li>
+            <li><strong>Role tooltips</strong> — P, S, and L indicator badges show descriptive "Pillar", "Supporting", and "Long Tail" labels on hover.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">April 25, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--improvement">Improvement</span>
+          <span class="changelog-tag changelog-tag--design">Design</span>
+        </div>
+        <h2 class="changelog-title">Company list <em>streamlining</em></h2>
+        <div class="changelog-body">
+          <p>
+            Simplified the company management interface for faster scanning and cleaner interactions.
+          </p>
+          <ul>
+            <li><strong>Compact list items</strong> — Reduced vertical footprint, displaying only name, creation date, and action buttons (edit, voice, prompt, delete).</li>
+            <li><strong>Modal-based Voice &amp; Prompt</strong> — Replaced slide-out panels with modal overlays for consistent interaction patterns.</li>
+            <li><strong>Team seat flexibility</strong> — Removed the single-seat restriction on the Starter plan, allowing team invitations regardless of plan tier.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">April 25, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--infrastructure">Infrastructure</span>
+        </div>
+        <h2 class="changelog-title">Production <em>deployment</em></h2>
+        <div class="changelog-body">
+          <p>
+            Resolved build-time crashes caused by module-level environment variable dependencies in Supabase client initialization. Supabase library now uses lazy env resolution, enabling compatibility with Next.js static prerendering and successful Vercel production deployment.
+          </p>
+          <ul>
+            <li><strong>Lazy env loading</strong> — Supabase client defers environment variable access until first use, not module load time.</li>
+            <li><strong>Navigation consistency</strong> — Docs and Changelog pages now share the same navigation bar (Product, Pipeline, Pricing, Docs, Changelog, Sign in, Start creating) as the home page.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ───────────────────────────────────── -->
       <!-- April 24, 2026 -->
       <!-- ───────────────────────────────────── -->
       <div class="changelog-entry">

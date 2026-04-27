@@ -9,6 +9,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
+import { xai } from "@ai-sdk/xai";
 import {
     FACT_CHECK_SYSTEM_PROMPT,
     SINGLE_MODEL_FACT_CHECK_SCHEMA,
@@ -21,8 +22,8 @@ import {
 
 // ── Constants ───────────────────────────────────────────────────────────
 
-const GEMINI_MODEL = "gemini-3.1-pro-preview";
-const GROK_MODEL = "xai/grok-4";
+const GEMINI_MODEL = "gemini-2.5-pro-preview-05-06";
+const GROK_MODEL = "grok-4";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -93,6 +94,7 @@ async function checkWithGemini(
         model: google(GEMINI_MODEL),
         system: FACT_CHECK_SYSTEM_PROMPT + "\n\nIMPORTANT: You MUST respond with valid JSON matching this schema exactly:\n" + JSON.stringify(SINGLE_MODEL_FACT_CHECK_SCHEMA, null, 2) + "\n\nRespond ONLY with the JSON object. No markdown fences, no preamble, no text after the JSON.",
         prompt: userPrompt,
+        maxTokens: 16384,
         tools: {
             google_search: google.tools.googleSearch({}),
         },
@@ -109,9 +111,10 @@ async function checkWithGrok(
     userPrompt: string
 ): Promise<SingleModelFactCheckResult> {
     const result = await generateText({
-        model: GROK_MODEL as any,
+        model: xai(GROK_MODEL),
         system: FACT_CHECK_SYSTEM_PROMPT + "\n\nIMPORTANT: You MUST respond with valid JSON matching this schema exactly:\n" + JSON.stringify(SINGLE_MODEL_FACT_CHECK_SCHEMA, null, 2) + "\n\nRespond ONLY with the JSON object. No markdown fences, no preamble, no text after the JSON.",
         prompt: userPrompt,
+        maxTokens: 16384,
     });
 
     return extractJSON(result.text) as SingleModelFactCheckResult;

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/router";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import type { GetServerSideProps } from "next";
@@ -18,6 +19,7 @@ import {
     AlertCircle, AlertTriangle, X, Play, Download,
     Wand2, ShieldCheck, ImageIcon, Video, Layers, Scale,
     ExternalLink, ChevronDown, ChevronRight,
+    FileText, Network, ArrowRight,
 } from "lucide-react";
 import type { ConsulResult, ConsulClaimReview } from "@/lib/consulPrompts";
 import { cn } from "@/lib/utils";
@@ -85,7 +87,18 @@ const AGREEMENT_LABELS: Record<string, { label: string; icon: string; color: str
 let _imgId = 0;
 
 export default function Home() {
+    const router = useRouter();
     const { defaults } = useModelDefaults();
+
+    // ── Creation Mode ───────────────────────────────────────────────
+    const [mode, setMode] = useState<"single" | "cluster">("single");
+
+    // ── Cluster Mode State ──────────────────────────────────────────
+    const [clusterTopic, setClusterTopic] = useState("");
+    const [clusterGenerating, setClusterGenerating] = useState(false);
+    const [clusterResult, setClusterResult] = useState<any>(null);
+    const [clusterErr, setClusterErr] = useState<string | null>(null);
+
     const [prompt, setPrompt] = useState("please make an image of a family in a major city");
     const [imageStyle, setImageStyle] = useState("default");
     const [model, setModel] = useState("");
@@ -252,6 +265,22 @@ export default function Home() {
             setResult(data);
             if (data?.image_base64) { const img: GalleryImage = { id: ++_imgId, base64: data.image_base64, prompt: data.image_prompt ?? "", label: "Original" }; setGallery([img]); setSelectedImgId(img.id); }
         } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
+    }
+
+    async function onCreateCluster() {
+        if (!companyId || !clusterTopic.trim()) return;
+        setClusterGenerating(true); setClusterErr(null); setClusterResult(null);
+        try {
+            const r = await fetch("/api/clusters", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ company_id: companyId, topic: clusterTopic.trim(), model }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || "Strategy generation failed");
+            setClusterResult(data);
+        } catch (e: any) { setClusterErr(e.message); }
+        finally { setClusterGenerating(false); }
     }
 
     async function onPreviewPrompt() {
@@ -446,7 +475,7 @@ export default function Home() {
         <AppLayout>
             <div className="space-y-6">
                 {/* Description */}
-                <p className="text-muted-foreground">Create on-brand blog posts + images from a single prompt.</p>
+                <p className="text-muted-foreground">Create on-brand content from a single prompt — either a standalone article or an entire content cluster.</p>
 
                 {/* Company Selector */}
                 <div className="flex gap-3 items-center">
@@ -460,6 +489,58 @@ export default function Home() {
                     {!companyId && companies.length > 0 && <Badge variant="outline" className="text-warning border-warning">Required</Badge>}
                     {companies.length === 0 && <Button variant="link" asChild size="sm"><Link href="/companies">Create a company first →</Link></Button>}
                 </div>
+
+                {/* ── Mode Selector ─────────────────────────────────────── */}
+                <div className="grid grid-cols-2 gap-2">
+                    <button
+                        id="mode-single"
+                        onClick={() => { setMode("single"); setClusterResult(null); setClusterErr(null); }}
+                        className={cn(
+                            "group relative flex items-center gap-2.5 rounded-lg border-2 px-3 py-2 text-left transition-all duration-200",
+                            mode === "single"
+                                ? "border-primary bg-primary/5 shadow-sm shadow-primary/10"
+                                : "border-border hover:border-primary/40 hover:bg-muted/50"
+                        )}
+                    >
+                        <div className={cn(
+                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors",
+                            mode === "single" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                        )}>
+                            <FileText className="h-3.5 w-3.5" />
+                        </div>
+                        <div className="min-w-0">
+                            <div className="font-semibold text-sm leading-tight">Single Article</div>
+                            <p className="text-[11px] text-muted-foreground leading-tight">One blog post with images & SEO</p>
+                        </div>
+                        {mode === "single" && <CheckCircle2 className="h-3.5 w-3.5 text-primary ml-auto shrink-0" />}
+                    </button>
+
+                    <button
+                        id="mode-cluster"
+                        onClick={() => { setMode("cluster"); setResult(null); setErr(null); }}
+                        className={cn(
+                            "group relative flex items-center gap-2.5 rounded-lg border-2 px-3 py-2 text-left transition-all duration-200",
+                            mode === "cluster"
+                                ? "border-primary bg-primary/5 shadow-sm shadow-primary/10"
+                                : "border-border hover:border-primary/40 hover:bg-muted/50"
+                        )}
+                    >
+                        <div className={cn(
+                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors",
+                            mode === "cluster" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                        )}>
+                            <Network className="h-3.5 w-3.5" />
+                        </div>
+                        <div className="min-w-0">
+                            <div className="font-semibold text-sm leading-tight">Content Cluster</div>
+                            <p className="text-[11px] text-muted-foreground leading-tight">Pillar + supporting pages strategy</p>
+                        </div>
+                        {mode === "cluster" && <CheckCircle2 className="h-3.5 w-3.5 text-primary ml-auto shrink-0" />}
+                    </button>
+                </div>
+
+                {/* ═══════════ SINGLE ARTICLE MODE ═══════════ */}
+                {mode === "single" && (<>
 
                 {/* Prompt Templates */}
                 {companyPrompts.length > 0 && (
@@ -936,7 +1017,163 @@ export default function Home() {
                     </section>
                 )}
 
-                {/* ====== Image Search ====== */}
+                </>)}
+
+                {/* ═══════════ CLUSTER MODE ═══════════ */}
+                {mode === "cluster" && (
+                    <section className="space-y-5">
+                        {/* Cluster Topic */}
+                        <div className="space-y-2">
+                            <Label className="text-sm font-medium">Cluster Topic</Label>
+                            <p className="text-xs text-muted-foreground">Describe the broad topic for your content cluster. AI will design a pillar page, supporting articles, and long-tail pages with keyword targets and interlinking.</p>
+                            <Textarea
+                                value={clusterTopic}
+                                onChange={(e) => setClusterTopic(e.target.value)}
+                                rows={3}
+                                placeholder="e.g., dental implant options, costs, and recovery for patients in 2026..."
+                                className="text-base"
+                            />
+                        </div>
+
+                        {/* Cluster Controls */}
+                        <div className="flex gap-3 items-center flex-wrap">
+                            <div className="space-y-1">
+                                <Label htmlFor="cluster-model" className="text-xs">Model</Label>
+                                <select id="cluster-model" value={model} onChange={(e) => setModel(e.target.value)}
+                                    className="rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                    {availableModels.length > 0 ? availableModels.map((m) => <option key={m.id} value={m.id}>{m.label}{m.provider !== "openai" ? ` (${m.provider})` : ""}</option>)
+                                        : <><option value="gpt-5.5">GPT-5.5</option><option value="gpt-5.4">GPT-5.4</option><option value="gpt-4.1-mini">GPT-4.1 Mini</option></>}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Generate Button */}
+                        <div className="flex gap-2.5 items-center">
+                            <Button onClick={onCreateCluster} disabled={clusterGenerating || !companyId || clusterTopic.trim().length < 5} size="lg" className="gap-1.5">
+                                {clusterGenerating ? <><RefreshCw className="h-4 w-4 animate-spin" /> Generating Strategy…</> : <><Network className="h-4 w-4" /> Generate Cluster Strategy</>}
+                            </Button>
+                        </div>
+
+                        {/* Cluster Error */}
+                        {clusterErr && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{clusterErr}</AlertDescription></Alert>}
+
+                        {/* Cluster Result */}
+                        {clusterResult && (
+                            <Card className="border-primary/20 overflow-hidden">
+                                <CardContent className="p-5 space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Network className="h-5 w-5 text-primary" />
+                                            <h3 className="font-semibold text-lg">{clusterResult.strategy?.cluster_name || clusterResult.name || "Cluster Strategy"}</h3>
+                                        </div>
+                                        <Badge className="bg-green-500/10 text-green-600 border-green-500/30">✓ Strategy Created</Badge>
+                                    </div>
+
+                                    {/* Strategy Summary */}
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {clusterResult.strategy?.pillar && (
+                                            <div className="rounded-lg border border-border bg-muted/30 p-3">
+                                                <div className="flex items-center gap-1.5 mb-1">
+                                                    <Badge variant="outline" className="text-[10px] h-5 border-primary/50 text-primary">P</Badge>
+                                                    <span className="text-xs font-medium text-muted-foreground">Pillar</span>
+                                                </div>
+                                                <p className="text-sm font-medium leading-tight">{clusterResult.strategy.pillar.title}</p>
+                                                <p className="text-xs text-muted-foreground mt-1">{clusterResult.strategy.pillar.keyword}</p>
+                                            </div>
+                                        )}
+                                        <div className="rounded-lg border border-border bg-muted/30 p-3">
+                                            <div className="flex items-center gap-1.5 mb-1">
+                                                <Badge variant="outline" className="text-[10px] h-5 border-blue-500/50 text-blue-600">S</Badge>
+                                                <span className="text-xs font-medium text-muted-foreground">Supporting</span>
+                                            </div>
+                                            <p className="text-2xl font-bold">{clusterResult.strategy?.supporting?.length ?? 0}</p>
+                                            <p className="text-xs text-muted-foreground">articles planned</p>
+                                        </div>
+                                        <div className="rounded-lg border border-border bg-muted/30 p-3">
+                                            <div className="flex items-center gap-1.5 mb-1">
+                                                <Badge variant="outline" className="text-[10px] h-5 border-amber-500/50 text-amber-600">L</Badge>
+                                                <span className="text-xs font-medium text-muted-foreground">Long Tail</span>
+                                            </div>
+                                            <p className="text-2xl font-bold">{clusterResult.strategy?.long_tail?.length ?? 0}</p>
+                                            <p className="text-xs text-muted-foreground">articles planned</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Page List */}
+                                    <div className="space-y-1.5">
+                                        <h4 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">All Planned Pages</h4>
+                                        {clusterResult.strategy?.pillar && (
+                                            <div className="flex items-center gap-2 p-2 rounded-md border border-border bg-card text-sm">
+                                                <Badge variant="outline" className="text-[10px] shrink-0 border-primary/50 text-primary">Pillar</Badge>
+                                                <span className="font-medium truncate">{clusterResult.strategy.pillar.title}</span>
+                                                <span className="text-xs text-muted-foreground ml-auto shrink-0">/{clusterResult.strategy.pillar.slug}</span>
+                                            </div>
+                                        )}
+                                        {(clusterResult.strategy?.supporting ?? []).map((p: any, i: number) => (
+                                            <div key={`s-${i}`} className="flex items-center gap-2 p-2 rounded-md border border-border bg-card text-sm">
+                                                <Badge variant="outline" className="text-[10px] shrink-0 border-blue-500/50 text-blue-600">S</Badge>
+                                                <span className="truncate">{p.title}</span>
+                                                <span className="text-xs text-muted-foreground ml-auto shrink-0">/{p.slug}</span>
+                                            </div>
+                                        ))}
+                                        {(clusterResult.strategy?.long_tail ?? []).map((p: any, i: number) => (
+                                            <div key={`l-${i}`} className="flex items-center gap-2 p-2 rounded-md border border-border bg-card text-sm">
+                                                <Badge variant="outline" className="text-[10px] shrink-0 border-amber-500/50 text-amber-600">L</Badge>
+                                                <span className="truncate">{p.title}</span>
+                                                <span className="text-xs text-muted-foreground ml-auto shrink-0">/{p.slug}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Overlap Warnings */}
+                                    {clusterResult.overlap_warnings && (
+                                        <>
+                                            {clusterResult.overlap_warnings.intra_cluster?.length > 0 && (
+                                                <Alert className="border-amber-500/30 bg-amber-500/5">
+                                                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                                    <AlertDescription>
+                                                        <p className="font-semibold text-sm text-amber-600">{clusterResult.overlap_warnings.intra_cluster.length} intra-cluster overlap{clusterResult.overlap_warnings.intra_cluster.length !== 1 ? "s" : ""} detected</p>
+                                                        <div className="mt-1 space-y-0.5">
+                                                            {clusterResult.overlap_warnings.intra_cluster.slice(0, 5).map((w: any, i: number) => (
+                                                                <p key={i} className="text-xs text-muted-foreground">"{w.slug_a}" ↔ "{w.slug_b}" ({Math.round(w.similarity * 100)}%)</p>
+                                                            ))}
+                                                        </div>
+                                                    </AlertDescription>
+                                                </Alert>
+                                            )}
+                                            {clusterResult.overlap_warnings.existing_content?.length > 0 && (
+                                                <Alert className="border-amber-500/30 bg-amber-500/5">
+                                                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                                    <AlertDescription>
+                                                        <p className="font-semibold text-sm text-amber-600">{clusterResult.overlap_warnings.existing_content.length} overlap{clusterResult.overlap_warnings.existing_content.length !== 1 ? "s" : ""} with existing articles</p>
+                                                        <div className="mt-1 space-y-0.5">
+                                                            {clusterResult.overlap_warnings.existing_content.slice(0, 5).map((w: any, i: number) => (
+                                                                <p key={i} className="text-xs text-muted-foreground">"{w.planned_slug}" ↔ "{w.existing_title}" ({Math.round(w.similarity * 100)}%)</p>
+                                                            ))}
+                                                        </div>
+                                                    </AlertDescription>
+                                                </Alert>
+                                            )}
+                                        </>
+                                    )}
+
+                                    {/* CTA to manage in Articles */}
+                                    <div className="flex gap-2 pt-2">
+                                        <Button onClick={() => router.push(`/articles?cluster=${clusterResult.id}`)} className="gap-1.5">
+                                            <ArrowRight className="h-4 w-4" /> Open in Content Architecture
+                                        </Button>
+                                        <Button variant="outline" onClick={() => { setClusterResult(null); setClusterTopic(""); }}>
+                                            Create Another
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+                    </section>
+                )}
+
+                {/* ====== Image Search (hidden) ====== */}
+                {false && (
                 <section className="space-y-4 mt-8">
                     <Separator />
                     <div>
@@ -1040,8 +1277,10 @@ export default function Home() {
                         </Card>
                     )}
                 </section>
+                )}
 
-                {/* ====== YouTube Search ====== */}
+                {/* ====== YouTube Search (hidden) ====== */}
+                {false && (
                 <section className="space-y-4 mt-8">
                     <Separator />
                     <div>
@@ -1081,6 +1320,7 @@ export default function Home() {
                         </div>
                     )}
                 </section>
+                )}
 
                 {/* ====== Prompt Preview Dialog ====== */}
                 <Dialog open={!!previewData} onOpenChange={(open) => { if (!open) setPreviewData(null); }}>

@@ -1,7 +1,7 @@
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { useTheme } from "next-themes";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Home,
   Building2,
@@ -93,6 +93,7 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
+  const [companyCount, setCompanyCount] = useState<number | null>(null);
   const { user, activeAccount, accounts, isAdmin, signOut, switchAccount } = useAuth();
 
   // Fetch usage for sidebar widget
@@ -108,12 +109,30 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
     fetchUsage();
   }, [fetchUsage]);
 
+  // Fetch company count for dynamic nav label
+  useEffect(() => {
+    fetch("/api/companies")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: any[]) => setCompanyCount(data.length))
+      .catch(() => {});
+  }, []);
+
+  // Dynamic nav items: show "Company" (singular) when only 1, "Companies" when more
+  const navItems = useMemo(() =>
+    NAV_ITEMS.map((item) =>
+      item.href === "/companies"
+        ? { ...item, label: companyCount === 1 ? "Company" : "Companies" }
+        : item
+    ),
+    [companyCount]
+  );
+
   // Determine which nav items to show based on role
   const userRole = isAdmin ? "admin" : (activeAccount?.role || "member");
   const roleHierarchy: Record<string, number> = { member: 1, owner: 2, admin: 3 };
   const userRoleLevel = roleHierarchy[userRole] || 1;
   const isScopedMember = !isAdmin && !!activeAccount?.company_id;
-  const visibleNavItems = NAV_ITEMS.filter(
+  const visibleNavItems = navItems.filter(
     (item) => {
       // Role check
       if ((roleHierarchy[item.minRole] || 1) > userRoleLevel) return false;
@@ -141,7 +160,7 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
               src="/organic-logo.png"
               alt="Organic"
               className="dark:invert"
-              style={{ height: '36px', width: 'auto' }}
+              style={{ height: '31px', width: 'auto' }}
             />
           </a>
         </div>
@@ -340,7 +359,7 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
 
             {/* Page title from nav */}
             <div className="flex items-center gap-2">
-              {NAV_ITEMS.map((item) => {
+              {navItems.map((item) => {
                 const isActive =
                   item.href === "/"
                     ? router.pathname === "/"
