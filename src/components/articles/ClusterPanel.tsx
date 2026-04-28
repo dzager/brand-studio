@@ -723,7 +723,8 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                                             <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0"
                                                 title="Copy invite link"
                                                 onClick={() => {
-                                                    const url = `${window.location.origin}/invite/${inv.token}`;
+                                                    const base = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+                                                    const url = `${base}/invite/${inv.token}`;
                                                     handleCopyInviteLink(url);
                                                 }}
                                             >

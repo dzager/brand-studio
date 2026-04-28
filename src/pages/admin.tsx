@@ -24,6 +24,12 @@ import {
     Mail,
     Calendar,
     UserX,
+    UserPlus,
+    Send,
+    Clock,
+    Copy,
+    Check,
+    XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -100,6 +106,12 @@ export default function AdminDashboard() {
     const [deletingUser, setDeletingUser] = useState<string | null>(null);
     const [changingRole, setChangingRole] = useState<string | null>(null);
     const [deletingMember, setDeletingMember] = useState<string | null>(null);
+    const [inviteEmail, setInviteEmail] = useState("");
+    const [inviteRole, setInviteRole] = useState<"member" | "owner">("member");
+    const [sendingInvite, setSendingInvite] = useState(false);
+    const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
+    const [revokingInvite, setRevokingInvite] = useState<string | null>(null);
+    const [copiedInvite, setCopiedInvite] = useState<string | null>(null);
 
     // Redirect non-admins
     useEffect(() => {
@@ -664,6 +676,172 @@ export default function AdminDashboard() {
                                             </div>
                                         ))}
                                     </div>
+
+                                    {/* Invite new member form */}
+                                    <div className="mt-4 pt-4 border-t border-border/50">
+                                        <h6 className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+                                            <UserPlus className="h-3 w-3" />
+                                            Invite New Member
+                                        </h6>
+                                        <form
+                                            onSubmit={async (e) => {
+                                                e.preventDefault();
+                                                if (!inviteEmail.trim() || sendingInvite) return;
+                                                setSendingInvite(true);
+                                                setInviteSuccess(null);
+                                                try {
+                                                    const r = await fetch("/api/invitations", {
+                                                        method: "POST",
+                                                        headers: { "Content-Type": "application/json" },
+                                                        body: JSON.stringify({
+                                                            account_id: detail.account.id,
+                                                            email: inviteEmail.trim(),
+                                                            role: inviteRole,
+                                                        }),
+                                                    });
+                                                    const data = await r.json();
+                                                    if (!r.ok) {
+                                                        alert(data.error || "Invite failed");
+                                                        return;
+                                                    }
+                                                    setInviteSuccess(inviteEmail.trim());
+                                                    setInviteEmail("");
+                                                    setInviteRole("member");
+                                                    // Refresh detail to show new pending invitation
+                                                    openDetail(detail.account.id);
+                                                    setTimeout(() => setInviteSuccess(null), 4000);
+                                                } catch (err) {
+                                                    console.error("Invite failed:", err);
+                                                } finally {
+                                                    setSendingInvite(false);
+                                                }
+                                            }}
+                                            className="flex items-center gap-2"
+                                        >
+                                            <input
+                                                type="email"
+                                                placeholder="email@example.com"
+                                                value={inviteEmail}
+                                                onChange={(e) => setInviteEmail(e.target.value)}
+                                                required
+                                                className="flex-1 min-w-0 text-sm px-3 py-1.5 rounded-md border border-border bg-background focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground/50"
+                                            />
+                                            <div className="relative">
+                                                <select
+                                                    value={inviteRole}
+                                                    onChange={(e) => setInviteRole(e.target.value as "member" | "owner")}
+                                                    className="appearance-none text-xs font-medium pl-2 pr-6 py-1.5 rounded-md border border-border bg-background cursor-pointer hover:border-foreground/30 focus:outline-none focus:ring-1 focus:ring-ring"
+                                                >
+                                                    <option value="member">Member</option>
+                                                    <option value="owner">Owner</option>
+                                                </select>
+                                                <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
+                                            </div>
+                                            <button
+                                                type="submit"
+                                                disabled={sendingInvite || !inviteEmail.trim()}
+                                                className={cn(
+                                                    "rounded-md px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5",
+                                                    "bg-foreground text-background hover:bg-foreground/90",
+                                                    "disabled:opacity-40 disabled:cursor-not-allowed"
+                                                )}
+                                            >
+                                                {sendingInvite ? (
+                                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                                ) : (
+                                                    <Send className="h-3 w-3" />
+                                                )}
+                                                Invite
+                                            </button>
+                                        </form>
+                                        {inviteSuccess && (
+                                            <p className="text-xs text-green-600 dark:text-green-400 mt-2 flex items-center gap-1">
+                                                <Check className="h-3 w-3" />
+                                                Invitation sent to {inviteSuccess}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {/* Pending invitations */}
+                                    {detail.invitations.length > 0 && (
+                                        <div className="mt-4 pt-4 border-t border-border/50">
+                                            <h6 className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+                                                <Clock className="h-3 w-3" />
+                                                Pending Invitations ({detail.invitations.length})
+                                            </h6>
+                                            <div className="space-y-2">
+                                                {detail.invitations.map((inv: any) => (
+                                                    <div
+                                                        key={inv.id}
+                                                        className="flex items-center justify-between text-sm group"
+                                                    >
+                                                        <div className="min-w-0 flex-1">
+                                                            <span className="text-muted-foreground">
+                                                                {inv.email}
+                                                            </span>
+                                                            <span className="text-xs text-muted-foreground/60 ml-2">
+                                                                {new Date(inv.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 shrink-0">
+                                                            <Badge variant="outline" className="text-xs capitalize">
+                                                                {inv.role}
+                                                            </Badge>
+                                                            {/* Copy invite link */}
+                                                            <button
+                                                                onClick={async () => {
+                                                                    const base = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+                                                                    const url = `${base}/invite/${inv.token}`;
+                                                                    await navigator.clipboard.writeText(url);
+                                                                    setCopiedInvite(inv.id);
+                                                                    setTimeout(() => setCopiedInvite(null), 2000);
+                                                                }}
+                                                                className="rounded-md p-1 hover:bg-muted transition-colors opacity-0 group-hover:opacity-100"
+                                                                title="Copy invite link"
+                                                            >
+                                                                {copiedInvite === inv.id ? (
+                                                                    <Check className="h-3.5 w-3.5 text-green-600" />
+                                                                ) : (
+                                                                    <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                                                                )}
+                                                            </button>
+                                                            {/* Revoke invitation */}
+                                                            <button
+                                                                onClick={async () => {
+                                                                    if (!confirm(`Revoke invitation for ${inv.email}?`)) return;
+                                                                    setRevokingInvite(inv.id);
+                                                                    try {
+                                                                        const r = await fetch(`/api/invitations/${inv.token}`, {
+                                                                            method: "DELETE",
+                                                                        });
+                                                                        if (!r.ok) {
+                                                                            const data = await r.json();
+                                                                            alert(data.error || "Revoke failed");
+                                                                            return;
+                                                                        }
+                                                                        openDetail(detail.account.id);
+                                                                    } catch (err) {
+                                                                        console.error("Revoke failed:", err);
+                                                                    } finally {
+                                                                        setRevokingInvite(null);
+                                                                    }
+                                                                }}
+                                                                disabled={revokingInvite === inv.id}
+                                                                className="rounded-md p-1 hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-40"
+                                                                title="Revoke invitation"
+                                                            >
+                                                                {revokingInvite === inv.id ? (
+                                                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                                ) : (
+                                                                    <XCircle className="h-3.5 w-3.5" />
+                                                                )}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <Separator />

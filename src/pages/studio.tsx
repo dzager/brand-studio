@@ -19,7 +19,7 @@ import {
     AlertCircle, AlertTriangle, X, Play, Download,
     Wand2, ShieldCheck, ImageIcon, Video, Layers, Scale,
     ExternalLink, ChevronDown, ChevronRight,
-    FileText, Network, ArrowRight,
+    FileText, Network, ArrowRight, Settings, Check,
 } from "lucide-react";
 import type { ConsulResult, ConsulClaimReview } from "@/lib/consulPrompts";
 import { cn } from "@/lib/utils";
@@ -99,7 +99,8 @@ export default function Home() {
     const [clusterResult, setClusterResult] = useState<any>(null);
     const [clusterErr, setClusterErr] = useState<string | null>(null);
 
-    const [prompt, setPrompt] = useState("please make an image of a family in a major city");
+    const [prompt, setPrompt] = useState("");
+    const [companyErr, setCompanyErr] = useState(false);
     const [imageStyle, setImageStyle] = useState("default");
     const [model, setModel] = useState("");
     const [availableModels, setAvailableModels] = useState<{ id: string; label: string; provider: string }[]>([]);
@@ -473,69 +474,80 @@ export default function Home() {
 
     return (
         <AppLayout>
-            <div className="space-y-6">
-                {/* Description */}
-                <p className="text-muted-foreground">Create on-brand content from a single prompt — either a standalone article or an entire content cluster.</p>
+            <div className="space-y-5">
+                {/* Header */}
+                <div>
+                    <h2 className="text-xl font-medium tracking-tight">Create content</h2>
+                    <p className="text-sm text-muted-foreground mt-1">On-brand articles and clusters from a single prompt.</p>
+                </div>
 
-                {/* Company Selector */}
-                <div className="flex gap-3 items-center">
-                    <Label htmlFor="company-select" className="whitespace-nowrap">Company</Label>
-                    <select id="company-select" value={companyId} onChange={(e) => setCompanyId(e.target.value)}
+                {/* Company selector */}
+                <div className="space-y-1.5">
+                    <Label htmlFor="company-select" className="text-sm font-medium">Company</Label>
+                    <select id="company-select" value={companyId} onChange={(e) => { setCompanyId(e.target.value); setCompanyErr(false); }}
                         disabled={isScopedMember && companies.length === 1}
-                        className={cn("flex-1 max-w-xs rounded-md border bg-background px-3 py-2 text-sm", companyId ? "border-input" : "border-warning", isScopedMember && companies.length === 1 && "opacity-70 cursor-not-allowed")}>
+                        className={cn("w-full max-w-xs rounded-md border bg-background px-3 py-2 text-sm", companyErr ? "border-destructive" : "border-input", isScopedMember && companies.length === 1 && "opacity-70 cursor-not-allowed")}>
                         <option value="">— Select a company —</option>
                         {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
-                    {!companyId && companies.length > 0 && <Badge variant="outline" className="text-warning border-warning">Required</Badge>}
+                    {companyErr && <p className="text-xs text-destructive">Please select a company before creating.</p>}
                     {companies.length === 0 && <Button variant="link" asChild size="sm"><Link href="/companies">Create a company first →</Link></Button>}
                 </div>
 
-                {/* ── Mode Selector ─────────────────────────────────────── */}
-                <div className="grid grid-cols-2 gap-2">
+                {/* ── Format selection ─────────────────────────────────── */}
+                <div className="grid grid-cols-2 gap-3">
                     <button
                         id="mode-single"
                         onClick={() => { setMode("single"); setClusterResult(null); setClusterErr(null); }}
                         className={cn(
-                            "group relative flex items-center gap-2.5 rounded-lg border-2 px-3 py-2 text-left transition-all duration-200",
+                            "group relative flex items-center gap-3 rounded-xl px-3.5 py-3 text-left cursor-pointer transition-all duration-150",
                             mode === "single"
-                                ? "border-primary bg-primary/5 shadow-sm shadow-primary/10"
-                                : "border-border hover:border-primary/40 hover:bg-muted/50"
+                                ? "border-2 border-primary bg-primary/[0.03]"
+                                : "border border-border/50 hover:border-border hover:bg-muted/40"
                         )}
                     >
                         <div className={cn(
-                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors",
-                            mode === "single" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors",
+                            mode === "single" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground group-hover:bg-primary/5 group-hover:text-foreground"
                         )}>
-                            <FileText className="h-3.5 w-3.5" />
+                            <FileText className="h-4 w-4" />
                         </div>
                         <div className="min-w-0">
-                            <div className="font-semibold text-sm leading-tight">Single Article</div>
-                            <p className="text-[11px] text-muted-foreground leading-tight">One blog post with images & SEO</p>
+                            <div className="text-sm font-medium leading-tight">Single article</div>
+                            <p className="text-xs text-muted-foreground leading-tight mt-0.5">One blog post with images and SEO</p>
                         </div>
-                        {mode === "single" && <CheckCircle2 className="h-3.5 w-3.5 text-primary ml-auto shrink-0" />}
+                        {mode === "single" && (
+                            <span className="absolute top-2 right-2 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                                <Check className="h-3 w-3" />
+                            </span>
+                        )}
                     </button>
 
                     <button
                         id="mode-cluster"
                         onClick={() => { setMode("cluster"); setResult(null); setErr(null); }}
                         className={cn(
-                            "group relative flex items-center gap-2.5 rounded-lg border-2 px-3 py-2 text-left transition-all duration-200",
+                            "group relative flex items-center gap-3 rounded-xl px-3.5 py-3 text-left cursor-pointer transition-all duration-150",
                             mode === "cluster"
-                                ? "border-primary bg-primary/5 shadow-sm shadow-primary/10"
-                                : "border-border hover:border-primary/40 hover:bg-muted/50"
+                                ? "border-2 border-primary bg-primary/[0.03]"
+                                : "border border-border/50 hover:border-border hover:bg-muted/40"
                         )}
                     >
                         <div className={cn(
-                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors",
-                            mode === "cluster" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors",
+                            mode === "cluster" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground group-hover:bg-primary/5 group-hover:text-foreground"
                         )}>
-                            <Network className="h-3.5 w-3.5" />
+                            <Network className="h-4 w-4" />
                         </div>
                         <div className="min-w-0">
-                            <div className="font-semibold text-sm leading-tight">Content Cluster</div>
-                            <p className="text-[11px] text-muted-foreground leading-tight">Pillar + supporting pages strategy</p>
+                            <div className="text-sm font-medium leading-tight">Content cluster</div>
+                            <p className="text-xs text-muted-foreground leading-tight mt-0.5">Pillar + supporting pages strategy</p>
                         </div>
-                        {mode === "cluster" && <CheckCircle2 className="h-3.5 w-3.5 text-primary ml-auto shrink-0" />}
+                        {mode === "cluster" && (
+                            <span className="absolute top-2 right-2 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                                <Check className="h-3 w-3" />
+                            </span>
+                        )}
                     </button>
                 </div>
 
@@ -558,59 +570,45 @@ export default function Home() {
                 )}
 
                 {/* Main Prompt */}
-                <Textarea value={prompt} onChange={(e) => { setPrompt(e.target.value); setActiveTemplateId(null); }} rows={3} placeholder="Describe the article you want to create..." className="text-base" />
+                <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                        <Label htmlFor="prompt-input" className="text-sm font-medium">Prompt</Label>
+                        <span className="text-xs text-muted-foreground tabular-nums">{prompt.length} / 2000</span>
+                    </div>
+                    <Textarea id="prompt-input" value={prompt} onChange={(e) => { setPrompt(e.target.value.slice(0, 2000)); setActiveTemplateId(null); }} rows={3} placeholder="Describe the article you want — topic, angle, audience, anything specific to cover…" className="text-sm min-h-[96px]" />
+                </div>
 
-                {/* Controls Row */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {/* Image Style */}
-                    <div className="space-y-1">
-                        <Label htmlFor="image-style" className="text-xs">Image Style</Label>
-                        <div className="flex gap-2 items-center">
-                            <select id="image-style" value={imageStyle} onChange={(e) => {
-                                    const newStyleId = e.target.value;
-                                    setImageStyle(newStyleId);
-                                    // Wipe previous prompt context and results when switching styles
-                                    setResult(null); setErr(null);
-                                    setGallery([]); setSelectedImgId(null); setRefreshErr(null);
-                                    setFactCheck(null); setFactCheckErr(null);
-                                    setConsulResult(null); setConsulErr(null); setExpandedClaims(new Set());
-                                    setHumanized(false); setHumanizeErr(null);
-                                    setRecommendation(null); setRecommendErr(null);
-                                    setPreviewData(null); setPreviewErr(null);
-                                    setOverlapResults(null); setOverlapErr(null);
-                                    const style = activeStyles.find((s) => s.id === newStyleId);
-                                    if (style && newStyleId !== "default") {
-                                        const parts: string[] = [];
-                                        if (style.image_prompt_style) parts.push(style.image_prompt_style);
-                                        else if (style.narrative) parts.push(style.narrative);
-                                        if (style.storytelling_cues.length) parts.push(`Cues: ${style.storytelling_cues.join("; ")}`);
-                                        setCustomImagePrompt(parts.join(". ").trim());
-                                    } else {
-                                        setCustomImagePrompt("");
-                                    }
-                                    // Reset composite state and pre-populate from style defaults
-                                    setCsProductUrl(null); setCsProductThumb(null); setCsProductResults([]);
-                                    if (style?.type === "composite") {
-                                        setCsProductQuery(style.composite_product_query ?? "");
-                                        setCsBgPrompt(style.composite_bg_prompt ?? "");
-                                        setCsBgImageUrl(style.composite_bg_image_url ?? "");
-                                    } else {
-                                        setCsProductQuery(""); setCsBgPrompt(""); setCsBgImageUrl("");
-                                    }
-                                }}
-                                className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm">
-                                {activeStyles.map((cat) => <option key={cat.id} value={cat.id}>{cat.type === "composite" ? `🧩 ${cat.label}` : cat.label}</option>)}
-                            </select>
-                            {activeStyles.length > 1 && (
-                                <Button variant="secondary" size="sm" disabled={recommending || !prompt.trim()} onClick={async () => {
-                                    setRecommending(true); setRecommendation(null); setRecommendErr(null);
-                                    try {
-                                        const r = await fetch("/api/recommend-style", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: prompt.trim(), styles: activeStyles }) });
-                                        const data = await r.json(); if (!r.ok) throw new Error(data.error || "Recommendation failed");
-                                        setRecommendation(data); setImageStyle(data.id);
-                                        // Pre-fill prompt from recommended style's data
-                                        const style = activeStyles.find((s) => s.id === data.id);
-                                        if (style && data.id !== "default") {
+                {/* Advanced options */}
+                <details className="group">
+                    <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium select-none list-none [&::-webkit-details-marker]:hidden">
+                        <Settings className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span>Advanced options</span>
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-open:rotate-90" />
+                        <span className="ml-auto text-xs font-normal text-muted-foreground group-open:hidden">
+                            {activeStyles.find(s => s.id === imageStyle)?.label ?? "Default"} · {availableModels.find(m => m.id === model)?.label ?? model} · {({
+                                "300-500": "Short", "800-1200": "Medium", "1500-2500": "Long", "2500-4000": "Deep Dive", "": "No limit"
+                            } as Record<string, string>)[wordCount] ?? wordCount}
+                        </span>
+                    </summary>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                        {/* Image Style */}
+                        <div className="space-y-1.5">
+                            <Label htmlFor="image-style" className="text-xs font-medium">Image style</Label>
+                            <div className="flex gap-2 items-center">
+                                <select id="image-style" value={imageStyle} onChange={(e) => {
+                                        const newStyleId = e.target.value;
+                                        setImageStyle(newStyleId);
+                                        // Wipe previous prompt context and results when switching styles
+                                        setResult(null); setErr(null);
+                                        setGallery([]); setSelectedImgId(null); setRefreshErr(null);
+                                        setFactCheck(null); setFactCheckErr(null);
+                                        setConsulResult(null); setConsulErr(null); setExpandedClaims(new Set());
+                                        setHumanized(false); setHumanizeErr(null);
+                                        setRecommendation(null); setRecommendErr(null);
+                                        setPreviewData(null); setPreviewErr(null);
+                                        setOverlapResults(null); setOverlapErr(null);
+                                        const style = activeStyles.find((s) => s.id === newStyleId);
+                                        if (style && newStyleId !== "default") {
                                             const parts: string[] = [];
                                             if (style.image_prompt_style) parts.push(style.image_prompt_style);
                                             else if (style.narrative) parts.push(style.narrative);
@@ -619,38 +617,69 @@ export default function Home() {
                                         } else {
                                             setCustomImagePrompt("");
                                         }
-                                    } catch (e: any) { setRecommendErr(e.message); } finally { setRecommending(false); }
-                                }} className="gap-1 whitespace-nowrap">
-                                    <Sparkles className="h-3.5 w-3.5" />
-                                    {recommending ? "…" : "Recommend"}
-                                </Button>
-                            )}
+                                        // Reset composite state and pre-populate from style defaults
+                                        setCsProductUrl(null); setCsProductThumb(null); setCsProductResults([]);
+                                        if (style?.type === "composite") {
+                                            setCsProductQuery(style.composite_product_query ?? "");
+                                            setCsBgPrompt(style.composite_bg_prompt ?? "");
+                                            setCsBgImageUrl(style.composite_bg_image_url ?? "");
+                                        } else {
+                                            setCsProductQuery(""); setCsBgPrompt(""); setCsBgImageUrl("");
+                                        }
+                                    }}
+                                    className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                    {activeStyles.map((cat) => <option key={cat.id} value={cat.id}>{cat.type === "composite" ? `🧩 ${cat.label}` : cat.label}</option>)}
+                                </select>
+                                {activeStyles.length > 1 && (
+                                    <Button variant="secondary" size="sm" disabled={recommending || !prompt.trim()} onClick={async () => {
+                                        setRecommending(true); setRecommendation(null); setRecommendErr(null);
+                                        try {
+                                            const r = await fetch("/api/recommend-style", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: prompt.trim(), styles: activeStyles }) });
+                                            const data = await r.json(); if (!r.ok) throw new Error(data.error || "Recommendation failed");
+                                            setRecommendation(data); setImageStyle(data.id);
+                                            const style = activeStyles.find((s) => s.id === data.id);
+                                            if (style && data.id !== "default") {
+                                                const parts: string[] = [];
+                                                if (style.image_prompt_style) parts.push(style.image_prompt_style);
+                                                else if (style.narrative) parts.push(style.narrative);
+                                                if (style.storytelling_cues.length) parts.push(`Cues: ${style.storytelling_cues.join("; ")}`);
+                                                setCustomImagePrompt(parts.join(". ").trim());
+                                            } else {
+                                                setCustomImagePrompt("");
+                                            }
+                                        } catch (e: any) { setRecommendErr(e.message); } finally { setRecommending(false); }
+                                    }} className="gap-1 whitespace-nowrap">
+                                        <Sparkles className="h-3.5 w-3.5" />
+                                        {recommending ? "…" : "Recommend"}
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Model */}
+                        <div className="space-y-1.5">
+                            <Label htmlFor="model-select" className="text-xs font-medium">Model</Label>
+                            <select id="model-select" value={model} onChange={(e) => setModel(e.target.value)}
+                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                {availableModels.length > 0 ? availableModels.map((m) => <option key={m.id} value={m.id}>{m.label}{m.provider !== "openai" ? ` (${m.provider})` : ""}</option>)
+                                    : <><option value="gpt-5.5">GPT-5.5</option><option value="gpt-5.4">GPT-5.4</option><option value="gpt-5.1">GPT-5.1</option><option value="gpt-4.1-mini">GPT-4.1 Mini</option></>}
+                            </select>
+                        </div>
+
+                        {/* Length */}
+                        <div className="space-y-1.5">
+                            <Label htmlFor="word-count" className="text-xs font-medium">Length</Label>
+                            <select id="word-count" value={wordCount} onChange={(e) => setWordCount(e.target.value)}
+                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                <option value="300-500">Short (300–500)</option>
+                                <option value="800-1200">Medium (800–1,200)</option>
+                                <option value="1500-2500">Long (1,500–2,500)</option>
+                                <option value="2500-4000">Deep Dive (2,500–4,000)</option>
+                                <option value="">No limit</option>
+                            </select>
                         </div>
                     </div>
-
-                    {/* Model */}
-                    <div className="space-y-1">
-                        <Label htmlFor="model-select" className="text-xs">Model</Label>
-                        <select id="model-select" value={model} onChange={(e) => setModel(e.target.value)}
-                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                            {availableModels.length > 0 ? availableModels.map((m) => <option key={m.id} value={m.id}>{m.label}{m.provider !== "openai" ? ` (${m.provider})` : ""}</option>)
-                                : <><option value="gpt-5.5">GPT-5.5</option><option value="gpt-5.4">GPT-5.4</option><option value="gpt-5.1">GPT-5.1</option><option value="gpt-4.1-mini">GPT-4.1 Mini</option></>}
-                        </select>
-                    </div>
-
-                    {/* Length */}
-                    <div className="space-y-1">
-                        <Label htmlFor="word-count" className="text-xs">Length</Label>
-                        <select id="word-count" value={wordCount} onChange={(e) => setWordCount(e.target.value)}
-                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                            <option value="300-500">Short (300–500)</option>
-                            <option value="800-1200">Medium (800–1,200)</option>
-                            <option value="1500-2500">Long (1,500–2,500)</option>
-                            <option value="2500-4000">Deep Dive (2,500–4,000)</option>
-                            <option value="">No limit</option>
-                        </select>
-                    </div>
-                </div>
+                </details>
 
                 {/* Recommendation */}
                 {recommendation && (
@@ -716,17 +745,18 @@ export default function Home() {
                     </Card>
                 )}
 
-                {/* Action Buttons */}
-                <div className="flex gap-2.5 items-center flex-wrap">
-                    <Button onClick={onCreate} disabled={loading || !companyId} size="lg" className="gap-1.5">
+                {/* Action bar */}
+                <div className="flex items-center gap-2.5 flex-wrap pt-4 border-t border-border">
+                    <Button onClick={() => { if (!companyId) { setCompanyErr(true); return; } onCreate(); }} disabled={loading} size="lg" className="gap-1.5">
                         {loading ? <><RefreshCw className="h-4 w-4 animate-spin" /> Creating…</> : "Create"}
                     </Button>
-                    <Button variant="outline" onClick={onPreviewPrompt} disabled={previewing || loading || !companyId || prompt.trim().length < 5} className="gap-1.5">
-                        <Eye className="h-4 w-4" /> {previewing ? "Loading…" : "Preview Prompt"}
+                    <Button variant="ghost" onClick={onPreviewPrompt} disabled={previewing || loading || !companyId || prompt.trim().length < 5} className="gap-1.5">
+                        <Eye className="h-4 w-4" /> {previewing ? "Loading…" : "Preview prompt"}
                     </Button>
-                    <Button variant="outline" onClick={onCheckOverlap} disabled={checkingOverlap || loading || !companyId || prompt.trim().length < 5} className="gap-1.5">
-                        <Search className="h-4 w-4" /> {checkingOverlap ? "Checking…" : "Check Overlap"}
+                    <Button variant="ghost" onClick={onCheckOverlap} disabled={checkingOverlap || loading || !companyId || prompt.trim().length < 5} className="gap-1.5">
+                        <Search className="h-4 w-4" /> {checkingOverlap ? "Checking…" : "Check overlap"}
                     </Button>
+                    <span className="ml-auto text-xs text-muted-foreground">~2 min · uses 1 credit</span>
                 </div>
 
                 {/* Overlap Results */}

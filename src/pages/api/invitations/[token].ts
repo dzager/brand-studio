@@ -1,9 +1,11 @@
 /**
- * GET  /api/invitations/[token]  — Validate an invitation token
- * POST /api/invitations/[token]  — Accept an invitation
+ * GET    /api/invitations/[token]  — Validate an invitation token
+ * POST   /api/invitations/[token]  — Accept an invitation
+ * DELETE /api/invitations/[token]  — Revoke a pending invitation (admin/owner only)
  */
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getAdminSupabase } from "@/lib/supabase";
+import { requireAuth, getUserAccounts, isPlatformAdmin } from "@/lib/auth";
 
 export default async function handler(
     req: NextApiRequest,
@@ -139,6 +141,29 @@ export default async function handler(
                 is_new_user: !existingUser,
                 cluster_id: invitation.cluster_id || null,
             });
+        }
+
+        if (req.method === "DELETE") {
+            // Revoke a pending invitation — requires auth + owner/admin on the account
+            const user = await requireAuth(req, res);
+            if (!user) return;
+
+            const isAdmin = await isPlatformAdmin(user.id);
+            if (!isAdmin) {
+                const accounts = await getUserAccounts(user.id);
+                const membership = accounts.find((a) => a.account_id === invitation.account_id);
+                if (!membership || (membership.role !== "owner" && membership.role !== "admin")) {
+                    return res.status(403).json({ error: "Only owners can revoke invitations" });
+                }
+            }
+
+            const { error: deleteError } = await admin
+                .from("invitations")
+                .delete()
+                .eq("id", invitation.id);
+
+            if (deleteError) throw deleteError;
+            return res.status(200).json({ success: true });
         }
 
         return res.status(405).json({ error: "Method not allowed" });
