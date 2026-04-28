@@ -118,37 +118,47 @@ export default async function handler(
             // Check for duplicate invitation
             const { data: existing } = await admin
                 .from("invitations")
-                .select("id")
+                .select("*")
                 .eq("account_id", accountId)
                 .eq("email", email.trim().toLowerCase())
                 .is("accepted_at", null)
-                .single();
+                .limit(1)
+                .maybeSingle();
 
+            let invitation;
             if (existing) {
-                return res.status(409).json({ error: "This email has already been invited" });
+                // If the user has already been invited, update their invitation and resend the email
+                const { data: updatedInvite, error: updateError } = await admin
+                    .from("invitations")
+                    .update({
+                        cluster_id: cluster_id || existing.cluster_id,
+                        role: inviteRole,
+                        invited_by: user.id,
+                        created_at: new Date().toISOString() // Refresh the timestamp
+                    })
+                    .eq("id", existing.id)
+                    .select()
+                    .single();
+
+                if (updateError) throw updateError;
+                invitation = updatedInvite;
+            } else {
+                // Create new invitation
+                const { data: newInvite, error: insertError } = await admin
+                    .from("invitations")
+                    .insert({
+                        account_id: accountId,
+                        email: email.trim().toLowerCase(),
+                        role: inviteRole,
+                        invited_by: user.id,
+                        cluster_id: cluster_id || null,
+                    })
+                    .select()
+                    .single();
+
+                if (insertError) throw insertError;
+                invitation = newInvite;
             }
-
-            // Check if user is already a member
-            const { data: existingUser } = await admin
-                .from("account_members")
-                .select("id, user_id!inner(email)")
-                .eq("account_id", accountId)
-                .limit(100);
-
-            // Create invitation
-            const { data: invitation, error } = await admin
-                .from("invitations")
-                .insert({
-                    account_id: accountId,
-                    email: email.trim().toLowerCase(),
-                    role: inviteRole,
-                    invited_by: user.id,
-                    cluster_id: cluster_id || null,
-                })
-                .select()
-                .single();
-
-            if (error) throw error;
 
             // Send invitation email
             let clusterName: string | null = null;

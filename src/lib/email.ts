@@ -97,7 +97,7 @@ export async function sendClusterInviteEmail({
     <div style="max-width:480px;margin:40px auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e4e4e7;">
         <!-- Header -->
         <div style="padding:32px 32px 24px;text-align:center;border-bottom:1px solid #f4f4f5;">
-            <img src="${getAppUrl()}/organic-logo.png" alt="Organic" style="height:28px;width:auto;" />
+            <img src="https://www.allorganic.ai/organic-logo.png" alt="Organic" style="height:28px;width:auto;" />
         </div>
 
         <!-- Body -->
@@ -129,7 +129,7 @@ export async function sendClusterInviteEmail({
         <!-- Footer -->
         <div style="padding:20px 32px;background:#fafafa;border-top:1px solid #f4f4f5;text-align:center;">
             <p style="margin:0;font-size:11px;color:#a1a1aa;">
-                Sent by Organic · <a href="${getAppUrl()}" style="color:#a1a1aa;">organic.so</a>
+                Sent by Organic · <a href="https://www.allorganic.ai" style="color:#a1a1aa;">allorganic.ai</a>
             </p>
         </div>
     </div>

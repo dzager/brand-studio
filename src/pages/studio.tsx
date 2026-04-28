@@ -1226,9 +1226,9 @@ export default function Home() {
                                     <div>
                                         <p className="text-xs text-muted-foreground mb-1.5">Product Image</p>
                                         <div className="rounded-lg overflow-hidden border border-border bg-muted aspect-[4/3]">
-                                            <img src={compositeProductImg.thumbnailUrl || compositeProductImg.imageUrl} alt={compositeProductImg.title} className="w-full h-full object-contain" />
+                                            <img src={compositeProductImg?.thumbnailUrl || compositeProductImg?.imageUrl} alt={compositeProductImg?.title} className="w-full h-full object-contain" />
                                         </div>
-                                        <p className="text-xs text-muted-foreground mt-1 truncate">{compositeProductImg.title}</p>
+                                        <p className="text-xs text-muted-foreground mt-1 truncate">{compositeProductImg?.title}</p>
                                     </div>
 
                                     {/* Result preview */}

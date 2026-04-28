@@ -202,6 +202,27 @@ export default function OutlineView({
         });
     }, [articles, clusters, companies]);
 
+    // DEBUG: log tree structure to identify missing cluster articles
+    useEffect(() => {
+        console.log("[OutlineView] tree data:", tree.map(c => ({
+            company: c.companyName,
+            clusters: c.clusters.map(({ cluster, pages }) => ({
+                name: cluster.name,
+                id: cluster.id,
+                pages: pages.length,
+                pageDetails: pages.map(p => ({ title: p.title.slice(0, 40), role: p.role, generated: p.generated, articleId: p.articleId })),
+            })),
+            unclustered: c.unclustered.length,
+        })));
+        console.log("[OutlineView] raw articles with cluster_id:", articles.filter(a => a.cluster_id).map(a => ({
+            title: a.title.slice(0, 40),
+            cluster_id: a.cluster_id,
+            company_id: a.company_id,
+            slug: a.slug,
+            cluster_role: a.cluster_role,
+        })));
+    }, [tree, articles]);
+
     // Seed default collapsed state: clusters closed, article role groups open
     useEffect(() => {
         setCollapsed((prev) => {
@@ -346,7 +367,7 @@ export default function OutlineView({
                                                         const roleColor = ROLE_COLORS[page.role] || "bg-muted-foreground";
                                                         return (
                                                             <button
-                                                                key={page.slug}
+                                                                key={page.articleId}
                                                                 onClick={() => onSelectArticle(page.articleId!)}
                                                                 className={cn(
                                                                     "flex items-center gap-2 w-full px-2 py-1 text-left rounded-md transition-colors text-[13px]",

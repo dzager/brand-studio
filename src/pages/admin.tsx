@@ -13,6 +13,7 @@ import {
     AlertTriangle,
     ExternalLink,
     ChevronRight,
+    ChevronDown,
     X,
     Loader2,
     Receipt,
@@ -97,6 +98,8 @@ export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState<AdminTab>("accounts");
     const [userSearch, setUserSearch] = useState("");
     const [deletingUser, setDeletingUser] = useState<string | null>(null);
+    const [changingRole, setChangingRole] = useState<string | null>(null);
+    const [deletingMember, setDeletingMember] = useState<string | null>(null);
 
     // Redirect non-admins
     useEffect(() => {
@@ -192,6 +195,48 @@ export default function AdminDashboard() {
             console.error("Delete user failed:", err);
         } finally {
             setDeletingUser(null);
+        }
+    }
+
+    async function handleChangeMemberRole(memberId: string, accountId: string, newRole: string) {
+        setChangingRole(memberId);
+        try {
+            const r = await fetch(`/api/account/members?account_id=${accountId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ account_id: accountId, member_id: memberId, role: newRole }),
+            });
+            const data = await r.json();
+            if (!r.ok) { alert(data.error || "Role change failed"); return; }
+            // Refresh account detail
+            openDetail(accountId);
+        } catch (err) {
+            console.error("Change role failed:", err);
+        } finally {
+            setChangingRole(null);
+        }
+    }
+
+    async function handleDeleteMember(memberId: string, accountId: string, email: string) {
+        if (!confirm(`Remove "${email}" from this account? They will lose access to all account resources.`)) return;
+        setDeletingMember(memberId);
+        try {
+            const r = await fetch(`/api/account/members?account_id=${accountId}`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ account_id: accountId, member_id: memberId }),
+            });
+            const data = await r.json();
+            if (!r.ok) { alert(data.error || "Delete failed"); return; }
+            // Refresh account detail
+            openDetail(accountId);
+            // Also refresh the main accounts list (member counts may have changed)
+            const accountsRes = await fetch("/api/admin/accounts");
+            setAccounts(await accountsRes.json());
+        } catch (err) {
+            console.error("Delete member failed:", err);
+        } finally {
+            setDeletingMember(null);
         }
     }
 
@@ -571,25 +616,51 @@ export default function AdminDashboard() {
                                         {detail.members.map((m: any) => (
                                             <div
                                                 key={m.id}
-                                                className="flex items-center justify-between text-sm"
+                                                className="flex items-center justify-between text-sm group"
                                             >
-                                                <div>
+                                                <div className="min-w-0 flex-1">
                                                     <span className="font-medium">
                                                         {m.full_name ||
                                                             m.email}
                                                     </span>
                                                     {m.full_name && (
-                                                        <span className="text-muted-foreground ml-2">
+                                                        <span className="text-muted-foreground ml-2 text-xs">
                                                             {m.email}
                                                         </span>
                                                     )}
                                                 </div>
-                                                <Badge
-                                                    variant="outline"
-                                                    className="text-xs capitalize"
-                                                >
-                                                    {m.role}
-                                                </Badge>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    {/* Role dropdown */}
+                                                    <div className="relative">
+                                                        <select
+                                                            value={m.role}
+                                                            onChange={(e) => handleChangeMemberRole(m.id, detail.account.id, e.target.value)}
+                                                            disabled={changingRole === m.id}
+                                                            className={cn(
+                                                                "appearance-none text-xs font-medium pl-2 pr-6 py-1 rounded-md border border-border bg-background cursor-pointer transition-colors",
+                                                                "hover:border-foreground/30 focus:outline-none focus:ring-1 focus:ring-ring",
+                                                                changingRole === m.id && "opacity-50 cursor-wait"
+                                                            )}
+                                                        >
+                                                            <option value="owner">Owner</option>
+                                                            <option value="member">Member</option>
+                                                        </select>
+                                                        <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
+                                                    </div>
+                                                    {/* Delete member */}
+                                                    <button
+                                                        onClick={() => handleDeleteMember(m.id, detail.account.id, m.email)}
+                                                        disabled={deletingMember === m.id}
+                                                        className="rounded-md p-1 hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-40"
+                                                        title="Remove member"
+                                                    >
+                                                        {deletingMember === m.id ? (
+                                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                        ) : (
+                                                            <UserX className="h-3.5 w-3.5" />
+                                                        )}
+                                                    </button>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>

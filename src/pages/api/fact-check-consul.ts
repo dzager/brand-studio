@@ -94,7 +94,6 @@ async function checkWithGemini(
         model: google(GEMINI_MODEL),
         system: FACT_CHECK_SYSTEM_PROMPT + "\n\nIMPORTANT: You MUST respond with valid JSON matching this schema exactly:\n" + JSON.stringify(SINGLE_MODEL_FACT_CHECK_SCHEMA, null, 2) + "\n\nRespond ONLY with the JSON object. No markdown fences, no preamble, no text after the JSON.",
         prompt: userPrompt,
-        maxTokens: 16384,
         tools: {
             google_search: google.tools.googleSearch({}),
         },
@@ -114,7 +113,6 @@ async function checkWithGrok(
         model: xai(GROK_MODEL),
         system: FACT_CHECK_SYSTEM_PROMPT + "\n\nIMPORTANT: You MUST respond with valid JSON matching this schema exactly:\n" + JSON.stringify(SINGLE_MODEL_FACT_CHECK_SCHEMA, null, 2) + "\n\nRespond ONLY with the JSON object. No markdown fences, no preamble, no text after the JSON.",
         prompt: userPrompt,
-        maxTokens: 16384,
     });
 
     return extractJSON(result.text) as SingleModelFactCheckResult;

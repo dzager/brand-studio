@@ -833,7 +833,7 @@ export default function CompaniesPage() {
                                             <Button variant="outline" className="border-dashed gap-1" onClick={() => setForm((prev) => ({ ...prev, image_style_categories: [...prev.image_style_categories, { id: "", label: "", narrative: "", storytelling_cues: [], image_prompt_style: "" }] }))}>
                                                 <Plus className="h-3.5 w-3.5" /> Add Style
                                             </Button>
-                                            <Button variant="outline" className="gap-1.5 border-primary/30 text-primary hover:bg-primary/5" onClick={openImageExtract}>
+                                            <Button variant="outline" className="gap-1.5 border-primary/30 text-primary hover:bg-primary/5" onClick={() => openImageExtract()}>
                                                 <Camera className="h-3.5 w-3.5" /> Extract from Image
                                             </Button>
                                         </div>

@@ -95,6 +95,20 @@ export default async function handler(
                 userId = newUser.user.id;
             }
 
+            let companyId: string | undefined;
+
+            if (invitation.cluster_id) {
+                const { data: clusterData } = await admin
+                    .from("clusters")
+                    .select("company_id")
+                    .eq("id", invitation.cluster_id)
+                    .single();
+                
+                if (clusterData?.company_id) {
+                    companyId = clusterData.company_id;
+                }
+            }
+
             // Add to account_members
             const { error: memberError } = await admin
                 .from("account_members")
@@ -105,6 +119,7 @@ export default async function handler(
                         role: invitation.role,
                         invited_by: invitation.invited_by,
                         accepted_at: new Date().toISOString(),
+                        company_id: companyId || null,
                     },
                     { onConflict: "account_id,user_id" }
                 );
