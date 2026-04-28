@@ -372,6 +372,108 @@
       </div>
 
       <!-- ───────────────────────────────────── -->
+      <!-- April 28, 2026 -->
+      <!-- ───────────────────────────────────── -->
+      <div class="changelog-entry">
+        <div class="changelog-date">April 28, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+          <span class="changelog-tag changelog-tag--design">Design</span>
+        </div>
+        <h2 class="changelog-title">Studio <em>redesign</em></h2>
+        <div class="changelog-body">
+          <p>
+            Completely redesigned the Studio content creation interface with a clearer hierarchy and more focused workflow.
+          </p>
+          <ul>
+            <li><strong>Card-based mode selector</strong> — Choose between Single Article and Content Cluster with large, visual cards instead of tabs.</li>
+            <li><strong>Character counter</strong> — Live character count on the prompt textarea helps you craft the right level of detail.</li>
+            <li><strong>Collapsible advanced options</strong> — Image style, model, and length controls are tucked into a disclosure block, keeping the primary view clean.</li>
+            <li><strong>Persistent action bar</strong> — Bottom-aligned action bar with credit estimates, clear button hierarchy, and a visual separator from the form.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">April 28, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+          <span class="changelog-tag changelog-tag--infrastructure">Infrastructure</span>
+        </div>
+        <h2 class="changelog-title">Member <em>invitations</em></h2>
+        <div class="changelog-body">
+          <p>
+            Account owners can now invite new members directly from the Admin panel with role-based access control.
+          </p>
+          <ul>
+            <li><strong>Inline invite form</strong> — Enter an email address and select a role (Owner or Member) from the account details slide-out panel.</li>
+            <li><strong>Company-scoped access</strong> — When a user accepts a cluster invitation, their account membership is scoped to the specific company associated with that cluster — not the full account.</li>
+            <li><strong>Re-invitation support</strong> — Resend invitations to the same email address without hitting "already invited" errors.</li>
+            <li><strong>Production invite URLs</strong> — Invitation links now always point to the canonical production URL instead of ephemeral Vercel deployment addresses.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">April 28, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--design">Design</span>
+          <span class="changelog-tag changelog-tag--improvement">Improvement</span>
+        </div>
+        <h2 class="changelog-title">UI <em>refinements</em></h2>
+        <div class="changelog-body">
+          <p>
+            A round of visual polish across the platform.
+          </p>
+          <ul>
+            <li><strong>Reduced border radius</strong> — Globally flattened corner radii for a sharper, more modern aesthetic.</li>
+            <li><strong>Voice profile URL import</strong> — Import writing samples directly from a URL in the Voice Profile modal. A new tabbed interface lets you choose between pasting text and fetching from a link.</li>
+            <li><strong>Image styles button</strong> — Company list rows now include an "Image Styles" action with a badge count, alongside Voice and Prompts.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ───────────────────────────────────── -->
+      <!-- April 27, 2026 -->
+      <!-- ───────────────────────────────────── -->
+      <div class="changelog-entry">
+        <div class="changelog-date">April 27, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+        </div>
+        <h2 class="changelog-title">Studio cluster <em>mode</em></h2>
+        <div class="changelog-body">
+          <p>
+            The Studio page now supports creating full content clusters alongside single articles. A visual mode switcher at the top lets you choose your creation path.
+          </p>
+          <ul>
+            <li><strong>Cluster creation flow</strong> — Define a topic, select a model, and generate a structured topical cluster strategy directly from the Studio.</li>
+            <li><strong>Deep navigation</strong> — After generating a cluster, navigate directly to the Content Architecture page to manage and expand it.</li>
+            <li><strong>Isolated UI paths</strong> — Single-article and cluster-creation inputs are separated into distinct conditional UI blocks.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">April 27, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--improvement">Improvement</span>
+          <span class="changelog-tag changelog-tag--infrastructure">Infrastructure</span>
+        </div>
+        <h2 class="changelog-title">Admin <em>enhancements</em></h2>
+        <div class="changelog-body">
+          <p>
+            Several improvements to the platform admin dashboard.
+          </p>
+          <ul>
+            <li><strong>Last Active column</strong> — Accounts table now shows the most recent sign-in across all account members.</li>
+            <li><strong>Automated brand defaults</strong> — New companies are automatically populated with best-in-class editorial guidelines, SEO content guidelines, and voice profiles during creation.</li>
+            <li><strong>Cluster sidebar fix</strong> — Resolved an issue where generated cluster articles failed to appear in the Content Architecture sidebar due to slug-based matching. Now uses <code>cluster_id</code> for reliable article association.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ───────────────────────────────────── -->
       <!-- April 26, 2026 -->
       <!-- ───────────────────────────────────── -->
       <div class="changelog-entry">

@@ -8,23 +8,38 @@ Organic is an AI-powered content creation platform that generates brand-consiste
 
 ## Pages
 
-### 1. Content Generator (`/`)
+### 1. Studio (`/studio`)
 
-The main article creation interface. Users write a prompt and the system generates a full blog article with featured image.
+The main content creation interface with two modes: **Single Article** and **Content Cluster**.
 
-**Controls:**
+**Mode Selector:**
+
+A card-based mode switcher at the top of the page lets users choose their creation path. Each mode shows its own configuration form.
+
+**Single Article Mode — Controls:**
 
 | Control | Description |
 |---|---|
 | **Company Selector** | Choose which company's brand engine to use. Loads company-specific image styles, voice profile, and editorial guidelines. |
+| **Prompt Textarea** | Free-text prompt with live character counter. |
 | **Prompt Templates** | Pre-built topic templates (loaded from `/api/prompts`) for quick article creation. |
+| **Advanced Options** | Collapsible disclosure block containing Image Style, Model, and Length selectors. |
 | **Image Style** | Dropdown of the company's custom image styles (or "Default"). Controls the visual style of the generated featured image. |
 | **✨ Recommend** | AI analyzes the prompt and recommends the best-fit image style from available options, with a reason. |
-| **Model** | Select the LLM model (GPT-5.1, Nano Banano 2). |
+| **Model** | Select the LLM model (GPT-5.4, GPT-5.5, etc.). |
 | **Length** | Target word count range (Short 300–500, Medium 800–1,200, Long 1,500–2,500, Deep Dive 2,500–4,000, No limit). |
 | **Create Article** | Generates the article, excerpt, SEO metadata, FAQ, key takeaways, JSON-LD, and featured image. |
 
-**Post-Generation Actions:**
+**Content Cluster Mode — Controls:**
+
+| Control | Description |
+|---|---|
+| **Company Selector** | Choose which company's brand engine to use. |
+| **Cluster Topic** | Free-text description of the topical cluster to generate. |
+| **Model** | Select the LLM model for strategy generation. |
+| **Generate Strategy** | Creates a structured cluster strategy with pillar, supporting, and long-tail pages. Navigates to Content Architecture on completion. |
+
+**Post-Generation Actions (Single Article):**
 
 | Action | Description |
 |---|---|
@@ -93,7 +108,9 @@ Each company can have a **Voice Profile** — a structured analysis of a writing
 
 **Workflow:**
 1. Open Voice Profile panel for a company
-2. Paste sample article content into the analysis box
+2. Choose an input method:
+   - **Paste text** — Paste sample article content directly into the analysis box
+   - **Import from URL** — Enter a URL and Organic fetches and extracts the article text automatically via `/api/fetch-article-text`
 3. Click **Analyze Voice** — AI extracts a structured voice profile
 4. Review and edit any field
 5. Click **Save Changes** — profile is persisted and used in all future article generation
@@ -169,8 +186,15 @@ Applied to every article regardless of company:
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/api/companies` | GET, POST | List companies or create a new one |
+| `/api/companies` | GET, POST | List companies or create a new one. POST auto-populates editorial guidelines, SEO guidelines, and voice profile defaults. |
 | `/api/companies/[id]` | GET, PUT, DELETE | Read, update, or delete a company |
+
+### Invitations & Collaboration
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/invitations` | POST | Create a new invitation. Sends a branded email with a unique token link. Supports re-inviting the same email. |
+| `/api/invitations/[token]` | GET, POST | GET validates the token. POST accepts the invitation — creates the user's account membership scoped to the invitation's company. |
 
 ### Utilities
 
@@ -180,6 +204,7 @@ Applied to every article regardless of company:
 | `/api/prompts/[id]` | GET | Get a specific prompt template |
 | `/api/image-search` | GET | Search Pexels for stock images |
 | `/api/image-proxy` | GET | Proxy external images to avoid CORS issues |
+| `/api/fetch-article-text` | POST | Extract article text from a URL for voice profile analysis |
 
 ---
 
@@ -221,6 +246,33 @@ Applied to every article regardless of company:
 | `image_prompt` | text | Prompt used to generate the image |
 | `seo` | jsonb | SEO metadata + AEO data (FAQ, key takeaways, content type) |
 | `company_id` | uuid | Foreign key to companies |
+| `created_at` | timestamptz | Creation timestamp |
+
+**`invitations`**
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | uuid | Primary key |
+| `email` | text | Invitee email address |
+| `token` | text | Unique invitation token (used in URL) |
+| `account_id` | uuid | Foreign key to accounts |
+| `company_id` | uuid | Foreign key to companies (scopes access) |
+| `cluster_id` | uuid | Foreign key to clusters (optional, for cluster sharing) |
+| `role` | text | Role to assign on acceptance (owner, member) |
+| `status` | text | Invitation status (pending, accepted, expired) |
+| `invited_by` | uuid | Foreign key to auth.users |
+| `created_at` | timestamptz | Creation timestamp |
+| `accepted_at` | timestamptz | Acceptance timestamp |
+
+**`account_members`**
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | uuid | Primary key |
+| `account_id` | uuid | Foreign key to accounts |
+| `user_id` | uuid | Foreign key to auth.users |
+| `company_id` | uuid | Foreign key to companies (scopes member to a specific company, nullable for full-account access) |
+| `role` | text | Member role (owner, member) |
 | `created_at` | timestamptz | Creation timestamp |
 
 ---
