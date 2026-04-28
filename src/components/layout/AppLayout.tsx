@@ -136,10 +136,10 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
     (item) => {
       // Role check
       if ((roleHierarchy[item.minRole] || 1) > userRoleLevel) return false;
-      // Company-scoped members don't need the Companies page
+      // Company-scoped members see /company instead of /companies
       if (isScopedMember && item.href === "/companies") return false;
-      // Hidden items only show in the top bar title, not sidebar/mobile nav
-      if ((item as any).hidden) return false;
+      // Non-scoped members see /companies, so hide /company for them
+      if (!isScopedMember && (item as any).hidden) return false;
       return true;
     }
   );
