@@ -1385,6 +1385,10 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                 <Button variant="outline" size="sm" onClick={() => { setShowInsertModal(true); setInsertMode("inline"); }} className="gap-1.5">
                     <ImageIcon className="h-3.5 w-3.5" /> Image
                 </Button>
+                <Button variant="outline" size="sm" onClick={checkSimilarity} disabled={checkingSimilarity || !article.company_id}
+                    className={cn("gap-1.5", similarResults !== null && similarResults.length === 0 && "text-success border-success", similarResults !== null && similarResults.length > 0 && "text-amber-500 border-amber-500")}>
+                    {checkingSimilarity ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Checking…</> : similarResults !== null ? <><Search className="h-3.5 w-3.5" /> {similarResults.length === 0 ? "No Overlap" : `${similarResults.length} Similar`}</> : <><Search className="h-3.5 w-3.5" /> Similarity</>}
+                </Button>
                 <Button variant="outline" size="sm" onClick={handleConsulCheck} disabled={consulChecking || !displayArticle.html}
                     className="gap-1.5 border-primary/30">
                     {consulChecking ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Consulting…</> : consulResult ? <><Scale className="h-3.5 w-3.5" /> Re-check</> : <><Scale className="h-3.5 w-3.5" /> Fact-Check Consul</>}
@@ -1417,44 +1421,32 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                 </Alert>
             )}
 
-            {/* Similarity Analysis */}
-            <Card>
-                <CardContent className="p-4">
-                    <div className="flex justify-between items-center mb-2">
-                        <h4 className="text-sm font-medium flex items-center gap-1.5">
-                            <Search className="h-3.5 w-3.5 text-muted-foreground" />
-                            Similarity Analysis
-                        </h4>
-                        <Button variant="outline" size="sm" onClick={checkSimilarity} disabled={checkingSimilarity || !article.company_id}
-                            className={cn("text-xs", !article.company_id && "opacity-50")}>
-                            {checkingSimilarity ? "Checking…" : "Find Similar"}
-                        </Button>
-                    </div>
-                    {simErr && <p className="text-xs text-destructive mt-1">{simErr}</p>}
-                    {similarResults !== null && (
-                        similarResults.length === 0 ? (
-                            <div className="flex items-center gap-1.5 text-sm text-success">
-                                <CheckCircle2 className="h-4 w-4" /> No significant overlap found
-                            </div>
-                        ) : (
-                            <div className="space-y-1.5 mt-2">
-                                {similarResults.map((r) => {
-                                    const pct = Math.round(r.similarity * 100);
-                                    return (
-                                        <button key={r.id} onClick={() => onSelectArticle(r.id)}
-                                            className="flex items-center gap-2 w-full p-2 rounded-md border border-border bg-background hover:bg-accent text-left text-xs transition-colors">
-                                            <Badge variant={pct >= 92 ? "destructive" : "secondary"} className="text-[11px] font-bold shrink-0">
-                                                {pct}%
-                                            </Badge>
-                                            <span className="truncate">{r.title}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        )
-                    )}
-                </CardContent>
-            </Card>
+            {/* Similarity Results (inline) */}
+            {simErr && (
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>Similarity check failed: {simErr}</AlertDescription>
+                </Alert>
+            )}
+            {similarResults !== null && similarResults.length > 0 && (
+                <div className="space-y-1.5">
+                    <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                        <Search className="h-3 w-3" /> {similarResults.length} similar article{similarResults.length !== 1 ? "s" : ""} found
+                    </h4>
+                    {similarResults.map((r) => {
+                        const pct = Math.round(r.similarity * 100);
+                        return (
+                            <button key={r.id} onClick={() => onSelectArticle(r.id)}
+                                className="flex items-center gap-2 w-full p-2 rounded-md border border-border bg-background hover:bg-accent text-left text-xs transition-colors">
+                                <Badge variant={pct >= 92 ? "destructive" : "secondary"} className="text-[11px] font-bold shrink-0">
+                                    {pct}%
+                                </Badge>
+                                <span className="truncate">{r.title}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
 
             {/* Fact-Check Consul */}
             {consulErr && (

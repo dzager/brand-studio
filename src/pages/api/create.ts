@@ -256,7 +256,24 @@ Which style best fits this article? Respond with JSON only.`;
             }
         }
 
-        let system = compileBlogSystemPrompt(brand);
+        // Fetch account-level base prompt overrides (if any)
+        let baseSystemPromptOverride: string | undefined;
+        if (accountId) {
+            try {
+                const { data: acctData } = await getSupabase()
+                    .from("accounts")
+                    .select("base_system_prompt")
+                    .eq("id", accountId)
+                    .single();
+                if (acctData?.base_system_prompt) {
+                    baseSystemPromptOverride = acctData.base_system_prompt;
+                }
+            } catch {
+                // Non-blocking — fall back to hardcoded defaults
+            }
+        }
+
+        let system = compileBlogSystemPrompt(brand, { baseOverride: baseSystemPromptOverride });
 
         // Fetch and inject reference articles if the company has any
         if (brand.reference_articles && brand.reference_articles.length > 0) {

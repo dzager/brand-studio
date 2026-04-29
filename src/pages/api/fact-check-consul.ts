@@ -22,7 +22,7 @@ import {
 
 // ── Constants ───────────────────────────────────────────────────────────
 
-const GEMINI_MODEL = "gemini-2.5-pro-preview-05-06";
+const GEMINI_MODEL = "gemini-2.5-pro";
 const GROK_MODEL = "grok-4";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -345,10 +345,13 @@ export default async function handler(
 
         const userPrompt = buildFactCheckUserPrompt(title, excerpt, html);
 
-        // Fire both models in parallel
+        // Fire both models in parallel (skip Grok if no XAI_API_KEY)
+        const hasXaiKey = !!process.env.XAI_API_KEY;
         const [geminiResult, grokResult] = await Promise.allSettled([
             checkWithGemini(userPrompt),
-            checkWithGrok(userPrompt),
+            hasXaiKey
+                ? checkWithGrok(userPrompt)
+                : Promise.reject(new Error("XAI_API_KEY not configured — skipping Grok")),
         ]);
 
         const geminiOk = geminiResult.status === "fulfilled";

@@ -15,8 +15,8 @@ import { Label } from "@/components/ui/label";
 import {
     ChevronDown, ChevronRight, AlertCircle, Mic, FileText,
     Palette, Eye, BookOpen, Search as SearchIcon, Settings2,
-    Layers, Copy as CopyIcon, CheckCircle2, Pencil, Save, X, Plus,
-    Camera, ImagePlus, Loader2, Sparkles,
+    Layers, Copy as CopyIcon, CheckCircle2, Save, X, Plus, Trash2,
+    Camera, ImagePlus, Loader2, Sparkles, Cpu,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
@@ -108,13 +108,14 @@ function FieldList({ label, items, editing, onChange, placeholder }: {
 /* ── Company Card (used for both single and multi mode) ──────────── */
 function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c: CompanyData) => void }) {
     const [copiedId, setCopiedId] = useState<string | null>(null);
-    const [editing, setEditing] = useState(false);
+    const [editing, setEditing] = useState(true);
     const [saving, setSaving] = useState(false);
     const [saveErr, setSaveErr] = useState<string | null>(null);
     const [saved, setSaved] = useState(false);
     const [newRefUrl, setNewRefUrl] = useState("");
     const [expandedStyles, setExpandedStyles] = useState<Set<number>>(new Set());
     const hasCustomStyles = Array.isArray(company.image_style_categories) && company.image_style_categories.length > 0;
+    const defaultVP: VoiceProfile = { summary: "", tone_descriptors: [], sentence_rhythm: "", paragraph_style: "", vocabulary_level: "", rhetorical_devices: [], structural_patterns: [], pov_and_person: "", sample_phrases: [], avoid: [], banned_phrases: [], structural_do: [], structural_dont: [], specificity_rules: [], length_rules: [] };
     const [form, setForm] = useState(() => ({
         name: company.name, tagline: company.tagline ?? "", mission: company.mission ?? "",
         archetype: company.archetype ?? "guide", tone: company.tone ?? "",
@@ -128,6 +129,7 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
         reference_articles: company.reference_articles ?? [] as string[],
         useCustomStyles: hasCustomStyles,
         image_style_categories: hasCustomStyles ? company.image_style_categories! : [] as ImageStyleCategory[],
+        voice_profile: company.voice_profile ? { ...company.voice_profile } : null as VoiceProfile | null,
     }));
 
     // Image Style Extraction state
@@ -218,11 +220,31 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
             reference_articles: company.reference_articles ?? [],
             useCustomStyles: hcs,
             image_style_categories: hcs ? company.image_style_categories! : [],
+            voice_profile: company.voice_profile ? { ...company.voice_profile } : null,
         });
         setEditing(true); setSaveErr(null); setSaved(false); setNewRefUrl("");
     }
 
-    function cancelEdit() { setEditing(false); setSaveErr(null); }
+    function cancelEdit() {
+        // Reset form to company data
+        const hcs = Array.isArray(company.image_style_categories) && company.image_style_categories.length > 0;
+        setForm({
+            name: company.name, tagline: company.tagline ?? "", mission: company.mission ?? "",
+            archetype: company.archetype ?? "guide", tone: company.tone ?? "",
+            target_audiences: company.target_audiences ?? [],
+            photography_style: company.photography_style ?? "",
+            color_primary: company.color_primary ?? "#000000", color_secondary: company.color_secondary ?? "#FFFFFF",
+            avoid_phrases: company.avoid_phrases ?? "",
+            editorial_guidelines: company.editorial_guidelines ?? "",
+            seo_content_guidelines: company.seo_content_guidelines ?? "",
+            auto_humanize: company.auto_humanize !== false, include_toc: company.include_toc === true,
+            reference_articles: company.reference_articles ?? [],
+            useCustomStyles: hcs,
+            image_style_categories: hcs ? company.image_style_categories! : [],
+            voice_profile: company.voice_profile ? { ...company.voice_profile } : null,
+        });
+        setSaveErr(null); setSaved(false);
+    }
 
     async function handleSave() {
         setSaving(true); setSaveErr(null);
@@ -239,7 +261,7 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
             });
             const data = await r.json();
             if (!r.ok) throw new Error(data.error || "Save failed");
-            setEditing(false); setSaved(true); setTimeout(() => setSaved(false), 3000);
+            setSaved(true); setTimeout(() => setSaved(false), 3000);
             if (onSaved) onSaved({ ...data, prompts: company.prompts });
         } catch (e: any) { setSaveErr(e.message); }
         finally { setSaving(false); }
@@ -256,29 +278,18 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
         });
     }
 
-    const vp = company.voice_profile;
-    const styles = company.image_style_categories;
-    const hasStyles = Array.isArray(styles) && styles.length > 0;
+
 
     return (
         <div className="space-y-3">
-            {/* Edit / Save bar */}
+            {/* Save bar */}
             <div className="flex items-center gap-2">
-                {!editing && (
-                    <Button variant="outline" size="sm" className="gap-1.5" onClick={startEdit}>
-                        <Pencil className="h-3.5 w-3.5" /> Edit
-                    </Button>
-                )}
-                {editing && (
-                    <>
-                        <Button size="sm" className="gap-1.5" onClick={handleSave} disabled={saving}>
-                            <Save className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Save"}
-                        </Button>
-                        <Button variant="ghost" size="sm" className="gap-1.5" onClick={cancelEdit} disabled={saving}>
-                            <X className="h-3.5 w-3.5" /> Cancel
-                        </Button>
-                    </>
-                )}
+                <Button size="sm" className="gap-1.5" onClick={handleSave} disabled={saving}>
+                    <Save className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Save Changes"}
+                </Button>
+                <Button variant="ghost" size="sm" className="gap-1.5" onClick={cancelEdit} disabled={saving}>
+                    <X className="h-3.5 w-3.5" /> Reset
+                </Button>
                 {saved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Saved</span>}
                 {saveErr && <span className="text-xs text-destructive">{saveErr}</span>}
             </div>
@@ -327,7 +338,7 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
                 title="Image Styles"
                 icon={Layers}
                 badge={(() => {
-                    const s = editing ? form.image_style_categories : styles;
+                    const s = form.image_style_categories;
                     const h = Array.isArray(s) && s.length > 0;
                     return h ? <Badge variant="secondary" className="text-[10px] ml-1">{s!.length}</Badge> : <Badge variant="outline" className="text-[10px] ml-1 text-muted-foreground">Default</Badge>;
                 })()}
@@ -409,57 +420,52 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
                                 </div>
                             )}
                         </>
-                    ) : (
-                        <>
-                            {!hasStyles && <p className="text-sm text-muted-foreground italic">Using default image styles. No custom styles configured.</p>}
-                            {hasStyles && styles!.map((cat, idx) => (
-                                <ImageStyleCard key={idx} style={cat} />
-                            ))}
-                        </>
-                    )}
+                    ) : null}
                 </div>
             </Section>
 
-            {/* Voice Profile (read-only — managed via Companies page) */}
+            {/* Voice Profile */}
             <Section
                 title="Voice Profile"
                 icon={Mic}
-                badge={vp ? <Badge variant="outline" className="text-[10px] ml-1 text-primary border-primary/50">Active</Badge> : <Badge variant="outline" className="text-[10px] ml-1 text-muted-foreground">Not Set</Badge>}
+                badge={form.voice_profile ? <Badge variant="outline" className="text-[10px] ml-1 text-primary border-primary/50">Active</Badge> : <Badge variant="outline" className="text-[10px] ml-1 text-muted-foreground">Not Set</Badge>}
             >
                 <div className="space-y-4 pt-3">
-                    {!vp && <p className="text-sm text-muted-foreground italic">No voice profile configured yet.</p>}
-                    {vp && (
+                    {!form.voice_profile ? (
+                        <div className="space-y-2">
+                            <p className="text-sm text-muted-foreground italic">No voice profile configured yet.</p>
+                            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setForm(prev => ({ ...prev, voice_profile: defaultVP }))}>
+                                <Plus className="h-3.5 w-3.5" /> Create Voice Profile
+                            </Button>
+                        </div>
+                    ) : (
                         <>
-                            <Field label="Summary" value={vp.summary} />
+                            <Field label="Summary" value={form.voice_profile.summary} editing onChange={v => setForm(prev => ({ ...prev, voice_profile: prev.voice_profile ? { ...prev.voice_profile, summary: v } : prev.voice_profile }))} rows={3} />
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <FieldList label="Tone Descriptors" items={vp.tone_descriptors} />
-                                <Field label="POV & Person" value={vp.pov_and_person} />
+                                <FieldList label="Tone Descriptors" items={form.voice_profile.tone_descriptors} editing onChange={v => setForm(prev => ({ ...prev, voice_profile: prev.voice_profile ? { ...prev.voice_profile, tone_descriptors: v } : prev.voice_profile }))} />
+                                <Field label="POV & Person" value={form.voice_profile.pov_and_person} editing onChange={v => setForm(prev => ({ ...prev, voice_profile: prev.voice_profile ? { ...prev.voice_profile, pov_and_person: v } : prev.voice_profile }))} />
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <Field label="Sentence Rhythm" value={vp.sentence_rhythm} />
-                                <Field label="Paragraph Style" value={vp.paragraph_style} />
+                                <Field label="Sentence Rhythm" value={form.voice_profile.sentence_rhythm} editing onChange={v => setForm(prev => ({ ...prev, voice_profile: prev.voice_profile ? { ...prev.voice_profile, sentence_rhythm: v } : prev.voice_profile }))} rows={2} />
+                                <Field label="Paragraph Style" value={form.voice_profile.paragraph_style} editing onChange={v => setForm(prev => ({ ...prev, voice_profile: prev.voice_profile ? { ...prev.voice_profile, paragraph_style: v } : prev.voice_profile }))} rows={2} />
                             </div>
-                            <Field label="Vocabulary Level" value={vp.vocabulary_level} />
+                            <Field label="Vocabulary Level" value={form.voice_profile.vocabulary_level} editing onChange={v => setForm(prev => ({ ...prev, voice_profile: prev.voice_profile ? { ...prev.voice_profile, vocabulary_level: v } : prev.voice_profile }))} rows={2} />
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <FieldList label="Rhetorical Devices" items={vp.rhetorical_devices} />
-                                <FieldList label="Sample Phrases" items={vp.sample_phrases} />
+                                <FieldList label="Rhetorical Devices" items={form.voice_profile.rhetorical_devices} editing onChange={v => setForm(prev => ({ ...prev, voice_profile: prev.voice_profile ? { ...prev.voice_profile, rhetorical_devices: v } : prev.voice_profile }))} />
+                                <FieldList label="Sample Phrases" items={form.voice_profile.sample_phrases} editing onChange={v => setForm(prev => ({ ...prev, voice_profile: prev.voice_profile ? { ...prev.voice_profile, sample_phrases: v } : prev.voice_profile }))} />
                             </div>
-                            <FieldList label="Structural Patterns" items={vp.structural_patterns} />
+                            <FieldList label="Structural Patterns" items={form.voice_profile.structural_patterns} editing onChange={v => setForm(prev => ({ ...prev, voice_profile: prev.voice_profile ? { ...prev.voice_profile, structural_patterns: v } : prev.voice_profile }))} />
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <FieldList label="✓ Do Use" items={vp.structural_do} />
-                                <FieldList label="✗ Don't Use" items={vp.structural_dont} />
+                                <FieldList label="✓ Do Use" items={form.voice_profile.structural_do} editing onChange={v => setForm(prev => ({ ...prev, voice_profile: prev.voice_profile ? { ...prev.voice_profile, structural_do: v } : prev.voice_profile }))} />
+                                <FieldList label="✗ Don't Use" items={form.voice_profile.structural_dont} editing onChange={v => setForm(prev => ({ ...prev, voice_profile: prev.voice_profile ? { ...prev.voice_profile, structural_dont: v } : prev.voice_profile }))} />
                             </div>
-                            <FieldList label="Specificity Rules" items={vp.specificity_rules} />
-                            <FieldList label="Length Rules" items={vp.length_rules} />
-                            <FieldList label="Patterns to Avoid" items={vp.avoid} />
-                            {(vp.banned_phrases?.length ?? 0) > 0 && (
-                                <div className="space-y-1">
-                                    <div className="text-xs font-medium text-destructive">Banned Phrases</div>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {vp.banned_phrases!.map((p, i) => <Badge key={i} variant="destructive" className="text-xs font-normal">&ldquo;{p}&rdquo;</Badge>)}
-                                    </div>
-                                </div>
-                            )}
+                            <FieldList label="Specificity Rules" items={form.voice_profile.specificity_rules} editing onChange={v => setForm(prev => ({ ...prev, voice_profile: prev.voice_profile ? { ...prev.voice_profile, specificity_rules: v } : prev.voice_profile }))} />
+                            <FieldList label="Length Rules" items={form.voice_profile.length_rules} editing onChange={v => setForm(prev => ({ ...prev, voice_profile: prev.voice_profile ? { ...prev.voice_profile, length_rules: v } : prev.voice_profile }))} />
+                            <FieldList label="Patterns to Avoid" items={form.voice_profile.avoid} editing onChange={v => setForm(prev => ({ ...prev, voice_profile: prev.voice_profile ? { ...prev.voice_profile, avoid: v } : prev.voice_profile }))} />
+                            <FieldList label="Banned Phrases" items={form.voice_profile.banned_phrases} editing onChange={v => setForm(prev => ({ ...prev, voice_profile: prev.voice_profile ? { ...prev.voice_profile, banned_phrases: v } : prev.voice_profile }))} placeholder="comma-separated banned phrases" />
+                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive gap-1.5" onClick={() => setForm(prev => ({ ...prev, voice_profile: null }))}>
+                                <Trash2 className="h-3.5 w-3.5" /> Remove Voice Profile
+                            </Button>
                         </>
                     )}
                 </div>
@@ -582,6 +588,9 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
                     ) : null}
                 </div>
             </Section>
+
+            {/* Prompt Engine (compiled system + user prompts) */}
+            <PromptEngineSection companyId={company.id} />
 
             {/* Image Style Extraction Modal */}
             <Dialog open={showImageExtract} onOpenChange={(open) => { if (!open) closeImageExtract(); }}>
@@ -711,22 +720,183 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
     );
 }
 
+/* ── Prompt Engine Section (lazy-loaded compiled prompts) ────────── */
+function PromptEngineSection({ companyId }: { companyId: string }) {
+    const [open, setOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
+    const [userPrompt, setUserPrompt] = useState<string | null>(null);
+    const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<"system" | "user">("system");
+    const loaded = useRef(false);
+
+    function copyToClipboard(text: string, id: string) {
+        navigator.clipboard.writeText(text).then(() => {
+            setCopiedId(id);
+            setTimeout(() => setCopiedId(null), 2000);
+        });
+    }
+
+    function handleToggle() {
+        const willOpen = !open;
+        setOpen(willOpen);
+        if (willOpen && !loaded.current) {
+            setLoading(true);
+            setError(null);
+            fetch(`/api/companies/${companyId}/prompt-engine`)
+                .then((r) => r.json())
+                .then((data) => {
+                    if (data.error) throw new Error(data.error);
+                    setSystemPrompt(data.system_prompt);
+                    setUserPrompt(data.user_prompt_template);
+                    loaded.current = true;
+                })
+                .catch((e) => setError(e.message))
+                .finally(() => setLoading(false));
+        }
+    }
+
+    // Rough token estimate
+    const estimateTokens = (text: string) => Math.ceil(text.length / 4);
+    const systemTokens = systemPrompt ? estimateTokens(systemPrompt) : 0;
+    const userTokens = userPrompt ? estimateTokens(userPrompt) : 0;
+
+    return (
+        <Card>
+            <button
+                onClick={handleToggle}
+                className="flex items-center justify-between w-full px-5 py-3.5 text-left hover:bg-muted/50 transition-colors"
+            >
+                <span className="flex items-center gap-2.5 text-sm font-semibold">
+                    <Cpu className="h-4 w-4 text-muted-foreground" />
+                    Prompt Engine
+                    <Badge variant="outline" className="text-[10px] ml-1 text-muted-foreground">Base</Badge>
+                </span>
+                {open ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+            </button>
+            {open && (
+                <CardContent className="pt-0 pb-5 px-5 border-t border-border">
+                    <div className="space-y-4 pt-3">
+                        {/* Info */}
+                        <div className="flex items-start gap-2.5 rounded-md bg-muted/40 border border-border p-3">
+                            <AlertCircle className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                            <div className="text-xs text-muted-foreground leading-relaxed">
+                                <p>This is the <strong>compiled prompt</strong> sent to the LLM for this company. It combines the <strong>base prompt</strong> (editable in <strong>Settings → Prompts</strong>) with this company's editorial guidelines, SEO guidelines, and voice profile layered on top.</p>
+                                <p className="mt-1.5">Company-level settings always take priority over the base prompt.</p>
+                            </div>
+                        </div>
+
+                        {loading && (
+                            <div className="flex items-center gap-2 justify-center py-8">
+                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">Compiling prompts…</span>
+                            </div>
+                        )}
+
+                        {error && (
+                            <Alert variant="destructive">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription>{error}</AlertDescription>
+                            </Alert>
+                        )}
+
+                        {systemPrompt && userPrompt && (
+                            <>
+                                {/* Token summary */}
+                                <div className="flex gap-4 text-xs text-muted-foreground">
+                                    <span>System: ~{systemTokens.toLocaleString()} tokens</span>
+                                    <span>User: ~{userTokens.toLocaleString()} tokens</span>
+                                    <span className="font-medium text-foreground">Total: ~{(systemTokens + userTokens).toLocaleString()} tokens</span>
+                                </div>
+
+                                {/* Tab toggle */}
+                                <div className="flex gap-1 rounded-lg bg-muted p-0.5">
+                                    <button
+                                        onClick={() => setActiveTab("system")}
+                                        className={cn(
+                                            "flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                                            activeTab === "system"
+                                                ? "bg-background shadow-sm text-foreground"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        System Prompt
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab("user")}
+                                        className={cn(
+                                            "flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                                            activeTab === "user"
+                                                ? "bg-background shadow-sm text-foreground"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        User Prompt Template
+                                    </button>
+                                </div>
+
+                                {/* Prompt content */}
+                                <div className="relative">
+                                    <pre className="whitespace-pre-wrap text-xs leading-relaxed bg-muted rounded-md p-4 max-h-[500px] overflow-y-auto font-mono">{activeTab === "system" ? systemPrompt : userPrompt}</pre>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="absolute top-2 right-2 h-7 text-xs gap-1"
+                                        onClick={() =>
+                                            copyToClipboard(
+                                                activeTab === "system" ? systemPrompt : userPrompt,
+                                                activeTab
+                                            )
+                                        }
+                                    >
+                                        {copiedId === activeTab ? (
+                                            <><CheckCircle2 className="h-3 w-3" /> Copied</>
+                                        ) : (
+                                            <><CopyIcon className="h-3 w-3" /> Copy</>
+                                        )}
+                                    </Button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </CardContent>
+            )}
+        </Card>
+    );
+}
+
 /* ── Image Style Card ────────────────────────────────────────────── */
-function ImageStyleCard({ style: cat }: { style: ImageStyleCategory }) {
+function ImageStyleCard({ style: cat, onDelete }: { style: ImageStyleCategory; onDelete?: () => void }) {
     const [expanded, setExpanded] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
     return (
         <Card className="bg-muted/20">
-            <button
-                onClick={() => setExpanded(!expanded)}
-                className="flex items-center justify-between w-full px-4 py-2.5 text-left hover:bg-muted/40 transition-colors"
-            >
-                <span className="text-sm font-medium flex items-center gap-1.5">
-                    {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            <div className="flex items-center justify-between px-4 py-2.5 hover:bg-muted/40 transition-colors">
+                <button
+                    onClick={() => setExpanded(!expanded)}
+                    className="flex items-center gap-1.5 text-sm font-medium text-left flex-1 min-w-0"
+                >
+                    {expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
                     {cat.label || "Untitled Style"}
                     <span className="text-xs text-muted-foreground">({cat.id})</span>
                     {cat.type === "composite" && <Badge variant="outline" className="text-[10px] h-4 gap-0.5">🧩 Composite</Badge>}
-                </span>
-            </button>
+                </button>
+                {onDelete && (
+                    <div className="flex items-center gap-1 shrink-0 ml-2">
+                        {confirmDelete ? (
+                            <>
+                                <Button variant="destructive" size="sm" className="h-6 text-[11px] px-2" onClick={onDelete}>Delete</Button>
+                                <Button variant="ghost" size="sm" className="h-6 text-[11px] px-2" onClick={() => setConfirmDelete(false)}>Cancel</Button>
+                            </>
+                        ) : (
+                            <Button variant="ghost" size="sm" className="h-6 px-1.5 text-destructive hover:text-destructive" onClick={() => setConfirmDelete(true)}>
+                                <Trash2 className="h-3 w-3" />
+                            </Button>
+                        )}
+                    </div>
+                )}
+            </div>
             {expanded && (
                 <CardContent className="pt-0 pb-3 px-4 space-y-2.5 border-t border-border">
                     <Field label="Narrative" value={cat.narrative} />

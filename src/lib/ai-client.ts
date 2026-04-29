@@ -46,7 +46,7 @@ export const MODEL_REGISTRY: ModelOption[] = [
     // Google
     { id: "gemini-3.1-pro-preview",            label: "Gemini 3.1 Pro",   provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true, capabilities: ["writing", "utility"] },
     { id: "gemini-2.5-flash-preview-04-17", label: "Gemini 2.5 Flash", provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true, capabilities: ["writing", "utility"] },
-    { id: "gemini-2.5-pro-preview-05-06",   label: "Gemini 2.5 Pro",   provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true, capabilities: ["writing", "utility"] },
+    { id: "gemini-2.5-pro",                 label: "Gemini 2.5 Pro",   provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true, capabilities: ["writing", "utility"] },
     { id: "gemini-3.1-flash-lite-preview",   label: "Gemini 3.1 Flash", provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true, capabilities: ["writing", "utility"] },
     { id: "gemini-2.5-flash-image",            label: "Gemini 2.5 Flash Image", provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true, capabilities: ["writing", "imageGeneration"] },
     { id: "gemini-3-pro-image-preview",         label: "Gemini 3 Pro Image",     provider: "google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY", supportsStructured: true, capabilities: ["writing", "imageGeneration"] },

@@ -472,7 +472,8 @@ export function compileVoiceProfileClause(
  * injected from engine.editorial_guidelines (editable per company).
  */
 export function compileBlogSystemPrompt(
-    engine: BrandEngine = BRAND_ENGINE
+    engine: BrandEngine = BRAND_ENGINE,
+    opts?: { baseOverride?: string }
 ): string {
     const brand = engine.engine_meta.brand_name;
     const vp = engine.voice_profile;
@@ -483,6 +484,36 @@ export function compileBlogSystemPrompt(
         ...(vp?.banned_phrases ?? []),
     ];
     const uniqueBanned = [...new Set(bannedPhrases)];
+
+    // ── ACCOUNT-LEVEL BASE OVERRIDE ──────────────────────────────────
+    // If an account-level base system prompt override is provided, use it
+    // as the foundation and only append company-specific overlays on top.
+    if (opts?.baseOverride) {
+        const overrideSections: string[] = [opts.baseOverride];
+
+        // Company SEO content guidelines (company-specific, takes priority)
+        if (engine.seo_content_guidelines) {
+            overrideSections.push(`\n\n## Company SEO Content Guidelines (MANDATORY — FOLLOW CLOSELY)\nThe following SEO content guidelines are specific to ${brand}. These guidelines supplement and may override the base SEO rules above. When in conflict, these company-specific guidelines take precedence.\n\n${engine.seo_content_guidelines}`);
+        }
+
+        // Company editorial guidelines (company-specific, takes priority)
+        if (engine.editorial_guidelines) {
+            overrideSections.push(`\n\n## Company Editorial Guidelines (FOLLOWS THESE CLOSELY)\nThe following editorial guidelines are specific to ${brand}. These guidelines take precedence over base rules for voice, tone, content depth, formatting, and section structure. Produce thorough, detailed, richly sourced articles as described below.\n\n${engine.editorial_guidelines}`);
+        }
+
+        // Banned phrases
+        if (uniqueBanned.length) {
+            overrideSections.push(`\n\n## Banned Phrases\nNever use these phrases: ${uniqueBanned.map(p => `"${p}"`).join(", ")}.`);
+        }
+
+        // Voice profile overlay (company-specific)
+        const voiceClauseOverride = compileVoiceProfileClause(engine);
+        if (voiceClauseOverride) {
+            overrideSections.push(voiceClauseOverride);
+        }
+
+        return overrideSections.join("\n");
+    }
 
     // ── BASE ENGINE (applies to ALL companies) ──────────────────────────
 

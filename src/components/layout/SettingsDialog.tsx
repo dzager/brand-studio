@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -28,6 +29,11 @@ import {
     Trash2,
     Check,
     X,
+    Cpu,
+    Copy,
+    CheckCircle2,
+    AlertCircle,
+    Info,
 } from "lucide-react";
 
 type ModelInfo = {
@@ -126,6 +132,19 @@ export default function SettingsDialog({
     const [removingMember, setRemovingMember] = useState<string | null>(null);
     const [companyList, setCompanyList] = useState<{ id: string; name: string }[]>([]);
     const [assigningCompany, setAssigningCompany] = useState<string | null>(null);
+
+    // Prompt Engine tab state
+    const [peLoading, setPeLoading] = useState(false);
+    const [peSaving, setPeSaving] = useState(false);
+    const [peError, setPeError] = useState<string | null>(null);
+    const [peSaved, setPeSaved] = useState(false);
+    const [peActiveTab, setPeActiveTab] = useState<"system" | "user">("system");
+    const [peSystemPrompt, setPeSystemPrompt] = useState("");
+    const [peUserPrompt, setPeUserPrompt] = useState("");
+    const [peDefaultSystem, setPeDefaultSystem] = useState("");
+    const [peDefaultUser, setPeDefaultUser] = useState("");
+    const [peCopiedId, setPeCopiedId] = useState<string | null>(null);
+    const [peLoaded, setPeLoaded] = useState(false);
 
     // Fetch models
     useEffect(() => {
@@ -299,15 +318,32 @@ export default function SettingsDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-xl">
+            <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         Settings
                     </DialogTitle>
                 </DialogHeader>
 
-                <Tabs defaultValue="account" className="w-full">
-                    <TabsList className="w-full">
+                <Tabs defaultValue="account" className="w-full flex-1 flex flex-col min-h-0" onValueChange={(val) => {
+                    if (val === "prompts" && !peLoaded && activeAccount?.account_id) {
+                        setPeLoading(true);
+                        setPeError(null);
+                        fetch(`/api/account/prompt-engine?account_id=${activeAccount.account_id}`)
+                            .then((r) => r.json())
+                            .then((data) => {
+                                if (data.error) throw new Error(data.error);
+                                setPeSystemPrompt(data.base_system_prompt || "");
+                                setPeUserPrompt(data.base_user_prompt || "");
+                                setPeDefaultSystem(data.default_system_prompt);
+                                setPeDefaultUser(data.default_user_prompt);
+                                setPeLoaded(true);
+                            })
+                            .catch((e) => setPeError(e.message))
+                            .finally(() => setPeLoading(false));
+                    }
+                }}>
+                    <TabsList className="w-full shrink-0">
                         <TabsTrigger value="account" className="flex-1 gap-1.5">
                             <Building2 className="h-3.5 w-3.5" />
                             Account
@@ -320,11 +356,15 @@ export default function SettingsDialog({
                             <CreditCard className="h-3.5 w-3.5" />
                             Billing
                         </TabsTrigger>
+                        <TabsTrigger value="prompts" className="flex-1 gap-1.5">
+                            <Cpu className="h-3.5 w-3.5" />
+                            Prompts
+                        </TabsTrigger>
                     </TabsList>
 
                     {/* ═══════ Account Tab ═══════ */}
-                    <TabsContent value="account">
-                        <div className="space-y-5 py-2">
+                    <TabsContent value="account" className="flex-1 flex flex-col min-h-0">
+                        <div className="flex-1 overflow-y-auto space-y-5 py-2 pr-1">
                             {/* Account Details */}
                             <div className="space-y-3">
                                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -433,14 +473,14 @@ export default function SettingsDialog({
                             </div>
                         </div>
 
-                        <DialogFooter>
+                        <DialogFooter className="shrink-0">
                             <Button onClick={() => onOpenChange(false)}>Done</Button>
                         </DialogFooter>
                     </TabsContent>
 
                     {/* ═══════ Models Tab ═══════ */}
-                    <TabsContent value="models">
-                        <div className="space-y-5 py-2">
+                    <TabsContent value="models" className="flex-1 flex flex-col min-h-0">
+                        <div className="flex-1 overflow-y-auto space-y-5 py-2 pr-1">
                             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                                 Default Models
                             </h3>
@@ -486,7 +526,7 @@ export default function SettingsDialog({
                             })}
                         </div>
 
-                        <DialogFooter className="flex-row justify-between sm:justify-between">
+                        <DialogFooter className="flex-row justify-between sm:justify-between shrink-0">
                             <Button
                                 variant="ghost"
                                 size="sm"
@@ -501,8 +541,8 @@ export default function SettingsDialog({
                     </TabsContent>
 
                     {/* ═══════ Billing Tab ═══════ */}
-                    <TabsContent value="billing">
-                        <div className="space-y-5 py-2">
+                    <TabsContent value="billing" className="flex-1 flex flex-col min-h-0">
+                        <div className="flex-1 overflow-y-auto space-y-5 py-2 pr-1">
                             {/* Current plan */}
                             <div className="rounded-xl border border-border p-4 space-y-4">
                                 <div className="flex items-center justify-between">
@@ -658,8 +698,166 @@ export default function SettingsDialog({
                             )}
                         </div>
 
-                        <DialogFooter>
+                        <DialogFooter className="shrink-0">
                             <Button onClick={() => onOpenChange(false)}>Done</Button>
+                        </DialogFooter>
+                    </TabsContent>
+
+                    {/* ═══════ Prompt Engine Tab ═══════ */}
+                    <TabsContent value="prompts" className="flex-1 flex flex-col min-h-0">
+                        <div className="flex-1 overflow-y-auto space-y-4 py-2 pr-1">
+                            {/* Info callout */}
+                            <div className="flex items-start gap-2.5 rounded-md bg-muted/40 border border-border p-3">
+                                <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    The <strong>base prompt engine</strong> defines the default instructions sent to the LLM for all companies under this account. Company-level <strong>Editorial Guidelines</strong>, <strong>SEO Guidelines</strong>, and <strong>Voice Profiles</strong> are layered on top and take priority.
+                                </p>
+                            </div>
+
+                            {peLoading && (
+                                <div className="flex items-center gap-2 justify-center py-8">
+                                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                    <span className="text-sm text-muted-foreground">Loading prompts…</span>
+                                </div>
+                            )}
+
+                            {peError && (
+                                <div className="rounded-lg bg-destructive/10 text-destructive px-3 py-2 text-xs flex items-center gap-1.5">
+                                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                                    {peError}
+                                </div>
+                            )}
+
+                            {!peLoading && peLoaded && (
+                                <>
+                                    {/* Tab toggle */}
+                                    <div className="flex gap-1 rounded-lg bg-muted p-0.5">
+                                        <button
+                                            onClick={() => setPeActiveTab("system")}
+                                            className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                                                peActiveTab === "system"
+                                                    ? "bg-background shadow-sm text-foreground"
+                                                    : "text-muted-foreground hover:text-foreground"
+                                            }`}
+                                        >
+                                            System Prompt
+                                        </button>
+                                        <button
+                                            onClick={() => setPeActiveTab("user")}
+                                            className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                                                peActiveTab === "user"
+                                                    ? "bg-background shadow-sm text-foreground"
+                                                    : "text-muted-foreground hover:text-foreground"
+                                            }`}
+                                        >
+                                            User Prompt Template
+                                        </button>
+                                    </div>
+
+                                    {/* Editor */}
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <Label className="text-xs text-muted-foreground">
+                                                {peActiveTab === "system" ? "Base System Prompt" : "Base User Prompt Template"}
+                                                {(peActiveTab === "system" ? peSystemPrompt : peUserPrompt) && (
+                                                    <Badge variant="outline" className="text-[10px] ml-1.5 text-primary border-primary/40">Custom</Badge>
+                                                )}
+                                                {!(peActiveTab === "system" ? peSystemPrompt : peUserPrompt) && (
+                                                    <Badge variant="outline" className="text-[10px] ml-1.5 text-muted-foreground">Default</Badge>
+                                                )}
+                                            </Label>
+                                            <div className="flex gap-1.5">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-6 text-[11px] gap-1"
+                                                    onClick={() => {
+                                                        const text = (peActiveTab === "system" ? peSystemPrompt : peUserPrompt)
+                                                            || (peActiveTab === "system" ? peDefaultSystem : peDefaultUser);
+                                                        navigator.clipboard.writeText(text).then(() => {
+                                                            setPeCopiedId(peActiveTab);
+                                                            setTimeout(() => setPeCopiedId(null), 2000);
+                                                        });
+                                                    }}
+                                                >
+                                                    {peCopiedId === peActiveTab
+                                                        ? <><CheckCircle2 className="h-3 w-3" /> Copied</>
+                                                        : <><Copy className="h-3 w-3" /> Copy</>}
+                                                </Button>
+                                                {(peActiveTab === "system" ? peSystemPrompt : peUserPrompt) && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-6 text-[11px] gap-1 text-muted-foreground"
+                                                        onClick={() => {
+                                                            if (peActiveTab === "system") setPeSystemPrompt("");
+                                                            else setPeUserPrompt("");
+                                                        }}
+                                                    >
+                                                        <RotateCcw className="h-3 w-3" /> Reset to Default
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <Textarea
+                                            value={
+                                                (peActiveTab === "system" ? peSystemPrompt : peUserPrompt)
+                                                || (peActiveTab === "system" ? peDefaultSystem : peDefaultUser)
+                                            }
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                const defaultVal = peActiveTab === "system" ? peDefaultSystem : peDefaultUser;
+                                                const isDefault = val.trim() === defaultVal.trim();
+                                                if (peActiveTab === "system") setPeSystemPrompt(isDefault ? "" : val);
+                                                else setPeUserPrompt(isDefault ? "" : val);
+                                            }}
+                                            rows={16}
+                                            className="text-xs font-mono leading-relaxed resize-none"
+                                            placeholder={peActiveTab === "system" ? "Base system prompt..." : "Base user prompt template..."}
+                                        />
+                                        <p className="text-[11px] text-muted-foreground">
+                                            {(peActiveTab === "system" ? peSystemPrompt : peUserPrompt)
+                                                ? "✏️ Custom override active — company-level guidelines will be appended on top."
+                                                : "Using built-in default. Edit to customize the base prompt for all companies."}
+                                        </p>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        <DialogFooter className="flex-row justify-between sm:justify-between shrink-0">
+                            <div>
+                                {peSaved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Saved</span>}
+                            </div>
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    disabled={peSaving || !peLoaded}
+                                    onClick={async () => {
+                                        if (!activeAccount?.account_id) return;
+                                        setPeSaving(true); setPeError(null); setPeSaved(false);
+                                        try {
+                                            const r = await fetch("/api/account/prompt-engine", {
+                                                method: "PUT",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({
+                                                    account_id: activeAccount.account_id,
+                                                    base_system_prompt: peSystemPrompt || null,
+                                                    base_user_prompt: peUserPrompt || null,
+                                                }),
+                                            });
+                                            const data = await r.json();
+                                            if (!r.ok) throw new Error(data?.error || "Save failed");
+                                            setPeSaved(true);
+                                            setTimeout(() => setPeSaved(false), 3000);
+                                        } catch (err: any) { setPeError(err.message); }
+                                        finally { setPeSaving(false); }
+                                    }}
+                                >
+                                    {peSaving ? <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Saving…</> : "Save Prompts"}
+                                </Button>
+                                <Button onClick={() => onOpenChange(false)}>Done</Button>
+                            </div>
                         </DialogFooter>
                     </TabsContent>
                 </Tabs>

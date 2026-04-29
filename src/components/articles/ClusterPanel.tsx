@@ -631,6 +631,37 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                 </div>
             </div>
 
+            {/* In-progress generation banner */}
+            {(generatingPage || batchGenerating) && (
+                <Alert className="border-primary/40 bg-primary/5 animate-pulse">
+                    <RefreshCw className="h-4 w-4 text-primary animate-spin" />
+                    <AlertDescription className="text-sm">
+                        {batchGenerating ? (
+                            <>
+                                <span className="font-semibold text-primary">Batch generating…</span>{" "}
+                                Article {batchProgress?.current} of {batchProgress?.total} is being created. Please wait — each article will be generated automatically.
+                            </>
+                        ) : (
+                            <>
+                                <span className="font-semibold text-primary">Generating article…</span>{" "}
+                                This may take a minute. Once complete, click <strong>Generate</strong> on the next article or use <strong>Generate All</strong> to create remaining pages.
+                            </>
+                        )}
+                    </AlertDescription>
+                </Alert>
+            )}
+
+            {/* Reminder banner: shows after a single page finishes if more remain */}
+            {!generatingPage && !batchGenerating && generatedCount > 0 && generatedCount < totalPages && !pageGenErr && (
+                <Alert className="border-amber-500/30 bg-amber-500/5">
+                    <Sparkles className="h-4 w-4 text-amber-500" />
+                    <AlertDescription className="text-sm">
+                        <span className="font-semibold text-amber-600 dark:text-amber-400">{totalPages - generatedCount} article{totalPages - generatedCount !== 1 ? "s" : ""} remaining.</span>{" "}
+                        Click <strong>Generate All ({totalPages - generatedCount})</strong> above or generate individual articles below.
+                    </AlertDescription>
+                </Alert>
+            )}
+
             {pageGenErr && (
                 <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />

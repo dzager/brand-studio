@@ -94,7 +94,24 @@ export default async function handler(
             styleId = rawStyle;
         }
 
-        let system = compileBlogSystemPrompt(brand);
+        // Fetch account-level base prompt overrides (if any)
+        let baseSystemPromptOverride: string | undefined;
+        if (companyData?.account_id) {
+            try {
+                const { data: acctData } = await getSupabase()
+                    .from("accounts")
+                    .select("base_system_prompt")
+                    .eq("id", companyData.account_id)
+                    .single();
+                if (acctData?.base_system_prompt) {
+                    baseSystemPromptOverride = acctData.base_system_prompt;
+                }
+            } catch {
+                // Non-blocking
+            }
+        }
+
+        let system = compileBlogSystemPrompt(brand, { baseOverride: baseSystemPromptOverride });
 
         // Reference articles
         if (brand.reference_articles && brand.reference_articles.length > 0) {
