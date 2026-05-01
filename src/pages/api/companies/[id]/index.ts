@@ -1,6 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { createServerSupabase } from "@/lib/supabase";
+import { getAdminSupabase } from "@/lib/supabase";
 import { requireAuth } from "@/lib/auth";
+
+export const config = {
+    api: {
+        bodyParser: {
+            sizeLimit: "4mb",
+        },
+    },
+};
 
 export default async function handler(
     req: NextApiRequest,
@@ -9,7 +17,10 @@ export default async function handler(
     const user = await requireAuth(req, res);
     if (!user) return;
 
-    const supabase = createServerSupabase(req, res);
+    // Use admin client (service role) to bypass RLS — auth is already verified above.
+    // This matches the GET /api/account/company endpoint pattern and avoids
+    // silent failures when the user's session cookies are stale.
+    const supabase = getAdminSupabase();
     const { id } = req.query;
 
     if (typeof id !== "string") {

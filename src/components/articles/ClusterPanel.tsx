@@ -2,6 +2,7 @@
 // Renders in the panel slot when a cluster is selected (instead of PanelView for articles)
 
 import { useState, useEffect, useCallback } from "react";
+import AIMemeModal from "@/components/ui/ai-meme-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -107,6 +108,11 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
     const [batchGenerating, setBatchGenerating] = useState(false);
     const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
     const [pageGenErr, setPageGenErr] = useState<string | null>(null);
+
+    // Meme modal — entertains users during generation
+    const [memeDismissed, setMemeDismissed] = useState(false);
+    const clusterAiWorking = !!generatingPage || batchGenerating;
+    useEffect(() => { if (clusterAiWorking) setMemeDismissed(false); }, [clusterAiWorking]);
 
     const [editingStrategy, setEditingStrategy] = useState(false);
     const [editStrategyJson, setEditStrategyJson] = useState("");
@@ -497,6 +503,7 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
     const generatedCount = cluster.articles?.length ?? 0;
 
     return (
+        <>
         <div className="p-5 overflow-y-auto h-full space-y-4">
             {/* Header */}
             <div>
@@ -936,6 +943,10 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                 </div>
             )}
         </div>
+
+        {/* AI Meme Entertainment Modal — shows during generation */}
+        <AIMemeModal open={clusterAiWorking && !memeDismissed} onClose={() => setMemeDismissed(true)} />
+        </>
     );
 }
 

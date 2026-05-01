@@ -2,6 +2,7 @@
 // Shows similarity analysis, SEO data, article content, and all action buttons
 
 import { useState, useRef, useEffect } from "react";
+import AIMemeModal from "@/components/ui/ai-meme-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -169,6 +170,11 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     const compositeProductFileRef = useRef<HTMLInputElement>(null);
     const compositeBgFileRef = useRef<HTMLInputElement>(null);
     const savedRangeRef = useRef<Range | null>(null);
+
+    // Meme modal — entertains users during heavy AI operations
+    const [memeDismissed, setMemeDismissed] = useState(false);
+    const panelAiWorking = regenerating || compositeGenerating;
+    useEffect(() => { if (panelAiWorking) setMemeDismissed(false); }, [panelAiWorking]);
 
     const [fullArticle, setFullArticle] = useState<Article | null>(null);
     const [loadingFull, setLoadingFull] = useState(false);
@@ -1306,6 +1312,7 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
 
     // ======= READ MODE =======
     return (
+        <>
         <div className="p-5 overflow-y-auto h-full space-y-4">
             {/* Header */}
             <div>
@@ -1633,5 +1640,9 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
 
             {insertImageModal}
         </div>
+
+        {/* AI Meme Entertainment Modal — shows during regeneration */}
+        <AIMemeModal open={panelAiWorking && !memeDismissed} onClose={() => setMemeDismissed(true)} />
+        </>
     );
 }

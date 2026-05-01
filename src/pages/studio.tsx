@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import AIMemeModal from "@/components/ui/ai-meme-modal";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
@@ -110,6 +111,12 @@ export default function Home() {
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<any>(null);
     const [err, setErr] = useState<string | null>(null);
+
+    // Meme modal state — auto-shows during AI generation, dismissible by user
+    const [memeDismissed, setMemeDismissed] = useState(false);
+    const aiIsWorking = loading || clusterGenerating;
+    // Reset dismissal when a new generation starts
+    useEffect(() => { if (aiIsWorking) setMemeDismissed(false); }, [aiIsWorking]);
 
     const [factChecking, setFactChecking] = useState(false);
     const [factCheck, setFactCheck] = useState<FactCheckResult | null>(null);
@@ -1419,6 +1426,9 @@ export default function Home() {
                 </Dialog>
                 {previewErr && <p className="text-sm text-destructive mt-2">Preview failed: {previewErr}</p>}
             </div>
+
+            {/* AI Meme Entertainment Modal — shows during generation */}
+            <AIMemeModal open={aiIsWorking && !memeDismissed} onClose={() => setMemeDismissed(true)} />
         </AppLayout>
     );
 }
