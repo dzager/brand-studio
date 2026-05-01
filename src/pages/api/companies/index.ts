@@ -1,8 +1,16 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { createServerSupabase, getAdminSupabase } from "@/lib/supabase";
+import { getAdminSupabase } from "@/lib/supabase";
 import { requireAuth, getUserAccounts, isPlatformAdmin, getUserAccountById } from "@/lib/auth";
 import { getPlanLimits } from "@/lib/plans";
 import { generateBrandDefaults } from "@/lib/generateBrandDefaults";
+
+export const config = {
+    api: {
+        bodyParser: {
+            sizeLimit: "4mb",
+        },
+    },
+};
 
 export default async function handler(
     req: NextApiRequest,
@@ -11,8 +19,6 @@ export default async function handler(
     const user = await requireAuth(req, res);
     if (!user) return;
 
-    // Use auth-aware client for RLS-scoped queries
-    const supabase = createServerSupabase(req, res);
     const admin = getAdminSupabase();
 
     try {
@@ -58,7 +64,7 @@ export default async function handler(
 
             console.log("[companies/GET] ADMIN — returning all companies");
             // Platform admins see all companies
-            const { data, error } = await supabase
+            const { data, error } = await admin
                 .from("companies")
                 .select("*")
                 .order("created_at", { ascending: false });

@@ -55,6 +55,9 @@ export default async function handler(
                 }
             }
 
+            const payloadSize = JSON.stringify(updates).length;
+            console.log(`[companies/${id}/PUT] Keys: ${Object.keys(updates).join(", ")} | Payload size: ${payloadSize} bytes`);
+
             const { data, error } = await supabase
                 .from("companies")
                 .update(updates)
@@ -62,7 +65,10 @@ export default async function handler(
                 .select()
                 .single();
 
-            if (error) throw error;
+            if (error) {
+                console.error(`[companies/${id}/PUT] Supabase error:`, JSON.stringify(error, null, 2));
+                return res.status(500).json({ error: error.message || error.details || "Database update failed", code: error.code, hint: error.hint });
+            }
             return res.status(200).json(data);
         }
 
@@ -77,9 +83,9 @@ export default async function handler(
         }
 
         return res.status(405).json({ error: "Method not allowed" });
-    } catch (err) {
+    } catch (err: any) {
         console.error(`API /api/companies/${id} error:`, err);
-        const message = err instanceof Error ? err.message : "Unknown server error";
+        const message = err?.message || (typeof err === "object" ? JSON.stringify(err) : String(err)) || "Unknown server error";
         return res.status(500).json({ error: message });
     }
 }
