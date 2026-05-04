@@ -2,6 +2,7 @@ import "@/styles/globals.css";
 import type { AppProps } from "next/app";
 import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { TaskProvider } from "@/lib/taskStore";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
@@ -56,9 +57,11 @@ export default function App({ Component, pageProps }: AppProps) {
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
             <TooltipProvider delayDuration={300}>
                 <AuthProvider>
+                    <TaskProvider>
                     <AuthGuard>
                         <Component {...pageProps} />
                     </AuthGuard>
+                    </TaskProvider>
                 </AuthProvider>
             </TooltipProvider>
         </ThemeProvider>

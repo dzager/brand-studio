@@ -5,6 +5,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import slugify from "slugify";
 import { getSupabase } from "@/lib/supabase";
+import { incrementArticleCount } from "@/lib/usage";
 import { buildBrandEngine, type CompanyRecord } from "@/lib/buildBrandEngine";
 import { compileBlogSystemPrompt, getImageStyleCategories } from "@/brand/engine";
 import { compileImageSystemPrompt, compileImageUserPrompt } from "@/lib/compileImagePrompt";
@@ -350,6 +351,7 @@ export default async function handler(
                 model_used: selectedModel,
                 image_style: styleId,
                 company_id: cluster.company_id,
+                account_id: (companyData as any).account_id || null,
                 cluster_id: clusterId,
                 cluster_role: "pillar",
             }).select("id").single();
@@ -368,6 +370,16 @@ export default async function handler(
                         .eq("id", savedArticleId);
                 } catch (embErr) {
                     console.warn("Failed to generate guide embedding:", embErr);
+                }
+
+                // Increment usage counter
+                const accountId = (companyData as any).account_id;
+                if (accountId) {
+                    try {
+                        await incrementArticleCount(accountId);
+                    } catch (usageErr) {
+                        console.warn("Failed to increment usage counter:", usageErr);
+                    }
                 }
             }
         } catch (saveErr) {

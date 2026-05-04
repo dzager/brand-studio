@@ -1,4 +1,6 @@
 import { useRouter } from "next/router";
+import TaskPanel from "@/components/layout/TaskPanel";
+import { useTaskStore } from "@/lib/taskStore";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { useEffect, useState, useCallback, useMemo } from "react";
@@ -95,6 +97,7 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [companyCount, setCompanyCount] = useState<number | null>(null);
   const { user, activeAccount, accounts, isAdmin, signOut, switchAccount } = useAuth();
+  const { tasks } = useTaskStore();
 
   // Fetch usage for sidebar widget
   const fetchUsage = useCallback(async () => {
@@ -105,9 +108,34 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
     } catch {}
   }, [activeAccount?.account_id]);
 
+  // Sync usage on mount to correct any drift from past bugs
+  const [synced, setSynced] = useState(false);
+  useEffect(() => {
+    if (!activeAccount?.account_id || synced) return;
+    fetch("/api/account/sync-usage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ account_id: activeAccount.account_id }),
+    })
+      .then(() => { setSynced(true); fetchUsage(); })
+      .catch(() => { setSynced(true); });
+  }, [activeAccount?.account_id, synced, fetchUsage]);
+
   useEffect(() => {
     fetchUsage();
-  }, [fetchUsage]);
+
+    // Re-fetch usage whenever an article is created anywhere in the app
+    const onArticleCreated = () => fetchUsage();
+    window.addEventListener("article-created", onArticleCreated);
+
+    // Also re-fetch on route changes (catches navigations after generation)
+    router.events.on("routeChangeComplete", onArticleCreated);
+
+    return () => {
+      window.removeEventListener("article-created", onArticleCreated);
+      router.events.off("routeChangeComplete", onArticleCreated);
+    };
+  }, [fetchUsage, router.events]);
 
   // Fetch company count for dynamic nav label
   useEffect(() => {
@@ -434,7 +462,7 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto">
-          <div className={cn("mx-auto w-full px-6 py-6", !fullWidth && "max-w-7xl")}>
+          <div className={cn("mx-auto w-full px-6 py-6", !fullWidth && "max-w-7xl", tasks.length > 0 && "pb-20")}>
             {children}
           </div>
         </main>
@@ -442,6 +470,9 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
 
       {/* Settings Dialog */}
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+
+      {/* Task Activity Panel */}
+      <TaskPanel />
     </div>
   );
 }

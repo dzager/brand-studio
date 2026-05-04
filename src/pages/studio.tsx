@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import AIMemeModal from "@/components/ui/ai-meme-modal";
+import { useTaskRunner } from "@/hooks/useTaskRunner";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
@@ -92,7 +93,7 @@ export default function Home() {
     const { defaults } = useModelDefaults();
 
     // ── Creation Mode ───────────────────────────────────────────────
-    const [mode, setMode] = useState<"single" | "cluster">("single");
+    const [mode, setMode] = useState<"single" | "cluster">("cluster");
 
     // ── Cluster Mode State ──────────────────────────────────────────
     const [clusterTopic, setClusterTopic] = useState("");
@@ -247,48 +248,58 @@ export default function Home() {
         fetch(`/api/prompts?company_id=${companyId}`).then((r) => r.json()).then((data) => { if (Array.isArray(data)) setCompanyPrompts(data); }).catch(() => {});
     }, [companyId]);
 
+    const { runTask } = useTaskRunner();
+
     async function onCreate() {
         setLoading(true); setErr(null); setResult(null); setFactCheck(null); setFactCheckErr(null);
         setConsulResult(null); setConsulErr(null); setExpandedClaims(new Set()); setAppliedRewrites(new Set());
         setGallery([]); setSelectedImgId(null); setCustomImagePrompt(""); setRefreshErr(null); setHumanized(false); setHumanizeErr(null);
-        try {
-            const payload: Record<string, unknown> = {
-                creation_prompt: prompt,
-                image_style: imageStyle,
-                model,
-                word_count: wordCount,
-                company_id: companyId || undefined,
-                image_model: defaults.imageGeneration,
-                utility_model: defaults.utility,
-            };
-            // Add composite params if applicable
-            if (isCompositeStyle && csProductUrl) {
-                payload.composite_product_image_url = csProductUrl;
-                if (csBgImageUrl.trim()) payload.composite_bg_image_url = csBgImageUrl.trim();
-                if (csBgPrompt.trim()) payload.composite_bg_prompt = csBgPrompt.trim();
-            }
-            const r = await fetch("/api/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-            const text = await r.text(); const data = text ? JSON.parse(text) : null;
-            if (!r.ok) throw new Error(data?.error || `Request failed with status ${r.status}`);
-            setResult(data);
-            if (data?.image_base64) { const img: GalleryImage = { id: ++_imgId, base64: data.image_base64, prompt: data.image_prompt ?? "", label: "Original" }; setGallery([img]); setSelectedImgId(img.id); }
-        } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
+        const payload: Record<string, unknown> = {
+            creation_prompt: prompt,
+            image_style: imageStyle,
+            model,
+            word_count: wordCount,
+            company_id: companyId || undefined,
+            image_model: defaults.imageGeneration,
+            utility_model: defaults.utility,
+        };
+        // Add composite params if applicable
+        if (isCompositeStyle && csProductUrl) {
+            payload.composite_product_image_url = csProductUrl;
+            if (csBgImageUrl.trim()) payload.composite_bg_image_url = csBgImageUrl.trim();
+            if (csBgPrompt.trim()) payload.composite_bg_prompt = csBgPrompt.trim();
+        }
+        await runTask({
+            type: "article",
+            label: prompt.trim().slice(0, 60) || "New article",
+            endpoint: "/api/create",
+            body: payload,
+            meta: { companyId },
+            onSuccess: (data: any) => {
+                setResult(data);
+                window.dispatchEvent(new Event("article-created"));
+                if (data?.image_base64) {
+                    const img: GalleryImage = { id: ++_imgId, base64: data.image_base64, prompt: data.image_prompt ?? "", label: "Original" };
+                    setGallery([img]); setSelectedImgId(img.id);
+                }
+                setLoading(false);
+            },
+            onError: (errMsg) => { setErr(errMsg); setLoading(false); },
+        });
     }
 
     async function onCreateCluster() {
         if (!companyId || !clusterTopic.trim()) return;
         setClusterGenerating(true); setClusterErr(null); setClusterResult(null);
-        try {
-            const r = await fetch("/api/clusters", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ company_id: companyId, topic: clusterTopic.trim(), model }),
-            });
-            const data = await r.json();
-            if (!r.ok) throw new Error(data.error || "Strategy generation failed");
-            setClusterResult(data);
-        } catch (e: any) { setClusterErr(e.message); }
-        finally { setClusterGenerating(false); }
+        await runTask({
+            type: "cluster-strategy",
+            label: `Strategy: ${clusterTopic.trim().slice(0, 50)}`,
+            endpoint: "/api/clusters",
+            body: { company_id: companyId, topic: clusterTopic.trim(), model },
+            meta: { companyId },
+            onSuccess: (data: any) => { setClusterResult(data); setClusterGenerating(false); },
+            onError: (errMsg) => { setClusterErr(errMsg); setClusterGenerating(false); },
+        });
     }
 
     async function onPreviewPrompt() {
@@ -343,23 +354,27 @@ export default function Home() {
     async function onFactCheck() {
         if (!result) return;
         setFactChecking(true); setFactCheckErr(null); setFactCheck(null);
-        try {
-            const r = await fetch("/api/fact-check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: result.title, excerpt: result.excerpt, html: result.html }) });
-            const text = await r.text(); const data = text ? JSON.parse(text) : null;
-            if (!r.ok) throw new Error(data?.error || `Fact-check failed with status ${r.status}`);
-            setFactCheck(data);
-        } catch (e: any) { setFactCheckErr(e.message); } finally { setFactChecking(false); }
+        await runTask({
+            type: "fact-check",
+            label: `Fact-check: ${(result.title || "").slice(0, 40)}`,
+            endpoint: "/api/fact-check",
+            body: { title: result.title, excerpt: result.excerpt, html: result.html },
+            onSuccess: (data: any) => { setFactCheck(data); setFactChecking(false); },
+            onError: (errMsg) => { setFactCheckErr(errMsg); setFactChecking(false); },
+        });
     }
 
     async function onConsulCheck() {
         if (!result) return;
         setConsulChecking(true); setConsulErr(null); setConsulResult(null); setExpandedClaims(new Set()); setAppliedRewrites(new Set());
-        try {
-            const r = await fetch("/api/fact-check-consul", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: result.title, excerpt: result.excerpt, html: result.html }) });
-            const text = await r.text(); const data = text ? JSON.parse(text) : null;
-            if (!r.ok) throw new Error(data?.error || `Consul check failed with status ${r.status}`);
-            setConsulResult(data);
-        } catch (e: any) { setConsulErr(e.message); } finally { setConsulChecking(false); }
+        await runTask({
+            type: "consul-check",
+            label: `Deep check: ${(result.title || "").slice(0, 40)}`,
+            endpoint: "/api/fact-check-consul",
+            body: { title: result.title, excerpt: result.excerpt, html: result.html },
+            onSuccess: (data: any) => { setConsulResult(data); setConsulChecking(false); },
+            onError: (errMsg) => { setConsulErr(errMsg); setConsulChecking(false); },
+        });
     }
 
     function toggleClaimExpanded(index: number) {
@@ -392,13 +407,18 @@ export default function Home() {
     async function onHumanize() {
         if (!result) return;
         setHumanizing(true); setHumanizeErr(null);
-        try {
-            const r = await fetch("/api/humanize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: result.title, excerpt: result.excerpt, html: result.html }) });
-            const text = await r.text(); const data = text ? JSON.parse(text) : null;
-            if (!r.ok) throw new Error(data?.error || `Humanize failed with status ${r.status}`);
-            setResult((prev: any) => ({ ...prev, title: data.title ?? prev.title, excerpt: data.excerpt ?? prev.excerpt, html: data.html ?? prev.html }));
-            setHumanized(true);
-        } catch (e: any) { setHumanizeErr(e.message); } finally { setHumanizing(false); }
+        await runTask({
+            type: "humanize",
+            label: `Humanize: ${(result.title || "").slice(0, 40)}`,
+            endpoint: "/api/humanize",
+            body: { title: result.title, excerpt: result.excerpt, html: result.html },
+            onSuccess: (data: any) => {
+                setResult((prev: any) => ({ ...prev, title: data.title ?? prev.title, excerpt: data.excerpt ?? prev.excerpt, html: data.html ?? prev.html }));
+                setHumanized(true);
+                setHumanizing(false);
+            },
+            onError: (errMsg) => { setHumanizeErr(errMsg); setHumanizing(false); },
+        });
     }
 
     async function onSearchImages() {
@@ -504,33 +524,6 @@ export default function Home() {
                 {/* ── Format selection ─────────────────────────────────── */}
                 <div className="grid grid-cols-2 gap-3">
                     <button
-                        id="mode-single"
-                        onClick={() => { setMode("single"); setClusterResult(null); setClusterErr(null); }}
-                        className={cn(
-                            "group relative flex items-center gap-3 rounded-xl px-3.5 py-3 text-left cursor-pointer transition-all duration-150",
-                            mode === "single"
-                                ? "border-2 border-primary bg-primary/[0.03]"
-                                : "border border-border/50 hover:border-border hover:bg-muted/40"
-                        )}
-                    >
-                        <div className={cn(
-                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors",
-                            mode === "single" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground group-hover:bg-primary/5 group-hover:text-foreground"
-                        )}>
-                            <FileText className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                            <div className="text-sm font-medium leading-tight">Single article</div>
-                            <p className="text-xs text-muted-foreground leading-tight mt-0.5">One blog post with images and SEO</p>
-                        </div>
-                        {mode === "single" && (
-                            <span className="absolute top-2 right-2 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                                <Check className="h-3 w-3" />
-                            </span>
-                        )}
-                    </button>
-
-                    <button
                         id="mode-cluster"
                         onClick={() => { setMode("cluster"); setResult(null); setErr(null); }}
                         className={cn(
@@ -551,6 +544,33 @@ export default function Home() {
                             <p className="text-xs text-muted-foreground leading-tight mt-0.5">Pillar + supporting pages strategy</p>
                         </div>
                         {mode === "cluster" && (
+                            <span className="absolute top-2 right-2 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                                <Check className="h-3 w-3" />
+                            </span>
+                        )}
+                    </button>
+
+                    <button
+                        id="mode-single"
+                        onClick={() => { setMode("single"); setClusterResult(null); setClusterErr(null); }}
+                        className={cn(
+                            "group relative flex items-center gap-3 rounded-xl px-3.5 py-3 text-left cursor-pointer transition-all duration-150",
+                            mode === "single"
+                                ? "border-2 border-primary bg-primary/[0.03]"
+                                : "border border-border/50 hover:border-border hover:bg-muted/40"
+                        )}
+                    >
+                        <div className={cn(
+                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors",
+                            mode === "single" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground group-hover:bg-primary/5 group-hover:text-foreground"
+                        )}>
+                            <FileText className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                            <div className="text-sm font-medium leading-tight">Single article</div>
+                            <p className="text-xs text-muted-foreground leading-tight mt-0.5">One blog post with images and SEO</p>
+                        </div>
+                        {mode === "single" && (
                             <span className="absolute top-2 right-2 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-primary text-primary-foreground">
                                 <Check className="h-3 w-3" />
                             </span>
@@ -1428,7 +1448,7 @@ export default function Home() {
             </div>
 
             {/* AI Meme Entertainment Modal — shows during generation */}
-            <AIMemeModal open={aiIsWorking && !memeDismissed} onClose={() => setMemeDismissed(true)} />
+            <AIMemeModal open={aiIsWorking && !memeDismissed} onClose={() => setMemeDismissed(true)} companyName={companies.find(c => c.id === companyId)?.name} />
         </AppLayout>
     );
 }

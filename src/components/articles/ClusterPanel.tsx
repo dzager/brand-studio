@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import AIMemeModal from "@/components/ui/ai-meme-modal";
+import { useTaskRunner } from "@/hooks/useTaskRunner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -225,48 +226,65 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
         });
     }
 
+    const { runTask, runBatchTask } = useTaskRunner();
+
     async function generatePage(pageType: string, pageIndex: number, pageKey: string) {
         setGeneratingPage(pageKey); setPageGenErr(null);
-        try {
-            const r = await fetch(`/api/clusters/${clusterId}/generate`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ page_type: pageType, page_index: pageIndex, image_mode: imageMode }),
-            });
-            const data = await r.json();
-            if (!r.ok) throw new Error(data.error || "Generation failed");
-            await loadCluster();
-            onUpdate();
-        } catch (e: any) { setPageGenErr(e.message); }
-        finally { setGeneratingPage(null); }
+        await runTask({
+            type: "cluster-page",
+            label: `Page: ${pageKey}`,
+            endpoint: `/api/clusters/${clusterId}/generate`,
+            body: { page_type: pageType, page_index: pageIndex, image_mode: imageMode },
+            meta: { clusterId, pageType, pageIndex },
+            onSuccess: async () => {
+                await loadCluster();
+                onUpdate();
+                window.dispatchEvent(new Event("article-created"));
+                setGeneratingPage(null);
+            },
+            onError: (errMsg) => { setPageGenErr(errMsg); setGeneratingPage(null); },
+        });
     }
 
     async function batchGenerate() {
         if (!cluster) return;
         const strategy = cluster.strategy;
         const existingSlugs = new Set((cluster.articles ?? []).map((a) => a.slug));
-        const pages: { type: string; index: number }[] = [];
-        if (!existingSlugs.has(strategy.pillar.slug)) pages.push({ type: "pillar", index: 0 });
-        strategy.supporting.forEach((p, i) => { if (!existingSlugs.has(p.slug)) pages.push({ type: "supporting", index: i }); });
-        strategy.long_tail.forEach((p, i) => { if (!existingSlugs.has(p.slug)) pages.push({ type: "long_tail", index: i }); });
+        const pages: { type: string; index: number; slug: string }[] = [];
+        if (!existingSlugs.has(strategy.pillar.slug)) pages.push({ type: "pillar", index: 0, slug: strategy.pillar.slug });
+        strategy.supporting.forEach((p, i) => { if (!existingSlugs.has(p.slug)) pages.push({ type: "supporting", index: i, slug: p.slug }); });
+        strategy.long_tail.forEach((p, i) => { if (!existingSlugs.has(p.slug)) pages.push({ type: "long_tail", index: i, slug: p.slug }); });
         if (pages.length === 0) return;
 
         setBatchGenerating(true); setBatchProgress({ current: 0, total: pages.length }); setPageGenErr(null);
-        for (let i = 0; i < pages.length; i++) {
-            setBatchProgress({ current: i + 1, total: pages.length });
-            try {
-                const r = await fetch(`/api/clusters/${clusterId}/generate`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ page_type: pages[i].type, page_index: pages[i].index, image_mode: imageMode }),
-                });
-                const data = await r.json();
-                if (!r.ok) throw new Error(data.error || `Failed on page ${i + 1}`);
+
+        await runBatchTask({
+            type: "cluster-batch",
+            label: `Batch: ${cluster.name} (${pages.length} pages)`,
+            items: pages.map((p) => ({
+                endpoint: `/api/clusters/${clusterId}/generate`,
+                body: { page_type: p.type, page_index: p.index, image_mode: imageMode },
+                label: `${p.type}: ${p.slug}`,
+            })),
+            concurrency: 2,
+            meta: { clusterId },
+            onItemComplete: async (index) => {
+                setBatchProgress((prev) => prev ? { ...prev, current: (prev.current || 0) + 1 } : null);
                 await loadCluster();
-            } catch (e: any) { setPageGenErr(`Failed on page ${i + 1}: ${e.message}`); break; }
-        }
-        setBatchGenerating(false); setBatchProgress(null);
-        onUpdate();
+            },
+            onItemError: (index, errMsg) => {
+                setPageGenErr(`Failed on page ${index + 1}: ${errMsg}`);
+            },
+            onSuccess: () => {
+                setBatchGenerating(false); setBatchProgress(null);
+                onUpdate();
+                window.dispatchEvent(new Event("article-created"));
+            },
+            onError: (errMsg) => {
+                setPageGenErr(errMsg);
+                setBatchGenerating(false); setBatchProgress(null);
+            },
+        });
     }
 
     async function saveStrategy() {
@@ -318,23 +336,24 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
     async function handleGenerateGuide() {
         if (!cluster) return;
         setGeneratingGuide(true); setGuideErr(null); setGuideSuccess(false);
-        try {
-            const r = await fetch(`/api/clusters/${clusterId}/generate-guide`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({}),
-            });
-            const data = await r.json();
-            if (!r.ok) throw new Error(data.error || "Guide generation failed");
-            setGuideSuccess(true);
-            await loadCluster();
-            onUpdate();
-            // Navigate to the generated guide article
-            if (data.id) {
-                setTimeout(() => onSelectArticle(data.id), 500);
-            }
-        } catch (e: any) { setGuideErr(e.message); }
-        finally { setGeneratingGuide(false); }
+        await runTask({
+            type: "guide",
+            label: `Guide: ${cluster.name}`,
+            endpoint: `/api/clusters/${clusterId}/generate-guide`,
+            body: {},
+            meta: { clusterId },
+            onSuccess: async (data: any) => {
+                setGuideSuccess(true);
+                await loadCluster();
+                onUpdate();
+                if (data.id) {
+                    setTimeout(() => onSelectArticle(data.id), 500);
+                }
+                window.dispatchEvent(new Event("article-created"));
+                setGeneratingGuide(false);
+            },
+            onError: (errMsg) => { setGuideErr(errMsg); setGeneratingGuide(false); },
+        });
     }
 
     function handleDownloadAll() {
@@ -345,22 +364,23 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
 
     async function handleInterlink() {
         setInterlinking(true); setInterlinkErr(null); setInterlinkResult(null);
-        try {
-            const r = await fetch(`/api/clusters/${clusterId}/interlink`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({}),
-            });
-            const data = await r.json();
-            if (!r.ok) throw new Error(data.error || "Interlinking failed");
-            setInterlinkResult({
-                succeeded: data.articles_succeeded ?? 0,
-                links: data.total_links_added ?? 0,
-            });
-            await loadCluster();
-            onUpdate();
-        } catch (e: any) { setInterlinkErr(e.message); }
-        finally { setInterlinking(false); }
+        await runTask({
+            type: "interlink",
+            label: `Interlink: ${cluster?.name || "cluster"}`,
+            endpoint: `/api/clusters/${clusterId}/interlink`,
+            body: {},
+            meta: { clusterId },
+            onSuccess: async (data: any) => {
+                setInterlinkResult({
+                    succeeded: data.articles_succeeded ?? 0,
+                    links: data.total_links_added ?? 0,
+                });
+                await loadCluster();
+                onUpdate();
+                setInterlinking(false);
+            },
+            onError: (errMsg) => { setInterlinkErr(errMsg); setInterlinking(false); },
+        });
     }
 
     async function loadArticleManager() {
@@ -546,7 +566,7 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                 </Button>
 
                 <div className="ml-auto">
-                <DropdownMenu>
+                <DropdownMenu onOpenChange={(open) => { if (!open) setConfirmDelete(false); }}>
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm" className="px-2">
                             <MoreHorizontal className="h-4 w-4" />
@@ -628,7 +648,11 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                                 {deleting ? "Deleting…" : "Confirm Delete"}
                             </DropdownMenuItem>
                         ) : (
-                            <DropdownMenuItem onClick={() => setConfirmDelete(true)} variant="destructive" className="gap-2 cursor-pointer">
+                            <DropdownMenuItem
+                                onSelect={(e) => { e.preventDefault(); setConfirmDelete(true); }}
+                                variant="destructive"
+                                className="gap-2 cursor-pointer"
+                            >
                                 <Trash2 className="h-4 w-4" />
                                 Delete Cluster
                             </DropdownMenuItem>
@@ -945,7 +969,7 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
         </div>
 
         {/* AI Meme Entertainment Modal — shows during generation */}
-        <AIMemeModal open={clusterAiWorking && !memeDismissed} onClose={() => setMemeDismissed(true)} />
+        <AIMemeModal open={clusterAiWorking && !memeDismissed} onClose={() => setMemeDismissed(true)} companyName={cluster ? companies[cluster.company_id] : undefined} />
         </>
     );
 }

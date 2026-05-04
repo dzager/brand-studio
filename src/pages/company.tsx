@@ -16,7 +16,7 @@ import {
     ChevronDown, ChevronRight, AlertCircle, Mic, FileText,
     Palette, Eye, BookOpen, Search as SearchIcon, Settings2,
     Layers, Copy as CopyIcon, CheckCircle2, Save, X, Plus, Trash2,
-    Camera, ImagePlus, Loader2, Sparkles, Cpu,
+    Camera, ImagePlus, Loader2, Sparkles, Cpu, Globe, Link2,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
@@ -165,6 +165,49 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
     const [extractResult, setExtractResult] = useState<ImageStyleAnalysis | null>(null);
     const [extractStyleName, setExtractStyleName] = useState("");
     const imageInputRef = useRef<HTMLInputElement>(null);
+
+    // Voice Profile URL import state
+    const [voiceImportUrl, setVoiceImportUrl] = useState("");
+    const [voiceImportFetching, setVoiceImportFetching] = useState(false);
+    const [voiceImportAnalyzing, setVoiceImportAnalyzing] = useState(false);
+    const [voiceImportErr, setVoiceImportErr] = useState<string | null>(null);
+    const [voiceImportSuccess, setVoiceImportSuccess] = useState(false);
+
+    async function handleVoiceImportFromUrl() {
+        if (!voiceImportUrl.trim()) return;
+        setVoiceImportErr(null); setVoiceImportSuccess(false);
+
+        // Step 1: Fetch article text
+        setVoiceImportFetching(true);
+        let articleText: string;
+        try {
+            const r = await fetch("/api/fetch-article-text", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url: voiceImportUrl.trim() }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || "Failed to fetch article");
+            articleText = data.text;
+            if (!articleText || articleText.trim().length < 50) throw new Error("Article content too short for analysis (need at least 50 characters).");
+        } catch (e: any) { setVoiceImportErr(e.message); setVoiceImportFetching(false); return; }
+        setVoiceImportFetching(false);
+
+        // Step 2: Analyze voice
+        setVoiceImportAnalyzing(true);
+        try {
+            const r = await fetch("/api/analyze-voice", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ html: articleText, company_id: company.id }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || "Voice analysis failed");
+            setForm(prev => ({ ...prev, voice_profile: data.voice_profile }));
+            setVoiceImportSuccess(true);
+            setVoiceImportUrl("");
+            setTimeout(() => setVoiceImportSuccess(false), 5000);
+        } catch (e: any) { setVoiceImportErr(e.message); }
+        finally { setVoiceImportAnalyzing(false); }
+    }
 
     function openImageExtract() {
         setShowImageExtract(true); setExtractPreviewUrl(null); setExtractBase64(null);
@@ -428,14 +471,65 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
             <Section
                 title="Voice Profile"
                 icon={Mic}
-                badge={form.voice_profile ? <Badge variant="outline" className="text-[10px] ml-1 text-primary border-primary/50">Active</Badge> : <Badge variant="outline" className="text-[10px] ml-1 text-muted-foreground">Not Set</Badge>}
+                badge={form.voice_profile ? <Badge variant="outline" className="text-[10px] ml-1 text-primary border-primary/50">Active</Badge> : <Badge variant="outline" className="text-[10px] ml-1 text-muted-foreground">Default</Badge>}
             >
                 <div className="space-y-4 pt-3">
+                    {/* URL Import */}
+                    <div className="rounded-lg border border-dashed border-border bg-muted/20 p-3.5 space-y-2.5">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                            <Link2 className="h-4 w-4 text-primary" />
+                            {form.voice_profile ? "Analyze a blog post to update voice" : "Import voice from a blog post"}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Paste a link to any article or blog post. We'll extract the text, analyze the writing style, and {form.voice_profile ? "update" : "populate"} all voice profile fields automatically.
+                        </p>
+                        <div className="flex gap-2">
+                            <Input
+                                type="url"
+                                value={voiceImportUrl}
+                                onChange={(e) => { setVoiceImportUrl(e.target.value); setVoiceImportErr(null); }}
+                                placeholder="https://example.com/blog/your-best-article"
+                                disabled={voiceImportFetching || voiceImportAnalyzing}
+                                onKeyDown={(e) => { if (e.key === "Enter" && voiceImportUrl.trim()) { e.preventDefault(); handleVoiceImportFromUrl(); } }}
+                                className="text-sm"
+                            />
+                            <Button
+                                variant="outline"
+                                onClick={handleVoiceImportFromUrl}
+                                disabled={voiceImportFetching || voiceImportAnalyzing || !voiceImportUrl.trim()}
+                                className="gap-1.5 whitespace-nowrap shrink-0"
+                            >
+                                {voiceImportFetching ? (
+                                    <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Fetching…</>
+                                ) : voiceImportAnalyzing ? (
+                                    <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Analyzing…</>
+                                ) : (
+                                    <><Globe className="h-3.5 w-3.5" /> Analyze URL</>
+                                )}
+                            </Button>
+                        </div>
+                        {(voiceImportFetching || voiceImportAnalyzing) && (
+                            <p className="text-xs text-muted-foreground animate-pulse">
+                                {voiceImportFetching ? "Fetching article content…" : "Analyzing writing style — this takes 15–30 seconds…"}
+                            </p>
+                        )}
+                        {voiceImportErr && (
+                            <p className="text-xs text-destructive flex items-center gap-1.5">
+                                <AlertCircle className="h-3 w-3 shrink-0" /> {voiceImportErr}
+                            </p>
+                        )}
+                        {voiceImportSuccess && (
+                            <p className="text-xs text-green-600 flex items-center gap-1.5">
+                                <CheckCircle2 className="h-3 w-3 shrink-0" /> Voice profile {form.voice_profile ? "updated" : "created"} from article! Review the fields below and save.
+                            </p>
+                        )}
+                    </div>
+
                     {!form.voice_profile ? (
                         <div className="space-y-2">
-                            <p className="text-sm text-muted-foreground italic">No voice profile configured yet.</p>
+                            <p className="text-sm text-muted-foreground italic">No voice profile configured yet. Import from a URL above, or create one manually.</p>
                             <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setForm(prev => ({ ...prev, voice_profile: defaultVP }))}>
-                                <Plus className="h-3.5 w-3.5" /> Create Voice Profile
+                                <Plus className="h-3.5 w-3.5" /> Create Manually
                             </Button>
                         </div>
                     ) : (
@@ -475,7 +569,7 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
             <Section
                 title="Editorial Guidelines"
                 icon={BookOpen}
-                badge={(editing ? form.editorial_guidelines : company.editorial_guidelines) ? <Badge variant="secondary" className="text-[10px] ml-1">{(editing ? form.editorial_guidelines : company.editorial_guidelines)!.length} chars</Badge> : undefined}
+                badge={(editing ? form.editorial_guidelines : company.editorial_guidelines) ? <Badge variant="secondary" className="text-[10px] ml-1">{(editing ? form.editorial_guidelines : company.editorial_guidelines)!.length} chars</Badge> : <Badge variant="outline" className="text-[10px] ml-1 text-muted-foreground">Default</Badge>}
             >
                 <div className="pt-3">
                     {editing ? (
@@ -497,7 +591,7 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
             <Section
                 title="SEO Content Guidelines"
                 icon={SearchIcon}
-                badge={(editing ? form.seo_content_guidelines : company.seo_content_guidelines) ? <Badge variant="secondary" className="text-[10px] ml-1">{(editing ? form.seo_content_guidelines : company.seo_content_guidelines)!.length} chars</Badge> : undefined}
+                badge={(editing ? form.seo_content_guidelines : company.seo_content_guidelines) ? <Badge variant="secondary" className="text-[10px] ml-1">{(editing ? form.seo_content_guidelines : company.seo_content_guidelines)!.length} chars</Badge> : <Badge variant="outline" className="text-[10px] ml-1 text-muted-foreground">Default</Badge>}
             >
                 <div className="pt-3">
                     {editing ? (
@@ -519,7 +613,7 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
             <Section
                 title="Prompt Templates"
                 icon={FileText}
-                badge={company.prompts?.length > 0 ? <Badge variant="secondary" className="text-[10px] ml-1">{company.prompts.length}</Badge> : undefined}
+                badge={company.prompts?.length > 0 ? <Badge variant="secondary" className="text-[10px] ml-1">{company.prompts.length}</Badge> : <Badge variant="outline" className="text-[10px] ml-1 text-muted-foreground">Default</Badge>}
             >
                 <div className="space-y-3 pt-3">
                     {(!company.prompts || company.prompts.length === 0) && (

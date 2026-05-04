@@ -2,7 +2,9 @@
 // Shows similarity analysis, SEO data, article content, and all action buttons
 
 import { useState, useRef, useEffect } from "react";
+import ArticleEditor, { type ArticleEditorHandle } from "@/components/articles/ArticleEditor";
 import AIMemeModal from "@/components/ui/ai-meme-modal";
+import { useTaskRunner } from "@/hooks/useTaskRunner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,7 +23,7 @@ import {
 import {
     Copy, Rocket, Pencil, RefreshCw, ImageIcon, Trash2,
     Search, Sparkles, Upload, AlertCircle, CheckCircle2,
-    Crown, BookOpen, Scroll, Eye, Code, Layers, ArrowLeft,
+    Crown, BookOpen, Scroll, Layers, ArrowLeft,
     ChevronDown, FileText, ClipboardCopy, Scissors, Crop,
     Scale, ExternalLink, ShieldCheck, Wand2, ChevronRight,
 } from "lucide-react";
@@ -75,13 +77,13 @@ type Props = {
 };
 
 export default function PanelView({ article, companies, onUpdate, onDelete, onSelectArticle }: Props) {
+    const { runTask } = useTaskRunner();
     const [editing, setEditing] = useState(false);
     const [editTitle, setEditTitle] = useState("");
     const [editExcerpt, setEditExcerpt] = useState("");
     const [editHtml, setEditHtml] = useState("");
-    const [editViewMode, setEditViewMode] = useState<"visual" | "html">("visual");
     const [saving, setSaving] = useState(false);
-    const contentEditableRef = useRef<HTMLDivElement>(null);
+    const editorRef = useRef<ArticleEditorHandle>(null);
 
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -169,7 +171,7 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     const [compositeErr, setCompositeErr] = useState<string | null>(null);
     const compositeProductFileRef = useRef<HTMLInputElement>(null);
     const compositeBgFileRef = useRef<HTMLInputElement>(null);
-    const savedRangeRef = useRef<Range | null>(null);
+    // savedRangeRef removed — Tiptap manages cursor/selection state internally
 
     // Meme modal — entertains users during heavy AI operations
     const [memeDismissed, setMemeDismissed] = useState(false);
@@ -227,25 +229,12 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
         setEditTitle(article.title);
         setEditExcerpt(article.excerpt ?? "");
         setEditHtml(displayArticle.html ?? "");
-        setEditViewMode("visual");
-    }
-
-    function syncFromContentEditable() {
-        if (contentEditableRef.current) setEditHtml(contentEditableRef.current.innerHTML);
-    }
-
-    function execFormat(command: string, value?: string) {
-        document.execCommand(command, false, value);
-        contentEditableRef.current?.focus();
-        syncFromContentEditable();
     }
 
     async function saveEdit() {
-        if (editViewMode === "visual") syncFromContentEditable();
         setSaving(true);
         try {
-            const htmlToSave = editViewMode === "visual" && contentEditableRef.current
-                ? contentEditableRef.current.innerHTML : editHtml;
+            const htmlToSave = editorRef.current?.getHTML() ?? editHtml;
             const r = await fetch(`/api/articles/${article.id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
@@ -343,31 +332,34 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
 
     async function handleRegenerate() {
         setRegenerating(true); setRegenErr(null);
-        try {
-            const r = await fetch("/api/create", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    creation_prompt: article.title,
-                    image_style: article.image_style ?? "default",
-                    company_id: article.company_id ?? undefined,
-                }),
-            });
-            const data = await r.json();
-            if (!r.ok) throw new Error(data.error || "Regeneration failed");
-            const saveResp = await fetch(`/api/articles/${article.id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    html: data.html, excerpt: data.excerpt, image_base64: data.image_base64,
-                    image_prompt: data.image_prompt, seo: data.seo, outline: data.outline, model_used: data.model_used,
-                }),
-            });
-            const saveData = await saveResp.json();
-            if (!saveResp.ok) throw new Error(saveData.error || "Failed to save");
-            onUpdate({ ...article, ...saveData });
-        } catch (e: any) { setRegenErr(e.message); }
-        finally { setRegenerating(false); }
+        await runTask({
+            type: "article",
+            label: `Regenerate: ${article.title.slice(0, 40)}`,
+            endpoint: "/api/create",
+            body: {
+                creation_prompt: article.title,
+                image_style: article.image_style ?? "default",
+                company_id: article.company_id ?? undefined,
+            },
+            meta: { articleId: article.id },
+            onSuccess: async (data: any) => {
+                try {
+                    const saveResp = await fetch(`/api/articles/${article.id}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            html: data.html, excerpt: data.excerpt, image_base64: data.image_base64,
+                            image_prompt: data.image_prompt, seo: data.seo, outline: data.outline, model_used: data.model_used,
+                        }),
+                    });
+                    const saveData = await saveResp.json();
+                    if (!saveResp.ok) throw new Error(saveData.error || "Failed to save");
+                    onUpdate({ ...article, ...saveData });
+                } catch (e: any) { setRegenErr(e.message); }
+                setRegenerating(false);
+            },
+            onError: (errMsg) => { setRegenErr(errMsg); setRegenerating(false); },
+        });
     }
 
     async function handleShorten() {
@@ -417,17 +409,15 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     async function handleConsulCheck() {
         if (!displayArticle.html) return;
         setConsulChecking(true); setConsulErr(null); setConsulResult(null); setExpandedClaims(new Set()); setAppliedRewrites(new Set());
-        try {
-            const r = await fetch("/api/fact-check-consul", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ title: article.title, excerpt: article.excerpt, html: displayArticle.html }),
-            });
-            const data = await r.json();
-            if (!r.ok) throw new Error(data?.error || "Consul check failed");
-            setConsulResult(data);
-        } catch (e: any) { setConsulErr(e.message); }
-        finally { setConsulChecking(false); }
+        await runTask({
+            type: "consul-check",
+            label: `Deep check: ${article.title.slice(0, 40)}`,
+            endpoint: "/api/fact-check-consul",
+            body: { title: article.title, excerpt: article.excerpt, html: displayArticle.html },
+            meta: { articleId: article.id },
+            onSuccess: (data: any) => { setConsulResult(data); setConsulChecking(false); },
+            onError: (errMsg) => { setConsulErr(errMsg); setConsulChecking(false); },
+        });
     }
 
     function toggleConsulClaim(index: number) {
@@ -715,19 +705,9 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                 const data = await r.json();
                 if (!r.ok) throw new Error(data.error || "Save failed");
                 onUpdate({ ...article, ...data });
-            } else if (insertMode === "editInline" && contentEditableRef.current) {
+            } else if (insertMode === "editInline" && editorRef.current) {
                 const imgSrc = insertPreview.type === "base64" ? `data:image/png;base64,${insertPreview.src}` : `/api/image-proxy?url=${encodeURIComponent(insertPreview.src)}`;
-                const figureHtml = `<figure style="margin:24px 0;text-align:center"><img src="${imgSrc}" alt="" style="max-width:100%;border-radius:10px" /></figure>`;
-                const sel = window.getSelection();
-                if (savedRangeRef.current && sel) {
-                    sel.removeAllRanges();
-                    sel.addRange(savedRangeRef.current);
-                    document.execCommand("insertHTML", false, figureHtml);
-                } else {
-                    contentEditableRef.current.innerHTML += "\n" + figureHtml;
-                }
-                syncFromContentEditable();
-                savedRangeRef.current = null;
+                editorRef.current.insertImage(imgSrc);
             } else {
                 const imgSrc = insertPreview.type === "base64" ? `data:image/png;base64,${insertPreview.src}` : `/api/image-proxy?url=${encodeURIComponent(insertPreview.src)}`;
                 const figureHtml = `<figure style="margin:24px 0;text-align:center"><img src="${imgSrc}" alt="" style="max-width:100%;border-radius:10px" /></figure>`;
@@ -1256,50 +1236,15 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                     <Textarea value={editExcerpt} onChange={(e) => setEditExcerpt(e.target.value)} rows={2} />
                 </div>
                 <div className="space-y-1.5">
-                    <div className="flex justify-between items-center">
-                        <Label>Body</Label>
-                        <div className="flex border border-border rounded-md overflow-hidden">
-                            <button onClick={() => { if (editViewMode === "html") setEditViewMode("visual"); }}
-                                className={cn("px-3 py-1 text-xs flex items-center gap-1", editViewMode === "visual" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted")}>
-                                <Eye className="h-3 w-3" /> Visual
-                            </button>
-                            <button onClick={() => { if (editViewMode === "visual") { syncFromContentEditable(); setEditViewMode("html"); } }}
-                                className={cn("px-3 py-1 text-xs flex items-center gap-1", editViewMode === "html" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted")}>
-                                <Code className="h-3 w-3" /> HTML
-                            </button>
-                        </div>
-                    </div>
-                    {editViewMode === "visual" && (
-                        <div className="flex gap-1 flex-wrap p-1.5 bg-muted border border-border border-b-0 rounded-t-md">
-                            {[{ label: "B", cmd: "bold" }, { label: "I", cmd: "italic" }, { label: "H2", cmd: "formatBlock", value: "H2" }, { label: "H3", cmd: "formatBlock", value: "H3" }, { label: "P", cmd: "formatBlock", value: "P" }].map((btn) => (
-                                <Button key={btn.label} variant="outline" size="sm" className="h-7 px-2.5 text-xs" onMouseDown={(e) => { e.preventDefault(); execFormat(btn.cmd, btn.value); }}>
-                                    {btn.label}
-                                </Button>
-                            ))}
-                            <Separator orientation="vertical" className="h-5 mx-0.5" />
-                            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onMouseDown={(e) => { e.preventDefault(); const url = prompt("Enter URL:"); if (url) execFormat("createLink", url); }}>
-                                🔗
-                            </Button>
-                            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onMouseDown={(e) => { e.preventDefault(); execFormat("insertUnorderedList"); }}>
-                                • List
-                            </Button>
-                            <Separator orientation="vertical" className="h-5 mx-0.5" />
-                            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onMouseDown={(e) => {
-                                e.preventDefault();
-                                const sel = window.getSelection();
-                                if (sel && sel.rangeCount > 0) savedRangeRef.current = sel.getRangeAt(0).cloneRange();
-                                setInsertMode("editInline"); setInsertPreview(null); setInsertErr(null); setShowInsertModal(true);
-                            }}>
-                                <ImageIcon className="h-3 w-3" />
-                            </Button>
-                        </div>
-                    )}
-                    {editViewMode === "visual" ? (
-                        <div ref={contentEditableRef} contentEditable suppressContentEditableWarning dangerouslySetInnerHTML={{ __html: editHtml }} onBlur={syncFromContentEditable}
-                            className="w-full min-h-[250px] p-3 text-sm leading-relaxed rounded-b-md border border-border bg-background outline-none overflow-y-auto max-h-[500px] prose prose-sm dark:prose-invert" />
-                    ) : (
-                        <Textarea value={editHtml} onChange={(e) => setEditHtml(e.target.value)} rows={14} className="font-mono text-xs" />
-                    )}
+                    <Label>Body</Label>
+                    <ArticleEditor
+                        ref={editorRef}
+                        initialContent={editHtml}
+                        onChange={(html) => setEditHtml(html)}
+                        onImageButtonClick={() => {
+                            setInsertMode("editInline"); setInsertPreview(null); setInsertErr(null); setShowInsertModal(true);
+                        }}
+                    />
                 </div>
                 <div className="flex gap-2 justify-end">
                     <Button variant="outline" onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
@@ -1642,7 +1587,7 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
         </div>
 
         {/* AI Meme Entertainment Modal — shows during regeneration */}
-        <AIMemeModal open={panelAiWorking && !memeDismissed} onClose={() => setMemeDismissed(true)} />
+        <AIMemeModal open={panelAiWorking && !memeDismissed} onClose={() => setMemeDismissed(true)} companyName={article.company_id ? companies[article.company_id] : undefined} />
         </>
     );
 }

@@ -5,6 +5,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import slugify from "slugify";
 import { getSupabase } from "@/lib/supabase";
+import { incrementArticleCount } from "@/lib/usage";
 import { buildBrandEngine, type CompanyRecord } from "@/lib/buildBrandEngine";
 import { buildAllJsonLd } from "@/lib/jsonld";
 import { compileReferenceArticles } from "@/lib/referenceArticles";
@@ -417,6 +418,7 @@ Which style best fits this article? Respond with JSON only.`;
                 model_used: selectedModel,
                 image_style: styleId,
                 company_id: cluster.company_id,
+                account_id: (companyData as any).account_id || null,
                 cluster_id: clusterId,
                 cluster_role: role,
             }).select("id").single();
@@ -433,6 +435,16 @@ Which style best fits this article? Respond with JSON only.`;
                         .eq("id", savedArticle.id);
                 } catch (embErr) {
                     console.warn("Failed to generate/save cluster article embedding:", embErr);
+                }
+
+                // Increment usage counter
+                const accountId = (companyData as any).account_id;
+                if (accountId) {
+                    try {
+                        await incrementArticleCount(accountId);
+                    } catch (usageErr) {
+                        console.warn("Failed to increment usage counter:", usageErr);
+                    }
                 }
             }
         } catch (saveErr) {

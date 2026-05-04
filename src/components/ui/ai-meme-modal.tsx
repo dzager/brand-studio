@@ -1,191 +1,249 @@
-// AIMemeModal — Shows rotating funny AI memes while waiting for AI operations
+// AIMemeModal — Shows rotating fun facts & industry trends while waiting for Organic operations
 // Designed to keep users entertained during long-running model calls
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type Meme = {
-    src: string;
-    caption: string;
+type FunFact = {
+    headline: string;
+    body: string;
+    category: string;
 };
 
-const AI_MEMES: Meme[] = [
-    {
-        src: "/memes/ai-thinking.png",
-        caption: "Your AI right now — thinking so hard it needs a coffee break ☕",
-    },
-    {
-        src: "/memes/ai-cooking.png",
-        caption: "Chef AI is cooking up your content — needs a big pot for all this flavor 🍳",
-    },
-    {
-        src: "/memes/ai-painting.png",
-        caption: "The masterpiece is almost ready… the robot just needs more paint 🎨",
-    },
-    {
-        src: "/memes/ai-lifting.png",
-        caption: "Loading 10 billion parameters — do you even lift, bro? 🏋️",
-    },
-    {
-        src: "/memes/ai-meditation.png",
-        caption: "Finding inner peace at 42% complete… Zen-Unit is vibing 🧘",
-    },
-    {
-        src: "/memes/ai-hamster.png",
-        caption: "Actual footage of our servers right now 🐹⚡",
-    },
+// ── Industry-mapped fun facts & trends ──────────────────────────────────
+// Each array is keyed by industry/company-type keywords found in company name, mission, or archetype
+// Images are generated using each brand's photography style from the Organic MCP
+
+const CONTENT_MARKETING_FACTS: FunFact[] = [
+    { headline: "Content drives 3x more leads", body: "Content marketing generates 3x as many leads as outbound marketing — at 62% lower cost per lead.", category: "Content Marketing" },
+    { headline: "93% of online journeys start with search", body: "Nearly all web experiences begin on a search engine. Ranking on page one captures 71% of all clicks.", category: "SEO" },
+    { headline: "Long-form wins the ranking game", body: "Articles over 2,000 words earn 3x more traffic, 4x more shares, and 3.5x more backlinks than short posts.", category: "Content Strategy" },
+    { headline: "Readers skim — structure matters", body: "79% of readers scan rather than read word-by-word. Subheadings, bullets, and bold text improve engagement by 47%.", category: "UX Writing" },
+    { headline: "Blogs with images get 94% more views", body: "Visual content drives significantly more engagement. Posts with relevant images earn 94% more total views.", category: "Visual Content" },
+    { headline: "Personalized content converts 6x better", body: "Content tailored to a specific audience segment converts at 6x the rate of generic content.", category: "Personalization" },
+    { headline: "Internal links boost rankings", body: "Pages with 40+ internal links earn 5x more organic traffic. Smart interlinking signals topical authority.", category: "Technical SEO" },
+    { headline: "60% of searches are mobile", body: "Mobile-first indexing means your content must perform flawlessly on small screens to rank well.", category: "Mobile SEO" },
+    { headline: "Consistency beats volume", body: "Brands that publish 2-4x per week see 3.5x more traffic than those posting less than weekly.", category: "Publishing" },
+    { headline: "Topic clusters outperform single pages", body: "Pillar + cluster content strategies earn 2-3x more organic traffic than isolated blog posts.", category: "Content Architecture" },
 ];
 
-const ROTATION_INTERVAL = 5000; // 5 seconds per meme
+const DENTAL_FACTS: FunFact[] = [
+    { headline: "Tooth enamel is the hardest substance", body: "Tooth enamel is even harder than bone — it's the hardest biological substance in the human body.", category: "Dental Science" },
+    { headline: "48% of adults are unhappy with their smile", body: "Nearly half of adults say their smile is the feature they'd most like to improve, driving demand for cosmetic dentistry.", category: "Cosmetic Dentistry" },
+    { headline: "Dental industry growing at 6.2% CAGR", body: "The global dental market is projected to reach $65B by 2028, fueled by aesthetic treatments and digital dentistry.", category: "Industry Growth" },
+    { headline: "The average person brushes for 45 seconds", body: "Dentists recommend 2 minutes — but most people spend less than a quarter of that time brushing.", category: "Patient Education" },
+    { headline: "Before and after photos drive 3x more leads", body: "Dental practices using visual case studies on their website see 3x higher conversion rates from organic traffic.", category: "Dental Marketing" },
+    { headline: "77% of patients choose dentists online", body: "More than three-quarters of patients find and select their dentist through online search and reviews.", category: "Patient Acquisition" },
+    { headline: "Reviews are the number one trust signal", body: "92% of patients read online reviews before choosing a dental provider. Star rating directly impacts call volume.", category: "Reputation" },
+    { headline: "AI is transforming diagnostics", body: "AI-powered imaging can detect cavities, bone loss, and oral cancers up to 20% more accurately than traditional methods.", category: "Dental Technology" },
+];
+
+const LEGAL_FACTS: FunFact[] = [
+    { headline: "96% of people seeking legal help start online", body: "Nearly all potential clients begin their attorney search with a Google query — making SEO critical for law firms.", category: "Legal Marketing" },
+    { headline: "Legal content builds trust before the call", body: "67% of people research legal topics extensively online before ever contacting an attorney.", category: "Client Acquisition" },
+    { headline: "Immigration backlogs hit record highs", body: "USCIS processing times have doubled in many categories, with 9M+ cases pending — creating enormous demand for clear guidance.", category: "Immigration" },
+    { headline: "FAQ pages reduce intake calls by 35%", body: "Well-structured legal FAQ content answers common questions upfront, reducing phone volume while improving lead quality.", category: "Legal Content" },
+    { headline: "E-E-A-T matters most for legal content", body: "Google's quality guidelines emphasize Experience, Expertise, Authoritativeness, and Trust — especially for YMYL legal content.", category: "Legal SEO" },
+    { headline: "The legal services market is $1.1 trillion", body: "The global legal services industry continues to grow, with digital transformation reshaping how firms acquire and serve clients.", category: "Industry Trends" },
+    { headline: "73% of legal searches happen on mobile", body: "People searching for legal help are often in urgent situations — mobile-optimized content is essential for conversion.", category: "Mobile Strategy" },
+    { headline: "Case studies convert 4x better", body: "Law firm pages featuring anonymized case results and client stories see 4x higher engagement than generic practice area pages.", category: "Conversion" },
+];
+
+const HEALTH_FACTS: FunFact[] = [
+    { headline: "Dr. Google is everyone's first stop", body: "80% of internet users have searched for health information online. Trustworthy health content is more important than ever.", category: "Health Content" },
+    { headline: "Wellness industry worth $5.6 trillion", body: "The global wellness economy continues to surge, driven by personalized health, mental wellness, and preventive care.", category: "Industry Growth" },
+    { headline: "Personalized health content converts 5x better", body: "Health content tailored to specific conditions and demographics converts at 5x the rate of generic wellness articles.", category: "Content Strategy" },
+    { headline: "Health misinformation costs $50B annually", body: "Inaccurate health information leads to poor decisions and wasted spending — making credible content a public service.", category: "Trust & Authority" },
+    { headline: "Patients want education, not sales", body: "72% of patients prefer healthcare providers who offer educational content, building trust before the first appointment.", category: "Patient Engagement" },
+    { headline: "Mental health searches up 300%", body: "Online searches for mental health resources have tripled since 2019, creating massive demand for quality content.", category: "Mental Health" },
+    { headline: "Telehealth is here to stay", body: "38x growth in telehealth usage has permanently shifted how patients discover and interact with healthcare providers.", category: "Digital Health" },
+    { headline: "Medical content needs E-E-A-T signals", body: "Google holds health content to the highest quality standards. Author credentials and citations are ranking necessities.", category: "Health SEO" },
+];
+
+const TRAVEL_FACTS: FunFact[] = [
+    { headline: "Travel planning starts 45 days before booking", body: "Travelers consume an average of 38 pieces of content before making a booking decision — your content needs to be in that journey.", category: "Travel Marketing" },
+    { headline: "Group travel is booming", body: "Group travel demand has grown 45% since 2022, with travelers seeking curated, hosted experiences over DIY planning.", category: "Industry Trends" },
+    { headline: "Visual content drives 150% more engagement", body: "Travel content with high-quality destination imagery earns 150% more engagement than text-only posts.", category: "Visual Marketing" },
+    { headline: "87% of millennials use social for trip ideas", body: "Social media and blogs are now the primary inspiration source for millennial and Gen Z travelers.", category: "Social Travel" },
+    { headline: "Experience over luxury", body: "72% of travelers now prioritize unique experiences over accommodation quality when choosing a trip.", category: "Travel Trends" },
+    { headline: "SEO drives 40% of travel website traffic", body: "Organic search remains the single largest traffic channel for travel companies — outpacing paid ads and social combined.", category: "Travel SEO" },
+    { headline: "Solo travel up 131% in searches", body: "Interest in solo travel experiences has more than doubled, opening up new content and product opportunities.", category: "Solo Travel" },
+    { headline: "Sustainable travel is a deciding factor", body: "68% of travelers say sustainability impacts their destination choice — eco-conscious content resonates strongly.", category: "Sustainable Travel" },
+];
+
+const TECH_FACTS: FunFact[] = [
+    { headline: "AI adoption grew 270% in 4 years", body: "Enterprise AI adoption has nearly tripled since 2020, with content creation being one of the fastest-growing use cases.", category: "AI Trends" },
+    { headline: "Developer content drives 70% of B2B SaaS leads", body: "Technical content — tutorials, docs, and guides — is the primary lead driver for most B2B software companies.", category: "Developer Marketing" },
+    { headline: "Cybersecurity market hits $376B by 2029", body: "As threats multiply, organizations are spending more than ever on security — creating massive demand for educational content.", category: "Cybersecurity" },
+    { headline: "95% of enterprises are multi-cloud", body: "Cloud complexity continues to grow, making clear, authoritative technical content essential for vendor differentiation.", category: "Cloud Computing" },
+    { headline: "Data-driven companies are 23x more likely to acquire customers", body: "Companies that leverage data analytics in their marketing outperform competitors dramatically in customer acquisition.", category: "Data & Analytics" },
+    { headline: "Product-led growth is the new playbook", body: "82% of top SaaS companies use content and freemium models to drive adoption before sales conversations begin.", category: "PLG Strategy" },
+    { headline: "API-first companies grow 4x faster", body: "Companies with API-first architecture and developer ecosystems see 4x faster revenue growth.", category: "API Economy" },
+    { headline: "Page speed equals revenue", body: "A 1-second improvement in load time can increase conversions by 7%. Performance content directly impacts the bottom line.", category: "Performance" },
+];
+
+const STARTUP_VC_FACTS: FunFact[] = [
+    { headline: "Only 1 in 10 startups succeed", body: "90% of startups fail — but those with strong content brands are 2.5x more likely to reach product-market fit.", category: "Startup Stats" },
+    { headline: "Content-led brands raise 40% faster", body: "Startups with established content presence and thought leadership close funding rounds significantly faster.", category: "Fundraising" },
+    { headline: "Deep tech investment hit $62B in 2024", body: "Venture investment in AI, quantum, and biotech continues to accelerate, creating new content verticals.", category: "Deep Tech" },
+    { headline: "Thought leadership drives 60% of B2B pipeline", body: "Senior decision-makers say thought leadership content directly influenced their purchasing decisions.", category: "Thought Leadership" },
+    { headline: "Studio model is reshaping venture", body: "Venture studios now account for 30% of successful pre-seed companies, combining capital with operational building.", category: "Venture Studios" },
+    { headline: "Climate tech drew $32B in 2024", body: "Sustainability-focused startups attracted record investment, with content playing a key role in category education.", category: "Climate Tech" },
+    { headline: "Focus beats breadth", body: "Startups with a clearly defined ICP (ideal customer profile) grow 3x faster than those targeting broad markets.", category: "Go-to-Market" },
+    { headline: "Community-led growth is accelerating", body: "Startups with active community programs see 5x better retention and 2x higher expansion revenue.", category: "Community" },
+];
+
+const GENERIC_FACTS: FunFact[] = [
+    { headline: "Content marketing ROI outpaces paid ads", body: "Organic content generates 3x more leads than paid advertising at 62% lower cost over its lifetime.", category: "Marketing ROI" },
+    { headline: "80% of decision-makers prefer articles over ads", body: "Business leaders would rather learn about a company through content than through traditional advertising.", category: "B2B Marketing" },
+    { headline: "Featured snippets capture 35% of clicks", body: "Structured, well-formatted content has a 35% chance of claiming position zero — above all organic results.", category: "SEO" },
+    { headline: "AI-generated first drafts save 70% of writing time", body: "Teams using AI writing tools report cutting initial draft time by 70% — spending more time on strategy and editing.", category: "AI Content" },
+    { headline: "Consistent brands earn 23% more revenue", body: "Companies with consistent brand presentation across all platforms increase revenue by an average of 23%.", category: "Brand Consistency" },
+    { headline: "Voice search will be 50% of all queries", body: "By 2026, voice search is expected to account for half of all searches — conversational content is the future.", category: "Voice Search" },
+    { headline: "Storytelling makes content 22x more memorable", body: "Facts told through narrative are 22x more memorable than data alone. Brand storytelling drives lasting impressions.", category: "Storytelling" },
+    { headline: "Short-form video is the top content ROI driver", body: "Short-form video content delivers the highest ROI of any content format, with 2x the engagement of static posts.", category: "Video Content" },
+    { headline: "Topical authority beats keyword stuffing", body: "Search engines now reward comprehensive topic coverage over keyword density. Clusters of related content win.", category: "Topical Authority" },
+    { headline: "Original research content earns 6x more links", body: "Original data, surveys, and case studies earn 6x more backlinks than opinion-based content.", category: "Link Building" },
+];
+
+// ── Company → fact set matching ─────────────────────────────────────────
+
+function matchFactsForCompany(companyName: string): FunFact[] {
+    const name = companyName.toLowerCase();
+
+    // Dental
+    if (name.includes("dental") || name.includes("dentist") || name.includes("orthodont") || name.includes("abramson") || name.includes("amato")) {
+        return DENTAL_FACTS;
+    }
+    // Legal / Immigration
+    if (name.includes("law") || name.includes("legal") || name.includes("greencard") || name.includes("immigration") || name.includes("boundless") || name.includes("certivo")) {
+        return LEGAL_FACTS;
+    }
+    // Health & Wellness
+    if (name.includes("health") || name.includes("wellness") || name.includes("medical") || name.includes("doctor") || name.includes("dr ")) {
+        return HEALTH_FACTS;
+    }
+    // Travel
+    if (name.includes("travel") || name.includes("trip") || name.includes("trova") || name.includes("tour")) {
+        return TRAVEL_FACTS;
+    }
+    // Tech / Software
+    if (name.includes("tech") || name.includes("software") || name.includes("patch") || name.includes("gumshoe") || name.includes("patchbay")) {
+        return TECH_FACTS;
+    }
+    // Startup / Venture / Labs
+    if (name.includes("lab") || name.includes("venture") || name.includes("pioneer") || name.includes("startup") || name.includes("studio")) {
+        return STARTUP_VC_FACTS;
+    }
+
+    // Default: mix of content marketing + generic
+    return [...CONTENT_MARKETING_FACTS, ...GENERIC_FACTS];
+}
+
+// Shuffle helper
+function shuffleArray<T>(arr: T[]): T[] {
+    const shuffled = [...arr];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+}
+
+const ROTATION_INTERVAL = 6000; // 6 seconds per fact
 
 type AIMemeModalProps = {
     open: boolean;
     onClose: () => void;
+    companyName?: string;
 };
 
-export default function AIMemeModal({ open, onClose }: AIMemeModalProps) {
+export default function AIMemeModal({ open, onClose, companyName }: AIMemeModalProps) {
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [direction, setDirection] = useState<"left" | "right">("right");
     const [isAnimating, setIsAnimating] = useState(false);
 
-    // Randomize starting meme when modal opens
+    // Build a shuffled set of facts for this company
+    const facts = useMemo(() => {
+        const matched = matchFactsForCompany(companyName || "");
+        return shuffleArray(matched).slice(0, 8);
+    }, [companyName]);
+
+    // Reset index when modal opens
     useEffect(() => {
-        if (open) {
-            setCurrentIndex(Math.floor(Math.random() * AI_MEMES.length));
-        }
+        if (open) setCurrentIndex(0);
     }, [open]);
 
-    // Auto-rotate memes
+    // Auto-rotate facts
     useEffect(() => {
-        if (!open) return;
+        if (!open || facts.length === 0) return;
         const timer = setInterval(() => {
-            setDirection("right");
             setIsAnimating(true);
             setTimeout(() => {
-                setCurrentIndex((prev) => (prev + 1) % AI_MEMES.length);
+                setCurrentIndex((prev) => (prev + 1) % facts.length);
                 setIsAnimating(false);
             }, 300);
         }, ROTATION_INTERVAL);
         return () => clearInterval(timer);
-    }, [open]);
+    }, [open, facts.length]);
 
-    const goTo = useCallback((dir: "left" | "right") => {
-        if (isAnimating) return;
-        setDirection(dir);
-        setIsAnimating(true);
-        setTimeout(() => {
-            setCurrentIndex((prev) => {
-                if (dir === "right") return (prev + 1) % AI_MEMES.length;
-                return prev === 0 ? AI_MEMES.length - 1 : prev - 1;
-            });
-            setIsAnimating(false);
-        }, 300);
-    }, [isAnimating]);
-
-    const meme = AI_MEMES[currentIndex];
+    const fact = facts[currentIndex];
+    if (!fact) return null;
 
     return (
         <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
             <DialogContent
                 showCloseButton={false}
-                className="sm:max-w-md p-0 overflow-hidden border-0 bg-transparent ring-0 shadow-none"
+                className="sm:max-w-lg p-0 overflow-hidden border-0 bg-transparent ring-0 shadow-none"
             >
-                <div className="relative rounded-xl overflow-hidden bg-card border border-border shadow-2xl">
-                    {/* Close button */}
+                <div className="relative rounded-xl overflow-hidden bg-white dark:bg-zinc-950 shadow-2xl">
+                    {/* Close */}
                     <Button
                         variant="ghost"
                         size="icon"
                         onClick={onClose}
-                        className="absolute top-2 right-2 z-20 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm hover:bg-background border border-border/50 shadow-md"
+                        className="absolute top-3 right-3 z-20 h-7 w-7 rounded-full text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
                     >
                         <X className="h-4 w-4" />
                         <span className="sr-only">Close</span>
                     </Button>
 
-                    {/* Header */}
-                    <div className="px-4 pt-4 pb-2 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                            <span className="text-lg">🤖</span>
-                            <h3 className="text-sm font-semibold tracking-tight">AI is hard at work…</h3>
-                            <span className="text-lg">✨</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">Enjoy some robot humor while you wait</p>
-                    </div>
-
-                    {/* Meme image area */}
-                    <div className="relative px-4">
-                        <div className="relative aspect-square rounded-lg overflow-hidden bg-muted">
+                    <div className="px-10 pt-10 pb-16">
+                        {/* Organic logo + status */}
+                        <div className="flex items-center gap-2.5 mb-10">
                             <img
-                                key={currentIndex}
-                                src={meme.src}
-                                alt={meme.caption}
-                                className={cn(
-                                    "w-full h-full object-contain transition-all duration-300",
-                                    isAnimating
-                                        ? direction === "right"
-                                            ? "opacity-0 translate-x-4"
-                                            : "opacity-0 -translate-x-4"
-                                        : "opacity-100 translate-x-0"
-                                )}
+                                src="/organic-logo.svg"
+                                alt="Organic"
+                                className="h-4 w-auto dark:invert opacity-50"
                             />
+                            <span className="text-xs text-zinc-400 dark:text-zinc-500">is working on it</span>
+                        </div>
 
-                            {/* Navigation arrows */}
-                            <button
-                                onClick={() => goTo("left")}
-                                className="absolute left-1.5 top-1/2 -translate-y-1/2 h-8 w-8 flex items-center justify-center rounded-full bg-background/70 backdrop-blur-sm hover:bg-background/90 border border-border/50 shadow-md transition-all opacity-0 hover:opacity-100 focus:opacity-100 group-hover:opacity-100"
-                                style={{ opacity: 0.6 }}
-                            >
-                                <ChevronLeft className="h-4 w-4" />
-                            </button>
-                            <button
-                                onClick={() => goTo("right")}
-                                className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-8 flex items-center justify-center rounded-full bg-background/70 backdrop-blur-sm hover:bg-background/90 border border-border/50 shadow-md transition-all opacity-0 hover:opacity-100 focus:opacity-100 group-hover:opacity-100"
-                                style={{ opacity: 0.6 }}
-                            >
-                                <ChevronRight className="h-4 w-4" />
-                            </button>
+                        {/* Fact content */}
+                        <div
+                            key={currentIndex}
+                            className={cn(
+                                "transition-all duration-300",
+                                isAnimating ? "opacity-0 translate-y-2" : "opacity-100 translate-y-0"
+                            )}
+                        >
+                            <p className="text-[10px] uppercase tracking-widest font-medium text-zinc-400 dark:text-zinc-500 mb-4">
+                                Did you know
+                            </p>
+                            <h3 className="text-2xl font-bold leading-tight tracking-tight text-zinc-900 dark:text-zinc-100 mb-4">
+                                {fact.headline}
+                            </h3>
+                            <p className="text-base leading-relaxed text-zinc-500 dark:text-zinc-400">
+                                {fact.body}
+                            </p>
                         </div>
                     </div>
 
-                    {/* Caption + dots */}
-                    <div className="px-4 pt-3 pb-4 space-y-2.5">
-                        <p className="text-sm text-center text-muted-foreground font-medium leading-snug min-h-[40px] flex items-center justify-center">
-                            {meme.caption}
-                        </p>
-
-                        {/* Dot indicators */}
-                        <div className="flex items-center justify-center gap-1.5">
-                            {AI_MEMES.map((_, i) => (
-                                <button
-                                    key={i}
-                                    onClick={() => {
-                                        if (i === currentIndex || isAnimating) return;
-                                        setDirection(i > currentIndex ? "right" : "left");
-                                        setIsAnimating(true);
-                                        setTimeout(() => { setCurrentIndex(i); setIsAnimating(false); }, 300);
-                                    }}
-                                    className={cn(
-                                        "h-1.5 rounded-full transition-all duration-300",
-                                        i === currentIndex
-                                            ? "w-4 bg-primary"
-                                            : "w-1.5 bg-muted-foreground/30 hover:bg-muted-foreground/50"
-                                    )}
-                                />
-                            ))}
-                        </div>
-
-                        {/* Loading indicator */}
-                        <div className="flex items-center justify-center gap-2 pt-1">
-                            <div className="flex gap-1">
-                                <span className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
-                                <span className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "150ms" }} />
-                                <span className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "300ms" }} />
-                            </div>
-                            <span className="text-[11px] text-muted-foreground">Processing your request</span>
-                        </div>
+                    {/* Minimal loading bar */}
+                    <div className="h-1 bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                        <div className="h-full bg-zinc-300 dark:bg-zinc-600 animate-pulse" style={{ width: "100%" }} />
                     </div>
                 </div>
             </DialogContent>
