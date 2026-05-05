@@ -88,7 +88,33 @@ export default async function handler(
                     new Date(a.created_at).getTime()
             );
 
-            return res.status(200).json(users);
+            // Fetch all pending invitations (people who haven't accepted yet)
+            const { data: pendingInvitations } = await admin
+                .from("invitations")
+                .select(`
+                    id,
+                    email,
+                    role,
+                    token,
+                    created_at,
+                    account_id,
+                    invited_by,
+                    accounts:account_id (
+                        id,
+                        name,
+                        plan
+                    )
+                `)
+                .is("accepted_at", null)
+                .order("created_at", { ascending: false });
+
+            // Dedupe: exclude invited emails that already have an auth user
+            const authEmails = new Set(authUsers.map((u: any) => (u.email || "").toLowerCase()));
+            const uniqueInvitations = (pendingInvitations || []).filter(
+                (inv: any) => !authEmails.has((inv.email || "").toLowerCase())
+            );
+
+            return res.status(200).json({ users, pending_invitations: uniqueInvitations });
         }
 
         if (req.method === "DELETE") {

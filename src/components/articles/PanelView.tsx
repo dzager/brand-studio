@@ -26,6 +26,7 @@ import {
     Crown, BookOpen, Scroll, Layers, ArrowLeft,
     ChevronDown, FileText, ClipboardCopy, Scissors, Crop,
     Scale, ExternalLink, ShieldCheck, Wand2, ChevronRight,
+    X, Maximize2, Video, Play,
 } from "lucide-react";
 import type { ConsulResult, ConsulClaimReview } from "@/lib/consulPrompts";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,16 @@ type SearchImage = {
     domain: string;
     width?: number;
     height?: number;
+};
+
+type SearchVideo = {
+    title: string;
+    link: string;
+    snippet: string;
+    channel?: string;
+    date?: string;
+    duration?: string;
+    imageUrl?: string;
 };
 
 type Article = {
@@ -172,6 +183,13 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     const compositeProductFileRef = useRef<HTMLInputElement>(null);
     const compositeBgFileRef = useRef<HTMLInputElement>(null);
     // savedRangeRef removed — Tiptap manages cursor/selection state internally
+
+    // YouTube search & embed state
+    const [showYouTubeModal, setShowYouTubeModal] = useState(false);
+    const [ytQuery, setYtQuery] = useState("");
+    const [ytResults, setYtResults] = useState<SearchVideo[]>([]);
+    const [ytSearching, setYtSearching] = useState(false);
+    const [ytErr, setYtErr] = useState<string | null>(null);
 
     // Meme modal — entertains users during heavy AI operations
     const [memeDismissed, setMemeDismissed] = useState(false);
@@ -535,6 +553,37 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
             setInsertSearchResults(data.images ?? []);
         } catch (e: any) { setInsertErr(e.message); }
         finally { setInsertSearching(false); }
+    }
+
+    async function onYouTubeSearch() {
+        if (!ytQuery.trim()) return;
+        setYtSearching(true); setYtErr(null);
+        try {
+            const r = await fetch("/api/youtube-search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: ytQuery.trim(), num: 12 }) });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data?.error || "YouTube search failed");
+            setYtResults(data.videos ?? []);
+        } catch (e: any) { setYtErr(e.message); }
+        finally { setYtSearching(false); }
+    }
+
+    /** Extract YouTube video ID from a URL (supports youtube.com/watch, youtu.be, embed, shorts) */
+    function extractYouTubeId(url: string): string | null {
+        const patterns = [
+            /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+        ];
+        for (const re of patterns) {
+            const m = url.match(re);
+            if (m) return m[1];
+        }
+        return null;
+    }
+
+    function insertYouTubeVideo(vid: SearchVideo) {
+        const videoId = extractYouTubeId(vid.link);
+        if (!videoId || !editorRef.current) return;
+        editorRef.current.insertYouTube(videoId, vid.title);
+        setShowYouTubeModal(false);
     }
 
     async function onCompositeSearch() {
@@ -1220,38 +1269,204 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
         </Dialog>
     );
 
-    // ======= EDIT MODE =======
+    // ======= INSERT YOUTUBE MODAL =======
+    const insertYouTubeModal = (
+        <Dialog open={showYouTubeModal} onOpenChange={setShowYouTubeModal}>
+            <DialogContent className="max-w-4xl w-[90vw] max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <Video className="h-5 w-5 text-red-500" /> Insert YouTube Video
+                    </DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                    {/* Search bar */}
+                    <div className="flex gap-2">
+                        <Input
+                            placeholder="Search YouTube for videos to embed…"
+                            value={ytQuery}
+                            onChange={(e) => setYtQuery(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") onYouTubeSearch(); }}
+                        />
+                        <Button onClick={onYouTubeSearch} disabled={ytSearching || !ytQuery.trim()} className="gap-1.5 whitespace-nowrap">
+                            <Play className="h-4 w-4" />
+                            {ytSearching ? "Searching…" : "Search"}
+                        </Button>
+                    </div>
+
+                    {ytErr && (
+                        <Alert variant="destructive">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>{ytErr}</AlertDescription>
+                        </Alert>
+                    )}
+
+                    {/* Results grid */}
+                    {ytResults.length > 0 && (
+                        <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3 max-h-[60vh] overflow-y-auto">
+                            {ytResults.map((vid, i) => {
+                                const videoId = extractYouTubeId(vid.link);
+                                return (
+                                    <Card key={i} className="overflow-hidden hover:shadow-lg transition-shadow group">
+                                        <div className="relative bg-black aspect-video overflow-hidden">
+                                            {vid.imageUrl && (
+                                                <img
+                                                    src={vid.imageUrl}
+                                                    alt={vid.title}
+                                                    loading="lazy"
+                                                    className="w-full h-full object-cover"
+                                                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                                                />
+                                            )}
+                                            {vid.duration && (
+                                                <span className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-[11px] font-semibold px-1.5 py-0.5 rounded">
+                                                    {vid.duration}
+                                                </span>
+                                            )}
+                                            <div className="absolute inset-0 flex items-center justify-center opacity-70 pointer-events-none">
+                                                <svg width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="rgba(0,0,0,0.5)"/><polygon points="18,14 36,24 18,34" fill="#fff"/></svg>
+                                            </div>
+                                        </div>
+                                        <CardContent className="p-2.5 space-y-1.5">
+                                            <div className="text-sm font-semibold line-clamp-2 leading-tight">{vid.title}</div>
+                                            {vid.channel && <div className="text-xs text-muted-foreground font-medium">{vid.channel}</div>}
+                                            <div className="flex items-center gap-2">
+                                                {vid.date && <span className="text-[11px] text-muted-foreground">{vid.date}</span>}
+                                            </div>
+                                            <div className="flex gap-1.5 pt-1">
+                                                {videoId && (
+                                                    <Button
+                                                        size="sm"
+                                                        className="gap-1 flex-1 text-xs"
+                                                        onClick={() => insertYouTubeVideo(vid)}
+                                                    >
+                                                        <Video className="h-3 w-3" /> Embed
+                                                    </Button>
+                                                )}
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="gap-1 text-xs"
+                                                    asChild
+                                                >
+                                                    <a href={vid.link} target="_blank" rel="noopener noreferrer">
+                                                        <ExternalLink className="h-3 w-3" /> Watch
+                                                    </a>
+                                                </Button>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {ytResults.length === 0 && !ytSearching && !ytErr && (
+                        <div className="py-12 text-center text-muted-foreground">
+                            <Video className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                            <p className="text-sm">Search for YouTube videos to embed in your article.</p>
+                            <p className="text-xs mt-1">Videos will be embedded as responsive iframes at the cursor position.</p>
+                        </div>
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+
+    // ======= EDIT MODE (fullscreen overlay) =======
     if (editing) {
         return (
-            <div className="p-5 space-y-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Pencil className="h-4 w-4" /> Edit Article
-                </h3>
-                <div className="space-y-1.5">
-                    <Label>Title</Label>
-                    <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+            <>
+            <div
+                className="fixed inset-0 z-50 flex flex-col bg-background"
+                style={{ animation: "editor-slide-up 0.3s ease-out" }}
+            >
+                {/* ── Sticky top bar ────────────────────────────────── */}
+                <div className="shrink-0 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+                    <div className="mx-auto max-w-4xl flex items-center justify-between px-6 py-3">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
+                                <Pencil className="h-4 w-4 text-primary" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-semibold leading-tight">Editing Article</h3>
+                                <p className="text-xs text-muted-foreground truncate max-w-[300px]">{editTitle || article.title}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setEditing(false)}
+                                disabled={saving}
+                                className="gap-1.5 text-muted-foreground hover:text-foreground"
+                            >
+                                <X className="h-4 w-4" /> Discard
+                            </Button>
+                            <Button
+                                size="sm"
+                                onClick={saveEdit}
+                                disabled={saving}
+                                className="gap-1.5 min-w-[120px]"
+                            >
+                                {saving ? (
+                                    <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Saving…</>
+                                ) : (
+                                    <><CheckCircle2 className="h-3.5 w-3.5" /> Save Changes</>
+                                )}
+                            </Button>
+                        </div>
+                    </div>
                 </div>
-                <div className="space-y-1.5">
-                    <Label>Excerpt</Label>
-                    <Textarea value={editExcerpt} onChange={(e) => setEditExcerpt(e.target.value)} rows={2} />
+
+                {/* ── Scrollable editor body ─────────────────────────── */}
+                <div className="flex-1 overflow-y-auto">
+                    <div className="mx-auto max-w-4xl px-6 py-8 space-y-6">
+                        {/* Title */}
+                        <div className="space-y-2">
+                            <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Title</Label>
+                            <Input
+                                value={editTitle}
+                                onChange={(e) => setEditTitle(e.target.value)}
+                                className="text-lg font-semibold h-12 border-0 border-b border-border rounded-none px-0 focus-visible:ring-0 focus-visible:border-primary bg-transparent"
+                                placeholder="Article title…"
+                            />
+                        </div>
+
+                        {/* Excerpt */}
+                        <div className="space-y-2">
+                            <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Excerpt</Label>
+                            <Textarea
+                                value={editExcerpt}
+                                onChange={(e) => setEditExcerpt(e.target.value)}
+                                rows={2}
+                                className="resize-none border-0 border-b border-border rounded-none px-0 focus-visible:ring-0 focus-visible:border-primary bg-transparent text-muted-foreground"
+                                placeholder="Brief description of the article…"
+                            />
+                        </div>
+
+                        {/* Body — Tiptap editor (expanded for fullscreen) */}
+                        <div className="space-y-2">
+                            <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Body</Label>
+                            <ArticleEditor
+                                ref={editorRef}
+                                initialContent={editHtml}
+                                onChange={(html) => setEditHtml(html)}
+                                onImageButtonClick={() => {
+                                    setInsertMode("editInline"); setInsertPreview(null); setInsertErr(null); setShowInsertModal(true);
+                                }}
+                                onYouTubeButtonClick={() => {
+                                    setYtResults([]); setYtErr(null); setShowYouTubeModal(true);
+                                }}
+                                className="fullscreen-editor"
+                            />
+                        </div>
+                    </div>
                 </div>
-                <div className="space-y-1.5">
-                    <Label>Body</Label>
-                    <ArticleEditor
-                        ref={editorRef}
-                        initialContent={editHtml}
-                        onChange={(html) => setEditHtml(html)}
-                        onImageButtonClick={() => {
-                            setInsertMode("editInline"); setInsertPreview(null); setInsertErr(null); setShowInsertModal(true);
-                        }}
-                    />
-                </div>
-                <div className="flex gap-2 justify-end">
-                    <Button variant="outline" onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
-                    <Button onClick={saveEdit} disabled={saving}>{saving ? "Saving…" : "Save Changes"}</Button>
-                </div>
-                {insertImageModal}
             </div>
+            {insertImageModal}
+            {insertYouTubeModal}
+            </>
         );
     }
 
@@ -1288,8 +1503,9 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                 </div>
             )}
 
-            {/* Actions */}
-            <div className="flex gap-2 flex-wrap pb-4 border-b border-border">
+            {/* Actions — grouped by purpose */}
+            <div className="flex items-center gap-1.5 flex-wrap pb-4 border-b border-border">
+                {/* ── Content ── */}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="outline" size="sm" className={cn("gap-1.5", copied && "text-success border-success")}>
@@ -1322,6 +1538,10 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                 <Button variant="outline" size="sm" onClick={startEdit} className="gap-1.5">
                     <Pencil className="h-3.5 w-3.5" /> Edit
                 </Button>
+
+                <Separator orientation="vertical" className="h-6 mx-1" />
+
+                {/* ── Transform ── */}
                 <Button variant="outline" size="sm" onClick={handleRegenerate} disabled={regenerating} className="gap-1.5">
                     <RefreshCw className={cn("h-3.5 w-3.5", regenerating && "animate-spin")} /> {regenerating ? "Regenerating…" : "Regenerate"}
                 </Button>
@@ -1337,6 +1557,10 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                 <Button variant="outline" size="sm" onClick={() => { setShowInsertModal(true); setInsertMode("inline"); }} className="gap-1.5">
                     <ImageIcon className="h-3.5 w-3.5" /> Image
                 </Button>
+
+                <Separator orientation="vertical" className="h-6 mx-1" />
+
+                {/* ── Quality ── */}
                 <Button variant="outline" size="sm" onClick={checkSimilarity} disabled={checkingSimilarity || !article.company_id}
                     className={cn("gap-1.5", similarResults !== null && similarResults.length === 0 && "text-success border-success", similarResults !== null && similarResults.length > 0 && "text-amber-500 border-amber-500")}>
                     {checkingSimilarity ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Checking…</> : similarResults !== null ? <><Search className="h-3.5 w-3.5" /> {similarResults.length === 0 ? "No Overlap" : `${similarResults.length} Similar`}</> : <><Search className="h-3.5 w-3.5" /> Similarity</>}
@@ -1345,6 +1569,10 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                     className="gap-1.5 border-primary/30">
                     {consulChecking ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Consulting…</> : consulResult ? <><Scale className="h-3.5 w-3.5" /> Re-check</> : <><Scale className="h-3.5 w-3.5" /> Fact-Check Consul</>}
                 </Button>
+
+                <Separator orientation="vertical" className="h-6 mx-1" />
+
+                {/* ── Danger ── */}
                 {confirmDelete ? (
                     <div className="flex gap-1.5">
                         <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
@@ -1573,7 +1801,7 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
 
             {/* Article Content */}
             <div dangerouslySetInnerHTML={{ __html: displayArticle.html ?? "" }}
-                className="prose prose-sm dark:prose-invert max-w-none leading-relaxed" />
+                className="prose prose-sm dark:prose-invert max-w-none leading-relaxed article-content" />
 
             {/* Image Prompt */}
             {article.image_prompt && (

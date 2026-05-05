@@ -1,9 +1,11 @@
 import { useRouter } from "next/router";
+import dynamic from "next/dynamic";
 import TaskPanel from "@/components/layout/TaskPanel";
 import { useTaskStore } from "@/lib/taskStore";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { useProductTour } from "@/hooks/useProductTour";
 import {
   Home,
   Building2,
@@ -20,6 +22,7 @@ import {
   User,
   UserPlus,
   Palette,
+  HelpCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -39,6 +42,8 @@ import {
 import { cn } from "@/lib/utils";
 import SettingsDialog from "@/components/layout/SettingsDialog";
 import { useAuth } from "@/hooks/useAuth";
+
+const ProductTour = dynamic(() => import("@/components/layout/ProductTour"), { ssr: false });
 
 const NAV_ITEMS = [
   { href: "/studio", label: "Studio", icon: Home, description: "Create content", minRole: "member" },
@@ -98,6 +103,7 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
   const [companyCount, setCompanyCount] = useState<number | null>(null);
   const { user, activeAccount, accounts, isAdmin, signOut, switchAccount } = useAuth();
   const { tasks } = useTaskStore();
+  const { startTour, resetTour } = useProductTour();
 
   // Fetch usage for sidebar widget
   const fetchUsage = useCallback(async () => {
@@ -194,7 +200,7 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
         </div>
 
         {/* Nav Items */}
-        <nav className="flex-1 px-2 py-3 space-y-1">
+        <nav className="flex-1 px-2 py-3 space-y-1" data-tour="sidebar-nav">
           {visibleNavItems.map((item) => {
             const isActive =
               item.href === "/"
@@ -208,6 +214,7 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
                   <TooltipTrigger asChild>
                     <Link
                       href={item.href}
+                      data-tour={`nav-${item.href.replace('/', '')}`}
                       className={cn(
                         "flex h-10 w-full items-center justify-center rounded-md transition-colors",
                         isActive
@@ -229,6 +236,7 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
               <Link
                 key={item.href}
                 href={item.href}
+                data-tour={`nav-${item.href.replace('/', '')}`}
                 className={cn(
                   "flex h-10 items-center gap-3 rounded-md px-3 text-sm transition-colors",
                   isActive
@@ -316,6 +324,21 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
           )}
 
           <div className="flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn("h-9 w-9", sidebarCollapsed ? "mx-auto" : "")}
+                onClick={() => { resetTour(); setTimeout(() => startTour(), 100); }}
+              >
+                <HelpCircle className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>Product tour</p>
+            </TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -473,6 +496,9 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
 
       {/* Task Activity Panel */}
       <TaskPanel />
+
+      {/* Product Tour */}
+      <ProductTour />
     </div>
   );
 }

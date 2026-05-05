@@ -80,12 +80,29 @@ interface UserRow {
     last_sign_in_at: string | null;
     email_confirmed_at: string | null;
     is_platform_admin: boolean;
+    is_pending_invite?: boolean;
+    invite_token?: string;
     accounts: {
         role: string;
         account_id: string;
         account_name: string;
         plan: string;
     }[];
+}
+
+interface PendingInvitation {
+    id: string;
+    email: string;
+    role: string;
+    token: string;
+    created_at: string;
+    account_id: string;
+    invited_by: string;
+    accounts: {
+        id: string;
+        name: string;
+        plan: string;
+    } | null;
 }
 
 type AdminTab = "accounts" | "users";
@@ -103,6 +120,8 @@ export default function AdminDashboard() {
     const [detailLoading, setDetailLoading] = useState(false);
     const [activeTab, setActiveTab] = useState<AdminTab>("accounts");
     const [userSearch, setUserSearch] = useState("");
+    const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([]);
+    const [userFilter, setUserFilter] = useState<"all" | "confirmed" | "pending" | "invited">("all");
     const [deletingUser, setDeletingUser] = useState<string | null>(null);
     const [changingRole, setChangingRole] = useState<string | null>(null);
     const [deletingMember, setDeletingMember] = useState<string | null>(null);
@@ -140,7 +159,13 @@ export default function AdminDashboard() {
 
                 setStats(statsData);
                 setAccounts(accountsData);
-                if (Array.isArray(usersData)) setUsers(usersData);
+                if (usersData && Array.isArray(usersData.users)) {
+                    setUsers(usersData.users);
+                    setPendingInvitations(usersData.pending_invitations || []);
+                } else if (Array.isArray(usersData)) {
+                    // Backward compat: old API shape
+                    setUsers(usersData);
+                }
             } catch (err) {
                 console.error("Failed to load admin data:", err);
             } finally {
@@ -259,7 +284,37 @@ export default function AdminDashboard() {
         alert(currentlyAdmin ? "Remove admin via Supabase dashboard" : "Add admin via Supabase dashboard");
     }
 
-    const filteredUsers = users.filter((u) => {
+    // Merge pending invitations into a unified list
+    const invitedAsUsers: UserRow[] = pendingInvitations.map((inv) => ({
+        id: `invite-${inv.id}`,
+        email: inv.email,
+        full_name: "",
+        avatar_url: null,
+        created_at: inv.created_at,
+        last_sign_in_at: null,
+        email_confirmed_at: null,
+        is_platform_admin: false,
+        is_pending_invite: true,
+        invite_token: inv.token,
+        accounts: inv.accounts
+            ? [{
+                role: inv.role,
+                account_id: inv.accounts.id,
+                account_name: inv.accounts.name,
+                plan: inv.accounts.plan,
+            }]
+            : [],
+    }));
+
+    const allUsers = [...users, ...invitedAsUsers];
+
+    const filteredUsers = allUsers.filter((u) => {
+        // Status filter
+        if (userFilter === "confirmed" && !u.email_confirmed_at) return false;
+        if (userFilter === "pending" && (u.email_confirmed_at || u.is_pending_invite)) return false;
+        if (userFilter === "invited" && !u.is_pending_invite) return false;
+
+        // Search filter
         if (!userSearch) return true;
         const q = userSearch.toLowerCase();
         return (
@@ -369,7 +424,7 @@ export default function AdminDashboard() {
                     >
                         <Users className="h-3.5 w-3.5 inline-block mr-1.5 -mt-0.5" />
                         Users
-                        <span className="ml-1.5 text-xs text-muted-foreground">({users.length})</span>
+                        <span className="ml-1.5 text-xs text-muted-foreground">({users.length + pendingInvitations.length})</span>
                     </button>
                 </div>
 
@@ -934,17 +989,41 @@ export default function AdminDashboard() {
                 {/* ── Users Table ──────────────────────────────────── */}
                 {activeTab === "users" && (
                 <div className="rounded-xl border border-border bg-card overflow-hidden">
-                    <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-                        <h2 className="font-semibold text-sm">All Users</h2>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                            <input
-                                type="text"
-                                placeholder="Search by name, email, or account…"
-                                value={userSearch}
-                                onChange={(e) => setUserSearch(e.target.value)}
-                                className="pl-9 pr-3 py-1.5 text-sm rounded-lg border border-border bg-background w-72 focus:outline-none focus:ring-1 focus:ring-ring"
-                            />
+                    <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
+                        <h2 className="font-semibold text-sm shrink-0">All Users</h2>
+                        <div className="flex items-center gap-2 flex-1 justify-end">
+                            {/* Status filter pills */}
+                            <div className="flex items-center gap-1 bg-muted/40 rounded-lg p-0.5">
+                                {(["all", "confirmed", "pending", "invited"] as const).map((f) => (
+                                    <button
+                                        key={f}
+                                        onClick={() => setUserFilter(f)}
+                                        className={cn(
+                                            "px-2.5 py-1 text-xs font-medium rounded-md transition-all capitalize",
+                                            userFilter === f
+                                                ? "bg-background text-foreground shadow-sm"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        {f}
+                                        {f === "invited" && pendingInvitations.length > 0 && (
+                                            <span className="ml-1 text-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400 px-1.5 py-0 rounded-full">
+                                                {pendingInvitations.length}
+                                            </span>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                <input
+                                    type="text"
+                                    placeholder="Search by name, email, or account…"
+                                    value={userSearch}
+                                    onChange={(e) => setUserSearch(e.target.value)}
+                                    className="pl-9 pr-3 py-1.5 text-sm rounded-lg border border-border bg-background w-72 focus:outline-none focus:ring-1 focus:ring-ring"
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -1005,7 +1084,12 @@ export default function AdminDashboard() {
                                             )}
                                         </td>
                                         <td className="px-3 py-3">
-                                            {u.email_confirmed_at ? (
+                                            {u.is_pending_invite ? (
+                                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-400 flex items-center gap-1 w-fit">
+                                                    <Mail className="h-3 w-3" />
+                                                    Invited
+                                                </span>
+                                            ) : u.email_confirmed_at ? (
                                                 <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">Confirmed</span>
                                             ) : (
                                                 <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400">Pending</span>
@@ -1029,18 +1113,75 @@ export default function AdminDashboard() {
                                             {new Date(u.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                                         </td>
                                         <td className="px-5 py-3 text-right">
-                                            <button
-                                                onClick={() => handleDeleteUser(u.id, u.email)}
-                                                disabled={deletingUser === u.id}
-                                                className="rounded-md p-1.5 hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-40"
-                                                title="Delete user"
-                                            >
-                                                {deletingUser === u.id ? (
-                                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                ) : (
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                )}
-                                            </button>
+                                            {u.is_pending_invite ? (
+                                                <div className="flex items-center gap-1 justify-end">
+                                                    {/* Copy invite link */}
+                                                    <button
+                                                        onClick={async () => {
+                                                            const base = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+                                                            const url = `${base}/invite/${u.invite_token}`;
+                                                            await navigator.clipboard.writeText(url);
+                                                            setCopiedInvite(u.id);
+                                                            setTimeout(() => setCopiedInvite(null), 2000);
+                                                        }}
+                                                        className="rounded-md p-1.5 hover:bg-muted transition-colors"
+                                                        title="Copy invite link"
+                                                    >
+                                                        {copiedInvite === u.id ? (
+                                                            <Check className="h-3.5 w-3.5 text-green-600" />
+                                                        ) : (
+                                                            <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                                                        )}
+                                                    </button>
+                                                    {/* Revoke invitation */}
+                                                    <button
+                                                        onClick={async () => {
+                                                            if (!confirm(`Revoke invitation for ${u.email}?`)) return;
+                                                            setRevokingInvite(u.id);
+                                                            try {
+                                                                const r = await fetch(`/api/invitations/${u.invite_token}`, {
+                                                                    method: "DELETE",
+                                                                });
+                                                                if (!r.ok) {
+                                                                    const data = await r.json();
+                                                                    alert(data.error || "Revoke failed");
+                                                                    return;
+                                                                }
+                                                                // Remove from local state
+                                                                setPendingInvitations((prev) =>
+                                                                    prev.filter((inv) => `invite-${inv.id}` !== u.id)
+                                                                );
+                                                            } catch (err) {
+                                                                console.error("Revoke failed:", err);
+                                                            } finally {
+                                                                setRevokingInvite(null);
+                                                            }
+                                                        }}
+                                                        disabled={revokingInvite === u.id}
+                                                        className="rounded-md p-1.5 hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-40"
+                                                        title="Revoke invitation"
+                                                    >
+                                                        {revokingInvite === u.id ? (
+                                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                        ) : (
+                                                            <XCircle className="h-3.5 w-3.5" />
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleDeleteUser(u.id, u.email)}
+                                                    disabled={deletingUser === u.id}
+                                                    className="rounded-md p-1.5 hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-40"
+                                                    title="Delete user"
+                                                >
+                                                    {deletingUser === u.id ? (
+                                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                    ) : (
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    )}
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}

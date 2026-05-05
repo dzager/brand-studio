@@ -14,6 +14,59 @@ import { cn } from "@/lib/utils";
 
 type Company = { id: string; name: string };
 
+/** Return a company-contextual placeholder for cluster topic inputs */
+function getClusterPlaceholder(companyName?: string): string {
+    if (!companyName) return "e.g., product benefits, comparisons, and buying guides for your audience...";
+    const lower = companyName.toLowerCase();
+    if (lower.includes("dental") || lower.includes("abramson") || lower.includes("amato"))
+        return `e.g., dental implant options, costs, and recovery for patients...`;
+    if (lower.includes("trovatrip") || lower.includes("travel") || lower.includes("trip"))
+        return `e.g., group travel planning tips, retreat destinations, and trip leader strategies...`;
+    if (lower.includes("certivo") || lower.includes("compliance") || lower.includes("cert"))
+        return `e.g., compliance certification workflows, audit readiness, and regulatory frameworks...`;
+    if (lower.includes("civenne"))
+        return `e.g., luxury fashion trends, sustainable style, and seasonal collection guides...`;
+    if (lower.includes("gumshoe") || lower.includes("legal") || lower.includes("law") || lower.includes("greencard"))
+        return `e.g., immigration visa options, green card timelines, and legal process guides...`;
+    if (lower.includes("health") || lower.includes("wellness"))
+        return `e.g., holistic wellness routines, nutrition strategies, and preventive health guides...`;
+    if (lower.includes("patchbay") || lower.includes("tech") || lower.includes("software"))
+        return `e.g., API integration patterns, developer workflow tools, and platform architecture guides...`;
+    if (lower.includes("pioneer") || lower.includes("labs") || lower.includes("startup") || lower.includes("venture"))
+        return `e.g., startup fundraising strategies, product-market fit frameworks, and venture studio insights...`;
+    if (lower.includes("potato"))
+        return `e.g., creative branding strategies, product storytelling, and audience engagement guides...`;
+    if (lower.includes("boundless"))
+        return `e.g., global hiring compliance, remote workforce management, and international expansion strategies...`;
+    return `e.g., key topics, strategies, and guides relevant to ${companyName}...`;
+}
+
+function getClusterNamePlaceholder(companyName?: string): string {
+    if (!companyName) return "e.g., Product Guide Cluster";
+    const lower = companyName.toLowerCase();
+    if (lower.includes("dental") || lower.includes("abramson") || lower.includes("amato"))
+        return `e.g., Dental Implant Guide`;
+    if (lower.includes("trovatrip") || lower.includes("travel") || lower.includes("trip"))
+        return `e.g., Group Travel Planning`;
+    if (lower.includes("certivo") || lower.includes("compliance"))
+        return `e.g., Compliance Certification Essentials`;
+    if (lower.includes("civenne"))
+        return `e.g., Seasonal Style Collection`;
+    if (lower.includes("gumshoe") || lower.includes("legal") || lower.includes("law"))
+        return `e.g., Immigration Visa Guide`;
+    if (lower.includes("health") || lower.includes("wellness"))
+        return `e.g., Wellness & Nutrition Hub`;
+    if (lower.includes("patchbay") || lower.includes("tech") || lower.includes("software"))
+        return `e.g., Developer Integration Hub`;
+    if (lower.includes("pioneer") || lower.includes("labs") || lower.includes("startup"))
+        return `e.g., Startup Launch Playbook`;
+    if (lower.includes("potato"))
+        return `e.g., Creative Brand Strategy`;
+    if (lower.includes("boundless"))
+        return `e.g., Global Workforce Hub`;
+    return `e.g., ${companyName} Content Hub`;
+}
+
 // ── AI Cluster Modal ────────────────────────────────────────────────────
 
 type AiClusterProps = {
@@ -120,7 +173,7 @@ export function AiClusterModal({ open, onOpenChange, companies, onCreated }: AiC
                             })()}
                         </div>
                         <Textarea value={topic} onChange={(e) => setTopic(e.target.value)}
-                            placeholder="e.g., dental implant options and costs..." rows={3} />
+                            placeholder={getClusterPlaceholder(companies.find(c => c.id === companyId)?.name)} rows={3} />
                     </div>
                     <div className="flex gap-2">
                         <Button onClick={create} disabled={generating || !companyId || !topic.trim()} className="gap-1.5">
@@ -188,7 +241,7 @@ export function ManualClusterModal({ open, onOpenChange, companies, onCreated }:
                     </div>
                     <div className="space-y-1">
                         <Label className="text-xs">Cluster Name *</Label>
-                        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Dental Implant Guide" />
+                        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={getClusterNamePlaceholder(companies.find(c => c.id === companyId)?.name)} />
                     </div>
                     <div className="flex gap-2">
                         <Button onClick={create} disabled={creating || !companyId || !name.trim()} className="gap-1.5">

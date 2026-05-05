@@ -16,7 +16,8 @@ Open [http://localhost:3000](http://localhost:3000) to see the result.
 - **Framework:** Next.js (Pages Router) + TypeScript
 - **Database:** Supabase (PostgreSQL)
 - **AI:** OpenAI GPT-5.4, GPT-4.1, gpt-image-2
-- **MCP:** Unified Organic Brand MCP server
+- **Editor:** Tiptap (WYSIWYG + Markdown + HTML)
+- **MCP:** Unified Organic Brand MCP server (21 tools)
 
 ## Project Structure
 
@@ -26,11 +27,11 @@ src/
   pages/          → Next.js pages (studio, articles, companies)
   pages/api/      → API routes (create, humanize, fact-check, etc.)
   lib/            → Shared libraries (Supabase client, AI client)
-  components/     → React components
-  hooks/          → Custom hooks
+  components/     → React components (ArticleEditor, TaskPanel, ClusterPanel)
+  hooks/          → Custom hooks (useTaskRunner, useModelDefaults)
 public/           → Static assets and landing page
 mcp/
-  organic-brand-mcp/  → Unified MCP server (20 tools for voice, photo style, blog)
+  organic-brand-mcp/  → Unified MCP server (21 tools for voice, photo style, blog)
 ```
 
 ## MCP Server
@@ -49,7 +50,7 @@ See [`mcp/organic-brand-mcp/README.md`](mcp/organic-brand-mcp/README.md) for ful
 
 - [`PRODUCT.md`](PRODUCT.md) — Full product documentation (pages, API, data model, architecture)
 - [`CLAUDE.md`](CLAUDE.md) — AI coding assistant instructions
-- [`mcp/organic-brand-mcp/README.md`](mcp/organic-brand-mcp/README.md) — MCP server setup and 20-tool reference
+- [`mcp/organic-brand-mcp/README.md`](mcp/organic-brand-mcp/README.md) — MCP server setup and 21-tool reference
 
 ## Deploy
 

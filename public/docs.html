@@ -420,6 +420,8 @@
             <li><a href="#topical-clusters">Topical Clusters</a></li>
             <li><a href="#seo-optimization">SEO & GEO</a></li>
             <li><a href="#admin-dashboard">Admin Dashboard</a></li>
+            <li><a href="#task-management">Task Management</a></li>
+            <li><a href="#prompt-engine">Prompt Engine</a></li>
             <li><a href="#settings">Settings</a></li>
           </ul>
         </div>
@@ -498,6 +500,18 @@
           <li><strong>Model</strong> — Choose which AI model writes the article. Options include GPT-5.x, Claude Sonnet, and Gemini models.</li>
           <li><strong>Length</strong> — Short (300–500 words), Medium (800–1,200), Long (1,500–2,500), Deep Dive (2,500–4,000), or No Limit.</li>
         </ul>
+        <h3>Rich Editor</h3>
+        <p>
+          After generation, Organic opens the article in a full-featured Tiptap editor with three editing modes:
+        </p>
+        <ul>
+          <li><strong>Visual</strong> — Full WYSIWYG editing with a formatting toolbar: bold, italic, headings (H2/H3/H4), bullet and ordered lists, blockquotes, links, images, code blocks, horizontal rules, and undo/redo.</li>
+          <li><strong>Markdown</strong> — Write and edit in Markdown syntax with automatic HTML conversion when switching modes.</li>
+          <li><strong>HTML</strong> — Direct source editing for precise control over article markup.</li>
+        </ul>
+        <p>
+          The editor displays a live word and character count, and seamlessly syncs content when external updates arrive (e.g. after humanization or fact-check rewrites).
+        </p>
         <h3>Preview Prompt</h3>
         <p>
           Click <strong>Preview Prompt</strong> to inspect the exact system, user, and image prompts that will be sent to the model — including estimated token count. You can copy individual sections or all prompts at once.
@@ -745,6 +759,55 @@
           <li><strong>User directory</strong> — Searchable list of all users with email, name, registration date, last sign-in, and email confirmation status.</li>
           <li><strong>Account associations</strong> — Each user row shows linked accounts with role, plan, and account name.</li>
           <li><strong>User deletion</strong> — Admins can remove users directly from the dashboard with confirmation.</li>
+        </ul>
+
+        <!-- Task Management -->
+        <h2 id="task-management">Task <em>Management</em></h2>
+        <p>
+          Organic supports concurrent, non-blocking AI operations with a global task management system. Launch multiple article generations, fact-checks, and humanizations simultaneously — each tracked in a persistent activity panel.
+        </p>
+        <h3>Task Panel</h3>
+        <p>
+          A bottom-docked activity monitor shows all running, completed, and failed tasks. Each task row displays:
+        </p>
+        <ul>
+          <li><strong>Status indicator</strong> — Color-coded icon (spinning for running, checkmark for complete, X for failed).</li>
+          <li><strong>Type badge</strong> — Article, Humanize, Fact Check, Batch Generate, etc.</li>
+          <li><strong>Live elapsed timer</strong> — Real-time duration counter during execution.</li>
+          <li><strong>Progress bar</strong> — For batch operations, shows completion percentage and item counts.</li>
+        </ul>
+        <p>
+          The panel auto-expands when new tasks start, shows a pulsing indicator for active work, and persists across page navigation.
+        </p>
+        <h3>Batch Generation</h3>
+        <p>
+          Cluster article generation runs items in parallel with configurable concurrency limits. A parent task tracks overall batch progress while individual child tasks show per-item status.
+        </p>
+        <div class="callout">
+          <strong>Non-blocking workflow</strong>
+          Start generating a batch of cluster articles, then navigate to the Studio to create a single article — both operations run simultaneously with full progress tracking.
+        </div>
+
+        <!-- Prompt Engine -->
+        <h2 id="prompt-engine">Prompt <em>Engine</em></h2>
+        <p>
+          Account owners can customize the base system and user prompts that Organic sends to the LLM. The <strong>Prompts</strong> tab in Settings exposes both the system prompt (editorial rules, guardrails, SEO framework) and the user prompt template (output requirements, JSON field mapping).
+        </p>
+        <h3>Override Hierarchy</h3>
+        <ol>
+          <li><strong>Account-level base prompts</strong> — Optional overrides that apply to all companies under the account.</li>
+          <li><strong>Organic default engine</strong> — Editorial credibility, AEO/GEO optimization, banned phrases, structure rules.</li>
+          <li><strong>Company editorial guidelines</strong> — Layered on top; take precedence for voice, tone, and content depth.</li>
+          <li><strong>Company SEO guidelines</strong> — Supplementary SEO rules specific to the company.</li>
+          <li><strong>Company voice profile</strong> — Appended as a voice matching overlay.</li>
+          <li><strong>Company-level prompt overrides</strong> — Per-company overrides for maximum control.</li>
+        </ol>
+        <h3>Using the Prompts Tab</h3>
+        <ul>
+          <li><strong>View defaults</strong> — See the compiled default system and user prompts at any time.</li>
+          <li><strong>Edit overrides</strong> — Write custom prompt text that replaces the default engine prompts.</li>
+          <li><strong>Copy to clipboard</strong> — One-click copy for sharing or external use.</li>
+          <li><strong>Reset to default</strong> — Remove your override and revert to the Organic engine defaults.</li>
         </ul>
 
         <!-- Settings -->

@@ -44,7 +44,7 @@ export interface RunBatchConfig<T = any> {
 /* ── Hook ──────────────────────────────────────────────── */
 
 export function useTaskRunner() {
-  const { addTask, updateTask, completeTask, failTask } = useTaskStore();
+  const { addTask, updateTask, completeTask, failTask, registerAbort } = useTaskStore();
   const idCounter = useRef(0);
 
   /** Generate a unique task ID */
@@ -60,6 +60,7 @@ export function useTaskRunner() {
   const runTask = useCallback(
     async <T = any>(config: RunTaskConfig<T>): Promise<T | null> => {
       const taskId = genId();
+      const abortController = new AbortController();
 
       addTask({
         id: taskId,
@@ -69,10 +70,14 @@ export function useTaskRunner() {
         meta: config.meta,
       });
 
+      // Register the AbortController so cancelTask() can abort this fetch
+      registerAbort(taskId, abortController);
+
       try {
         const fetchOpts: RequestInit = {
           method: config.method || "POST",
           headers: { "Content-Type": "application/json" },
+          signal: abortController.signal,
         };
         if (config.body !== undefined) {
           fetchOpts.body = JSON.stringify(config.body);
@@ -90,13 +95,18 @@ export function useTaskRunner() {
         config.onSuccess?.(data as T, taskId);
         return data as T;
       } catch (e: any) {
+        // Don't overwrite cancelled status with a generic failure
+        if (e.name === "AbortError") {
+          config.onError?.("Cancelled by user", taskId);
+          return null;
+        }
         const errMsg = e.message || "Unknown error";
         failTask(taskId, errMsg);
         config.onError?.(errMsg, taskId);
         return null;
       }
     },
-    [addTask, completeTask, failTask, genId]
+    [addTask, completeTask, failTask, genId, registerAbort]
   );
 
   /**
@@ -108,6 +118,7 @@ export function useTaskRunner() {
     async <T = any>(config: RunBatchConfig<T>): Promise<(T | null)[]> => {
       const { items, concurrency = 2, type, label, meta } = config;
       const parentId = genId();
+      const parentAbort = new AbortController();
       const results: (T | null)[] = new Array(items.length).fill(null);
       let completed = 0;
       let failed = 0;
@@ -122,12 +133,16 @@ export function useTaskRunner() {
         meta: { ...meta, isParent: true, childCount: items.length },
       });
 
+      // Register the parent AbortController so cancelTask(parentId) aborts everything
+      registerAbort(parentId, parentAbort);
+
       // Execute items with concurrency limit
       const queue = items.map((item, index) => ({ item, index }));
       const running = new Set<Promise<void>>();
 
       const processNext = async (): Promise<void> => {
-        if (queue.length === 0) return;
+        // Stop pulling from queue if parent was cancelled
+        if (parentAbort.signal.aborted || queue.length === 0) return;
         const { item, index } = queue.shift()!;
         const childId = genId();
 
@@ -143,6 +158,7 @@ export function useTaskRunner() {
           const fetchOpts: RequestInit = {
             method: item.method || "POST",
             headers: { "Content-Type": "application/json" },
+            signal: parentAbort.signal,
           };
           if (item.body !== undefined) {
             fetchOpts.body = JSON.stringify(item.body);
@@ -161,30 +177,45 @@ export function useTaskRunner() {
           completeTask(childId, data);
           config.onItemComplete?.(index, data as T);
         } catch (e: any) {
+          if (e.name === "AbortError") {
+            // Parent was cancelled — mark child as cancelled too (via store dispatch)
+            failTask(childId, "Cancelled");
+            return;
+          }
           const errMsg = e.message || "Unknown error";
           failed++;
           failTask(childId, errMsg);
           config.onItemError?.(index, errMsg);
         }
 
-        // Update parent progress
-        const total = completed + failed;
-        const pct = Math.round((total / items.length) * 100);
-        updateTask(parentId, {
-          progress: pct,
-          progressLabel: `${total} of ${items.length}${failed > 0 ? ` (${failed} failed)` : ""}`,
-        });
+        // Update parent progress (only if not aborted)
+        if (!parentAbort.signal.aborted) {
+          const total = completed + failed;
+          const pct = Math.round((total / items.length) * 100);
+          updateTask(parentId, {
+            progress: pct,
+            progressLabel: `${total} of ${items.length}${failed > 0 ? ` (${failed} failed)` : ""}`,
+          });
+        }
       };
 
       // Process with concurrency limit
-      while (queue.length > 0 || running.size > 0) {
-        while (running.size < concurrency && queue.length > 0) {
+      while ((queue.length > 0 || running.size > 0) && !parentAbort.signal.aborted) {
+        while (running.size < concurrency && queue.length > 0 && !parentAbort.signal.aborted) {
           const promise = processNext().finally(() => running.delete(promise));
           running.add(promise);
         }
         if (running.size > 0) {
           await Promise.race(running);
         }
+      }
+
+      // If cancelled, drain remaining queue children and fire onError
+      if (parentAbort.signal.aborted) {
+        // Clear queued items that never started
+        queue.length = 0;
+        config.onError?.("Cancelled by user");
+        return results;
       }
 
       // Mark parent as complete or failed
@@ -198,7 +229,7 @@ export function useTaskRunner() {
 
       return results;
     },
-    [addTask, updateTask, completeTask, failTask, genId]
+    [addTask, updateTask, completeTask, failTask, genId, registerAbort]
   );
 
   return { runTask, runBatchTask };

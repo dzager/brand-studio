@@ -43,7 +43,7 @@ A card-based mode switcher at the top of the page lets users choose their creati
 
 | Action | Description |
 |---|---|
-| **Rich Editor** | Visual (WYSIWYG) and HTML editing modes for the generated article. |
+| **Rich Editor** | Tiptap-powered editor with three modes: Visual (WYSIWYG with toolbar), Markdown, and HTML source. Includes live word/character counts and seamless mode switching. |
 | **✨ Humanize** | Rewrites the article through a separate AI pass (`gpt-4.1`) to remove AI writing patterns and inject natural voice. Rewrites title and excerpt too. |
 | **🔍 Fact-Check** | Runs the article through `o3` to verify claims, flag unsupported statements, and score factual accuracy (0–100). |
 | **Image Gallery** | Shows the featured image. Supports custom prompt regeneration and image search (Pexels integration). |
@@ -115,6 +115,74 @@ Each company can have a **Voice Profile** — a structured analysis of a writing
 4. Review and edit any field
 5. Click **Save Changes** — profile is persisted and used in all future article generation
 6. **Clear Profile** removes the voice profile entirely
+
+---
+
+## Multi-Task Management
+
+Organic supports concurrent, non-blocking AI operations with a global task management system.
+
+**Components:**
+
+| Component | Purpose |
+|---|---|
+| **TaskProvider** | Global React context that wraps the app, providing task state across all pages. |
+| **useTaskRunner** | Hook that wraps fetch calls with full task lifecycle management. Provides `runTask()` for single operations and `runBatchTask()` for parallelized multi-item batches. |
+| **TaskPanel** | Bottom-docked activity monitor showing all running, completed, and failed tasks with live elapsed timers, progress bars, and status badges. |
+| **taskStore** | Zustand-based global store managing task state (queued, running, completed, failed). |
+
+**Supported Task Types:**
+
+`article`, `humanize`, `fact-check`, `consul-check`, `image-regen`, `cluster-strategy`, `cluster-page`, `cluster-batch`, `guide`, `interlink`, `recommend-style`, `composite`, `shorten`
+
+**Batch Concurrency:** Cluster article generation creates a parent task for overall progress and individual child tasks, with configurable concurrency (default 2 parallel requests).
+
+---
+
+## AI Loading Modal
+
+During content generation, Organic displays a branded loading modal with rotating industry-specific facts and statistics.
+
+**Industry Matching:** The modal automatically detects the selected company's industry from its name and selects from 7 curated fact sets:
+
+| Category | Example Topics |
+|---|---|
+| Content Marketing | SEO, topic clusters, publishing cadence |
+| Dental | Patient acquisition, AI diagnostics, cosmetic trends |
+| Legal | E-E-A-T for legal content, immigration backlogs, client research patterns |
+| Health & Wellness | Telehealth, mental health search trends, medical E-E-A-T |
+| Travel | Trip planning journeys, group travel, sustainable tourism |
+| Tech & Software | AI adoption, developer content, cloud complexity |
+| Startup & Venture | Thought leadership, community-led growth, studio model |
+
+Facts rotate every 6 seconds with smooth fade transitions.
+
+---
+
+## Prompt Engine Overrides
+
+Account owners can customize the base system and user prompts that Organic sends to the LLM.
+
+**Hierarchy:**
+
+```
+1. Account-level base prompts (optional overrides)
+2. Organic default engine (editorial credibility, AEO/GEO, banned phrases)
+3. Company editorial guidelines (layered on top)
+4. Company SEO guidelines (layered on top)
+5. Company voice profile (appended)
+6. Company-level prompt overrides (optional, per-company)
+```
+
+**Settings UI:** A "Prompts" tab in the Settings dialog shows both the system prompt and user prompt template. Users can view the compiled defaults, edit overrides, copy to clipboard, and reset to defaults.
+
+**API:**
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/account/prompt-engine` | GET | Returns account base prompt overrides + compiled defaults |
+| `/api/account/prompt-engine` | PUT | Save account-level prompt overrides |
+| `/api/companies/[id]/prompt-engine` | GET, PUT | Company-level prompt overrides |
 
 ---
 
@@ -195,6 +263,14 @@ Applied to every article regardless of company:
 |---|---|---|
 | `/api/invitations` | POST | Create a new invitation. Sends a branded email with a unique token link. Supports re-inviting the same email. |
 | `/api/invitations/[token]` | GET, POST | GET validates the token. POST accepts the invitation — creates the user's account membership scoped to the invitation's company. |
+
+### Account & Prompt Engine
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/account/prompt-engine` | GET, PUT | Read or update account-level base system/user prompt overrides |
+| `/api/account/sync-usage` | POST | Reconcile usage counter with actual article count for the billing period |
+| `/api/companies/[id]/prompt-engine` | GET, PUT | Read or update company-level prompt overrides |
 
 ### Utilities
 
@@ -321,10 +397,12 @@ The server includes guided workflow prompts accessible via `/` in Claude Desktop
 | **Database** | Supabase (PostgreSQL) |
 | **AI Models** | OpenAI GPT-5.4, GPT-4.1, GPT-4.1-mini, o3, gpt-image-2 |
 | **MCP Server** | `@modelcontextprotocol/sdk` (unified organic-brand-mcp) |
+| **Rich Text Editor** | Tiptap (with StarterKit, Image, Link, Placeholder, CharacterCount extensions) |
+| **Markdown** | Turndown (HTML→MD), Marked (MD→HTML) |
+| **State Management** | Zustand (task store) |
 | **Image Search** | Pexels API |
 | **Publishing** | WordPress REST API |
 | **HTML Parsing** | cheerio (for reference article scraping) |
-| **Rich Editor** | React-based WYSIWYG with HTML mode |
 
 ---
 

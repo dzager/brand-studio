@@ -5,7 +5,7 @@ import React, { createContext, useContext, useReducer, useCallback, useMemo, use
 
 /* ── Types ─────────────────────────────────────────────── */
 
-export type TaskStatus = "queued" | "running" | "completed" | "failed";
+export type TaskStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
 
 export type TaskType =
   | "article"
@@ -43,6 +43,7 @@ type Action =
   | { type: "UPDATE_TASK"; id: string; patch: Partial<Task> }
   | { type: "COMPLETE_TASK"; id: string; result?: any }
   | { type: "FAIL_TASK"; id: string; error: string }
+  | { type: "CANCEL_TASK"; id: string }
   | { type: "REMOVE_TASK"; id: string }
   | { type: "CLEAR_COMPLETED" };
 
@@ -70,6 +71,13 @@ function taskReducer(state: Task[], action: Action): Task[] {
           : t
       );
 
+    case "CANCEL_TASK":
+      return state.map((t) =>
+        t.id === action.id && (t.status === "running" || t.status === "queued")
+          ? { ...t, status: "cancelled" as const, completedAt: Date.now(), error: "Cancelled by user" }
+          : t
+      );
+
     case "REMOVE_TASK":
       return state.filter((t) => t.id !== action.id);
 
@@ -91,6 +99,8 @@ interface TaskStoreAPI {
   updateTask: (id: string, patch: Partial<Task>) => void;
   completeTask: (id: string, result?: any) => void;
   failTask: (id: string, error: string) => void;
+  cancelTask: (id: string) => void;
+  registerAbort: (taskId: string, controller: AbortController) => void;
   removeTask: (id: string) => void;
   clearCompleted: () => void;
 }
@@ -104,6 +114,7 @@ const AUTO_DISMISS_MS = 5 * 60 * 1000; // 5 minutes
 export function TaskProvider({ children }: { children: React.ReactNode }) {
   const [tasks, dispatch] = useReducer(taskReducer, []);
   const timersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const abortRef = useRef<Map<string, AbortController>>(new Map());
 
   // Auto-dismiss completed tasks after 5 minutes
   useEffect(() => {
@@ -159,6 +170,26 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const cancelTask = useCallback(
+    (id: string) => {
+      // Abort the in-flight fetch if one exists
+      const ctrl = abortRef.current.get(id);
+      if (ctrl) {
+        ctrl.abort();
+        abortRef.current.delete(id);
+      }
+      dispatch({ type: "CANCEL_TASK", id });
+    },
+    []
+  );
+
+  const registerAbort = useCallback(
+    (taskId: string, controller: AbortController) => {
+      abortRef.current.set(taskId, controller);
+    },
+    []
+  );
+
   const removeTask = useCallback(
     (id: string) => dispatch({ type: "REMOVE_TASK", id }),
     []
@@ -185,10 +216,12 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       updateTask,
       completeTask,
       failTask,
+      cancelTask,
+      registerAbort,
       removeTask,
       clearCompleted,
     }),
-    [tasks, activeTasks, hasActiveTasks, addTask, updateTask, completeTask, failTask, removeTask, clearCompleted]
+    [tasks, activeTasks, hasActiveTasks, addTask, updateTask, completeTask, failTask, cancelTask, registerAbort, removeTask, clearCompleted]
   );
 
   return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;

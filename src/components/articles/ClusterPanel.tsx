@@ -568,11 +568,12 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                 <div className="ml-auto">
                 <DropdownMenu onOpenChange={(open) => { if (!open) setConfirmDelete(false); }}>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="px-2">
-                            <MoreHorizontal className="h-4 w-4" />
+                        <Button variant="outline" size="sm" className="gap-1.5 px-2.5 text-xs font-medium data-[state=open]:rounded-b-none data-[state=open]:border-b-0 data-[state=open]:bg-popover">
+                            <MoreHorizontal className="h-3.5 w-3.5" />
+                            Actions
                         </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuContent align="end" sideOffset={0} className="w-52 rounded-tr-none">
                         {/* Image mode */}
                         <DropdownMenuItem
                             onClick={() => setImageMode(imageMode === "ai" ? "search" : "ai")}

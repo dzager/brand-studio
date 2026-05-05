@@ -46,7 +46,7 @@ function Section({ title, icon: Icon, badge, defaultOpen, children }: {
 }) {
     const [open, setOpen] = useState(defaultOpen ?? false);
     return (
-        <Card>
+        <Card className="ring-0">
             <button
                 onClick={() => setOpen(!open)}
                 className="flex items-center justify-between w-full px-5 py-3.5 text-left hover:bg-muted/50 transition-colors"

@@ -26,6 +26,7 @@ import {
 import type { ConsulResult, ConsulClaimReview } from "@/lib/consulPrompts";
 import { cn } from "@/lib/utils";
 import { useModelDefaults } from "@/hooks/useModelDefaults";
+import ModelBakeoff from "@/components/ui/ModelBakeoff";
 
 export const getServerSideProps: GetServerSideProps = async () => {
   return { props: {} };
@@ -87,6 +88,33 @@ const AGREEMENT_LABELS: Record<string, { label: string; icon: string; color: str
 };
 
 let _imgId = 0;
+
+/** Return a company-contextual placeholder for the cluster topic input */
+function getClusterPlaceholder(companyName?: string): string {
+    if (!companyName) return "e.g., product benefits, comparisons, and buying guides for your audience in 2026...";
+    const lower = companyName.toLowerCase();
+    if (lower.includes("dental") || lower.includes("abramson") || lower.includes("amato"))
+        return `e.g., dental implant options, costs, and recovery for patients in 2026...`;
+    if (lower.includes("trovatrip") || lower.includes("travel") || lower.includes("trip"))
+        return `e.g., group travel planning tips, retreat destinations, and trip leader strategies for 2026...`;
+    if (lower.includes("certivo") || lower.includes("compliance") || lower.includes("cert"))
+        return `e.g., compliance certification workflows, audit readiness, and regulatory frameworks for 2026...`;
+    if (lower.includes("civenne"))
+        return `e.g., luxury fashion trends, sustainable style, and seasonal collection guides for 2026...`;
+    if (lower.includes("gumshoe") || lower.includes("legal") || lower.includes("law") || lower.includes("greencard"))
+        return `e.g., immigration visa options, green card timelines, and legal process guides for 2026...`;
+    if (lower.includes("health") || lower.includes("wellness"))
+        return `e.g., holistic wellness routines, nutrition strategies, and preventive health guides for 2026...`;
+    if (lower.includes("patchbay") || lower.includes("tech") || lower.includes("software"))
+        return `e.g., API integration patterns, developer workflow tools, and platform architecture guides for 2026...`;
+    if (lower.includes("pioneer") || lower.includes("labs") || lower.includes("startup") || lower.includes("venture"))
+        return `e.g., startup fundraising strategies, product-market fit frameworks, and venture studio insights for 2026...`;
+    if (lower.includes("potato"))
+        return `e.g., creative branding strategies, product storytelling, and audience engagement guides for 2026...`;
+    if (lower.includes("boundless"))
+        return `e.g., global hiring compliance, remote workforce management, and international expansion strategies for 2026...`;
+    return `e.g., key topics, strategies, and guides relevant to ${companyName} for 2026...`;
+}
 
 export default function Home() {
     const router = useRouter();
@@ -239,6 +267,10 @@ export default function Home() {
                 setActiveStyles(data.image_style_categories);
             } else { setActiveStyles(IMAGE_STYLE_CATEGORIES); }
             setImageStyle("default");
+            // Auto-select the company's preferred model (saved from bake-off)
+            if (data?.preferred_model && typeof data.preferred_model === "string" && availableModels.some(m => m.id === data.preferred_model)) {
+                setModel(data.preferred_model);
+            }
         }).catch(() => { setActiveStyles(IMAGE_STYLE_CATEGORIES); setImageStyle("default"); });
     }, [companyId]);
 
@@ -283,6 +315,10 @@ export default function Home() {
                     setGallery([img]); setSelectedImgId(img.id);
                 }
                 setLoading(false);
+                // Navigate to the company page where the new article lives
+                if (companyId) {
+                    setTimeout(() => router.push(`/company?id=${companyId}`), 600);
+                }
             },
             onError: (errMsg) => { setErr(errMsg); setLoading(false); },
         });
@@ -597,7 +633,7 @@ export default function Home() {
                 )}
 
                 {/* Main Prompt */}
-                <div className="space-y-1.5">
+                <div className="space-y-1.5" data-tour="prompt-input">
                     <div className="flex items-center justify-between">
                         <Label htmlFor="prompt-input" className="text-sm font-medium">Prompt</Label>
                         <span className="text-xs text-muted-foreground tabular-nums">{prompt.length} / 2000</span>
@@ -606,7 +642,7 @@ export default function Home() {
                 </div>
 
                 {/* Advanced options */}
-                <details className="group">
+                <details className="group" data-tour="advanced-options">
                     <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium select-none list-none [&::-webkit-details-marker]:hidden">
                         <Settings className="h-3.5 w-3.5 text-muted-foreground" />
                         <span>Advanced options</span>
@@ -686,11 +722,18 @@ export default function Home() {
                         {/* Model */}
                         <div className="space-y-1.5">
                             <Label htmlFor="model-select" className="text-xs font-medium">Model</Label>
-                            <select id="model-select" value={model} onChange={(e) => setModel(e.target.value)}
-                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                                {availableModels.length > 0 ? availableModels.map((m) => <option key={m.id} value={m.id}>{m.label}{m.provider !== "openai" ? ` (${m.provider})` : ""}</option>)
-                                    : <><option value="gpt-5.5">GPT-5.5</option><option value="gpt-5.4">GPT-5.4</option><option value="gpt-5.1">GPT-5.1</option><option value="gpt-4.1-mini">GPT-4.1 Mini</option></>}
-                            </select>
+                            <div className="flex gap-2 items-center">
+                                <select id="model-select" value={model} onChange={(e) => setModel(e.target.value)}
+                                    className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                    {availableModels.length > 0 ? availableModels.map((m) => <option key={m.id} value={m.id}>{m.label}{m.provider !== "openai" ? ` (${m.provider})` : ""}</option>)
+                                        : <><option value="gpt-5.5">GPT-5.5</option><option value="gpt-5.4">GPT-5.4</option><option value="gpt-5.1">GPT-5.1</option><option value="gpt-4.1-mini">GPT-4.1 Mini</option></>}
+                                </select>
+                                <ModelBakeoff
+                                    companyId={companyId}
+                                    companyName={companies.find(c => c.id === companyId)?.name}
+                                    onModelSelected={(mid) => { if (availableModels.some(m => m.id === mid)) setModel(mid); }}
+                                />
+                            </div>
                         </div>
 
                         {/* Length */}
@@ -773,7 +816,7 @@ export default function Home() {
                 )}
 
                 {/* Action bar */}
-                <div className="flex items-center gap-2.5 flex-wrap pt-4 border-t border-border">
+                <div className="flex items-center gap-2.5 flex-wrap pt-4 border-t border-border" data-tour="action-bar">
                     <Button onClick={() => { if (!companyId) { setCompanyErr(true); return; } onCreate(); }} disabled={loading} size="lg" className="gap-1.5">
                         {loading ? <><RefreshCw className="h-4 w-4 animate-spin" /> Creating…</> : "Create"}
                     </Button>
@@ -1087,7 +1130,7 @@ export default function Home() {
                                 value={clusterTopic}
                                 onChange={(e) => setClusterTopic(e.target.value)}
                                 rows={3}
-                                placeholder="e.g., dental implant options, costs, and recovery for patients in 2026..."
+                                placeholder={getClusterPlaceholder(companies.find(c => c.id === companyId)?.name)}
                                 className="text-base"
                             />
                         </div>
@@ -1096,11 +1139,18 @@ export default function Home() {
                         <div className="flex gap-3 items-center flex-wrap">
                             <div className="space-y-1">
                                 <Label htmlFor="cluster-model" className="text-xs">Model</Label>
-                                <select id="cluster-model" value={model} onChange={(e) => setModel(e.target.value)}
-                                    className="rounded-md border border-input bg-background px-3 py-2 text-sm">
-                                    {availableModels.length > 0 ? availableModels.map((m) => <option key={m.id} value={m.id}>{m.label}{m.provider !== "openai" ? ` (${m.provider})` : ""}</option>)
-                                        : <><option value="gpt-5.5">GPT-5.5</option><option value="gpt-5.4">GPT-5.4</option><option value="gpt-4.1-mini">GPT-4.1 Mini</option></>}
-                                </select>
+                                <div className="flex gap-2 items-center">
+                                    <select id="cluster-model" value={model} onChange={(e) => setModel(e.target.value)}
+                                        className="rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                        {availableModels.length > 0 ? availableModels.map((m) => <option key={m.id} value={m.id}>{m.label}{m.provider !== "openai" ? ` (${m.provider})` : ""}</option>)
+                                            : <><option value="gpt-5.5">GPT-5.5</option><option value="gpt-5.4">GPT-5.4</option><option value="gpt-4.1-mini">GPT-4.1 Mini</option></>}
+                                    </select>
+                                    <ModelBakeoff
+                                        companyId={companyId}
+                                        companyName={companies.find(c => c.id === companyId)?.name}
+                                        onModelSelected={(mid) => { if (availableModels.some(m => m.id === mid)) setModel(mid); }}
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -1345,7 +1395,7 @@ export default function Home() {
                         <p className="text-sm text-muted-foreground mt-1">Search YouTube for relevant videos, tutorials, and media.</p>
                     </div>
                     <div className="flex gap-2">
-                        <Input placeholder="e.g. best dental implant options for seniors" value={ytQuery} onChange={(e) => setYtQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onSearchYouTube(); }} />
+                        <Input placeholder={companyId ? `e.g. popular topics about ${companies.find(c => c.id === companyId)?.name || "your brand"}` : "e.g. best tips and strategies for your audience"} value={ytQuery} onChange={(e) => setYtQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onSearchYouTube(); }} />
                         <Button variant="outline" onClick={onSearchYouTube} disabled={ytSearching || !ytQuery.trim()} className="gap-1.5 whitespace-nowrap">
                             <Play className="h-4 w-4" /> {ytSearching ? "Searching…" : "Search"}
                         </Button>

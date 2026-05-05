@@ -19,6 +19,8 @@ import {
   Eye,
   RotateCcw,
   Layers,
+  Ban,
+  StopCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -63,6 +65,12 @@ const STATUS_CONFIG: Record<TaskStatus, {
     color: "text-destructive",
     borderColor: "border-l-destructive",
     label: "Failed",
+  },
+  cancelled: {
+    icon: Ban,
+    color: "text-amber-500",
+    borderColor: "border-l-amber-500",
+    label: "Cancelled",
   },
 };
 
@@ -109,7 +117,7 @@ function useElapsedTime(startedAt: number, isActive: boolean) {
 
 /* ── Task Row ──────────────────────────────────────────── */
 
-function TaskRow({ task, onRemove }: { task: Task; onRemove: (id: string) => void }) {
+function TaskRow({ task, onRemove, onCancel }: { task: Task; onRemove: (id: string) => void; onCancel: (id: string) => void }) {
   const isActive = task.status === "running" || task.status === "queued";
   const elapsed = useElapsedTime(task.startedAt, isActive);
   const config = STATUS_CONFIG[task.status];
@@ -160,7 +168,19 @@ function TaskRow({ task, onRemove }: { task: Task; onRemove: (id: string) => voi
           {formatElapsed(task.completedAt ? task.completedAt - task.startedAt : elapsed)}
         </span>
 
-        {/* Dismiss button — visible on hover for completed/failed */}
+        {/* Cancel button — visible for running/queued tasks */}
+        {isActive && (
+          <button
+            onClick={() => onCancel(task.id)}
+            className="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity px-1.5 py-0.5 rounded hover:bg-destructive/10 text-amber-500 hover:text-amber-400"
+            title="Cancel task"
+          >
+            <StopCircle className="h-3.5 w-3.5" />
+            <span className="text-[10px] font-medium">Cancel</span>
+          </button>
+        )}
+
+        {/* Dismiss button — visible on hover for completed/failed/cancelled */}
         {!isActive && (
           <button
             onClick={() => onRemove(task.id)}
@@ -188,6 +208,13 @@ function TaskRow({ task, onRemove }: { task: Task; onRemove: (id: string) => voi
           {task.error}
         </p>
       )}
+
+      {/* Cancelled message */}
+      {task.status === "cancelled" && (
+        <p className="text-[11px] text-amber-500/80 pl-5.5 truncate">
+          Cancelled by user
+        </p>
+      )}
     </div>
   );
 }
@@ -195,9 +222,30 @@ function TaskRow({ task, onRemove }: { task: Task; onRemove: (id: string) => voi
 /* ── Task Panel ────────────────────────────────────────── */
 
 export default function TaskPanel() {
-  const { tasks, activeTasks, hasActiveTasks, removeTask, clearCompleted } = useTaskStore();
+  const { tasks, activeTasks, hasActiveTasks, removeTask, clearCompleted, cancelTask } = useTaskStore();
   const [expanded, setExpanded] = useState(false);
   const prevActiveCountRef = useRef(0);
+
+  // Entrance / exit animation state
+  const [mounted, setMounted] = useState(false);
+  const [visible, setVisible] = useState(false);
+
+  const hasTasks = tasks.length > 0;
+
+  // Mount when tasks appear, unmount after exit animation
+  useEffect(() => {
+    if (hasTasks && !mounted) {
+      setMounted(true);
+      // Trigger slide-up on next frame so the off-screen state renders first
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setVisible(true));
+      });
+    } else if (!hasTasks && mounted) {
+      setVisible(false);
+      const timer = setTimeout(() => setMounted(false), 350); // match transition duration
+      return () => clearTimeout(timer);
+    }
+  }, [hasTasks, mounted]);
 
   // Auto-expand when a new task starts
   useEffect(() => {
@@ -207,8 +255,8 @@ export default function TaskPanel() {
     prevActiveCountRef.current = activeTasks.length;
   }, [activeTasks.length]);
 
-  // Don't render if no tasks at all
-  if (tasks.length === 0) return null;
+  // Don't render if not mounted
+  if (!mounted) return null;
 
   const completedCount = tasks.filter((t) => t.status === "completed").length;
   const failedCount = tasks.filter((t) => t.status === "failed").length;
@@ -219,7 +267,7 @@ export default function TaskPanel() {
     .filter((t) => !t.meta?.parentId)
     .sort((a, b) => {
       // Active first, then by most recent
-      const statusOrder: Record<TaskStatus, number> = { running: 0, queued: 1, failed: 2, completed: 3 };
+      const statusOrder: Record<TaskStatus, number> = { running: 0, queued: 1, failed: 2, cancelled: 3, completed: 4 };
       const diff = statusOrder[a.status] - statusOrder[b.status];
       if (diff !== 0) return diff;
       return b.startedAt - a.startedAt;
@@ -228,12 +276,23 @@ export default function TaskPanel() {
   return (
     <div
       className={cn(
-        "fixed bottom-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out",
-        "md:left-16", // Account for sidebar (collapsed width)
+        "fixed z-50 transition-all duration-300 ease-out",
+        "left-1/2 -translate-x-1/2 w-[calc(100%-1.5rem)] max-w-[600px]",
+        "md:left-[calc(2rem+50%)] md:w-[calc(100%-5rem)] md:max-w-[600px]",
+        visible ? "opacity-100" : "opacity-0 pointer-events-none",
       )}
+      style={{
+        bottom: visible ? 40 : -100,
+        boxShadow:
+          "0 -2px 6px rgba(0,0,0,0.15), " +   // tight close shadow
+          "0 -8px 24px rgba(0,0,0,0.12), " +   // medium diffuse
+          "0 -20px 60px rgba(0,0,0,0.08)",      // far ambient glow
+        borderRadius: 12,
+        transition: "bottom 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease",
+      }}
     >
       {/* Backdrop blur layer */}
-      <div className="absolute inset-0 bg-background/80 backdrop-blur-xl border-t border-border/50 rounded-t-xl" />
+      <div className="absolute inset-0 bg-background/80 backdrop-blur-xl border border-border/50 rounded-xl" />
 
       <div className="relative">
         {/* ── Collapsed bar ──────────────────────────────────── */}
@@ -313,7 +372,7 @@ export default function TaskPanel() {
               </p>
             ) : (
               visibleTasks.map((task) => (
-                <TaskRow key={task.id} task={task} onRemove={removeTask} />
+                <TaskRow key={task.id} task={task} onRemove={removeTask} onCancel={cancelTask} />
               ))
             )}
           </div>

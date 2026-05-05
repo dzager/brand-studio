@@ -372,6 +372,110 @@
       </div>
 
       <!-- ───────────────────────────────────── -->
+      <!-- May 4, 2026 -->
+      <!-- ───────────────────────────────────── -->
+      <div class="changelog-entry">
+        <div class="changelog-date">May 4, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+          <span class="changelog-tag changelog-tag--design">Design</span>
+        </div>
+        <h2 class="changelog-title">Tiptap <em>editor</em></h2>
+        <div class="changelog-body">
+          <p>
+            Replaced the legacy <code>contentEditable</code> rich text editor with a modern, Tiptap-based implementation. The new editor provides a stable, declarative editing experience with three view modes.
+          </p>
+          <ul>
+            <li><strong>Visual mode</strong> — Full WYSIWYG editing with a formatting toolbar (bold, italic, headings, lists, blockquotes, links, images, code blocks, horizontal rules, undo/redo).</li>
+            <li><strong>Markdown mode</strong> — Write and edit in Markdown with automatic HTML conversion on mode switch.</li>
+            <li><strong>HTML mode</strong> — Direct source editing for precise control over article markup.</li>
+            <li><strong>Live word count</strong> — Real-time word and character counts displayed above the editor.</li>
+            <li><strong>Seamless state sync</strong> — Content stays consistent when switching between modes and when external updates arrive (e.g. after humanization or fact-check rewrites).</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">May 4, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+          <span class="changelog-tag changelog-tag--infrastructure">Infrastructure</span>
+        </div>
+        <h2 class="changelog-title">Multi-task <em>management</em></h2>
+        <div class="changelog-body">
+          <p>
+            Organic now supports concurrent, non-blocking AI operations with a global task management system. Launch multiple article generations, fact-checks, and humanizations simultaneously — each tracked in a persistent activity panel.
+          </p>
+          <ul>
+            <li><strong>Task panel</strong> — A bottom-docked activity monitor shows all running, completed, and failed tasks with live elapsed timers, progress bars, and status badges.</li>
+            <li><strong>Background execution</strong> — Article creation, humanization, fact-checking, batch cluster generation, and image regeneration all run as tracked background tasks.</li>
+            <li><strong>Batch concurrency</strong> — Cluster article generation runs items in parallel with configurable concurrency limits and per-item progress tracking.</li>
+            <li><strong>Persistent across navigation</strong> — Tasks remain visible across page changes so you never lose track of background operations.</li>
+            <li><strong>Auto-expand</strong> — The panel automatically opens when new tasks start and shows a pulsing indicator for active work.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">May 4, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+          <span class="changelog-tag changelog-tag--design">Design</span>
+        </div>
+        <h2 class="changelog-title">AI loading <em>modal</em></h2>
+        <div class="changelog-body">
+          <p>
+            While Organic generates your content, a new loading modal displays rotating industry-specific facts and statistics to keep you engaged. Facts are matched to your company's industry — dental, legal, health, travel, tech, startup, or general content marketing.
+          </p>
+          <ul>
+            <li><strong>Industry matching</strong> — Automatically detects your company's industry from its name and selects relevant fact sets (80+ facts across 7 categories).</li>
+            <li><strong>Shuffled rotation</strong> — Facts rotate every 6 seconds with smooth fade transitions, showing a different set each time.</li>
+            <li><strong>Minimal design</strong> — Clean, brand-aligned modal with Organic branding, category labels, and a subtle loading indicator.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">May 4, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+          <span class="changelog-tag changelog-tag--infrastructure">Infrastructure</span>
+        </div>
+        <h2 class="changelog-title">Prompt engine <em>overrides</em></h2>
+        <div class="changelog-body">
+          <p>
+            Account owners can now customize the base system and user prompts that Organic sends to the LLM. A new <strong>Prompts</strong> tab in Settings exposes both the system prompt (editorial rules, guardrails, SEO framework) and the user prompt template (output requirements, JSON mapping).
+          </p>
+          <ul>
+            <li><strong>Account-level scope</strong> — Overrides apply to all companies under the account. Company-specific editorial guidelines, SEO rules, and voice profiles layer on top.</li>
+            <li><strong>Default preview</strong> — View the compiled default prompts at any time to understand what the engine sends out of the box.</li>
+            <li><strong>Copy and reset</strong> — One-click copy to clipboard and reset-to-default for each prompt section.</li>
+            <li><strong>Company-level overrides</strong> — Individual companies can also override prompts via <code>/api/companies/[id]/prompt-engine</code>.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">May 4, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--improvement">Improvement</span>
+          <span class="changelog-tag changelog-tag--infrastructure">Infrastructure</span>
+        </div>
+        <h2 class="changelog-title">Usage <em>tracking</em></h2>
+        <div class="changelog-body">
+          <p>
+            Improved article usage tracking to ensure accurate monthly quota counts across all generation workflows.
+          </p>
+          <ul>
+            <li><strong>Cluster generation tracking</strong> — Articles generated through cluster batch workflows now correctly increment the monthly article counter.</li>
+            <li><strong>Usage sync endpoint</strong> — New <code>/api/account/sync-usage</code> API reconciles the usage counter with actual article counts, correcting drift from older generation paths.</li>
+            <li><strong>Real-time sidebar updates</strong> — The sidebar usage widget refreshes automatically after each successful article creation.</li>
+            <li><strong>Company save fix</strong> — Resolved a 500 error when saving company profiles with voice profiles or TOC settings, caused by missing database column references.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ───────────────────────────────────── -->
       <!-- April 28, 2026 -->
       <!-- ───────────────────────────────────── -->
       <div class="changelog-entry">

@@ -18,11 +18,12 @@ import {
 import { cn } from "@/lib/utils";
 
 // ── Steps ──────────────────────────────────────────────────────────
+// NOTE: Plan and Team steps are hidden while payments are paused.
+// To re-enable, restore steps 3 (Plan) and 4 (Team) and update
+// the navigation logic + handleSubmit to redirect to Stripe checkout.
 const STEPS = [
     { id: 1, label: "Account", icon: User },
     { id: 2, label: "Company", icon: Building2 },
-    { id: 3, label: "Plan", icon: CreditCard },
-    { id: 4, label: "Team", icon: Users },
 ];
 
 const PLAN_IDS: PlanId[] = ["starter", "standard", "scale"];
@@ -130,29 +131,8 @@ export default function RegisterPage() {
                 password,
             });
 
-            // Redirect to Stripe Checkout to activate subscription
-            try {
-                const billingRes = await fetch("/api/account/billing", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        action: "create-checkout",
-                        account_id: data.account_id,
-                        plan: selectedPlan,
-                    }),
-                });
-
-                const billingData = await billingRes.json();
-
-                if (billingRes.ok && billingData.url) {
-                    window.location.href = billingData.url;
-                    return; // Don't set loading false — we're navigating away
-                }
-            } catch {
-                // If checkout creation fails, still send them to studio
-                console.warn("Stripe checkout failed — continuing to studio");
-            }
-
+            // Payments paused — skip Stripe checkout and go straight to studio.
+            // To re-enable, restore the Stripe Checkout redirect block here.
             router.push("/studio");
         } catch (err: any) {
             setError(err.message);
@@ -181,8 +161,8 @@ export default function RegisterPage() {
     }
 
     const selectedLimits = PLAN_LIMITS[selectedPlan];
-    const showTeamStep =
-        selectedPlan === "standard" || selectedPlan === "scale";
+    // Payments paused — team step is hidden
+    const showTeamStep = false;
 
     return (
         <>
@@ -220,7 +200,7 @@ export default function RegisterPage() {
                 <div className="max-w-2xl mx-auto px-6 pt-8 pb-4">
                     <div className="flex items-center justify-center gap-2">
                         {STEPS.filter(
-                            (s) => s.id !== 4 || showTeamStep
+                            (_s) => true
                         ).map((s, i, arr) => {
                             const Icon = s.icon;
                             const isActive = step === s.id;
@@ -622,7 +602,7 @@ export default function RegisterPage() {
                             Back
                         </button>
 
-                        {step < (showTeamStep ? 4 : 3) ? (
+                        {step < 2 ? (
                             <button
                                 onClick={() => {
                                     setError(null);
@@ -645,7 +625,7 @@ export default function RegisterPage() {
                                 ) : null}
                                 {loading
                                     ? "Creating account…"
-                                    : "Continue to payment →"}
+                                    : "Create account →"}
                             </button>
                         )}
                     </div>
