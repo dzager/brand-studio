@@ -43,7 +43,7 @@ export default async function handler(
             const allowed = [
                 "name", "tagline", "mission", "archetype", "tone",
                 "target_audiences", "photography_style",
-                "color_primary", "color_secondary", "avoid_phrases",
+                "color_primary", "color_secondary", "brand_colors", "avoid_phrases",
                 "image_style_categories", "voice_profile", "editorial_guidelines",
                 "seo_content_guidelines", "reference_articles", "evals", "auto_humanize",
                 "include_toc", "archived", "preferred_model",

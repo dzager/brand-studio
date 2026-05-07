@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useTaskRunner } from "@/hooks/useTaskRunner";
 import type { GetServerSideProps } from "next";
 import { useRouter } from "next/router";
 import type { ImageStyleCategory, VoiceProfile, BrandEngine } from "@/brand/engine";
@@ -16,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
     Pencil, Trash2, Mic, FileText, Plus, ChevronDown, ChevronRight,
     Copy as CopyIcon, X, AlertCircle, CheckCircle2, Save, Sparkles, Search,
-    Globe, Loader2, ImagePlus, Camera, Link2,
+    Globe, Loader2, ImagePlus, Camera, Link2, Archive, ArchiveRestore,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +34,7 @@ type Company = {
     seo_content_guidelines: string | null;
     reference_articles: string[] | null; evals: BrandEngine["evals"] | null;
     auto_humanize: boolean | null; include_toc: boolean | null; created_at: string;
+    archived: boolean | null;
 };
 
 type CompanyPrompt = { id: string; company_id: string; name: string; body: string; created_at: string; };
@@ -45,6 +47,7 @@ const EMPTY_FORM = {
 };
 
 export default function CompaniesPage() {
+    const { runTask } = useTaskRunner();
     const router = useRouter();
     const [companies, setCompanies] = useState<Company[]>([]);
     const [loading, setLoading] = useState(true);
@@ -63,6 +66,10 @@ export default function CompaniesPage() {
     const [generatingDefaultsIds, setGeneratingDefaultsIds] = useState<Set<string>>(new Set());
     const [defaultsReadyId, setDefaultsReadyId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+
+    // Archive state
+    const [showArchived, setShowArchived] = useState(false);
+    const [archivingId, setArchivingId] = useState<string | null>(null);
 
     // Image Style Extraction state
     type ImageStyleAnalysis = {
@@ -96,6 +103,8 @@ export default function CompaniesPage() {
     const [extractErr, setExtractErr] = useState<string | null>(null);
     const [extractResult, setExtractResult] = useState<ImageStyleAnalysis | null>(null);
     const [extractStyleName, setExtractStyleName] = useState("");
+    const [extractThumbnail, setExtractThumbnail] = useState<string | null>(null);
+    const [generatingThumbnail, setGeneratingThumbnail] = useState(false);
     const imageInputRef = useRef<HTMLInputElement>(null);
 
     // URL import state
@@ -150,6 +159,8 @@ export default function CompaniesPage() {
         setExtractErr(null);
         setExtractResult(null);
         setExtractStyleName("");
+        setExtractThumbnail(null);
+        setGeneratingThumbnail(false);
     }
     function closeImageExtract() {
         setShowImageExtract(false);
@@ -160,6 +171,8 @@ export default function CompaniesPage() {
         setExtractErr(null);
         setExtractResult(null);
         setExtractStyleName("");
+        setExtractThumbnail(null);
+        setGeneratingThumbnail(false);
         setSavingExtractedStyle(false);
     }
 
@@ -190,21 +203,30 @@ export default function CompaniesPage() {
         if (!extractBase64) return;
         setExtracting(true);
         setExtractErr(null);
-        try {
-            const r = await fetch("/api/analyze-image-style", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ image_base64: extractBase64 }),
-            });
-            const data = await r.json();
-            if (!r.ok) throw new Error(data.error || "Analysis failed");
-            setExtractResult(data.style);
-            setExtractStyleName(data.style.style_name || "");
-        } catch (e: any) {
-            setExtractErr(e.message);
-        } finally {
-            setExtracting(false);
-        }
+        setExtractThumbnail(null);
+        await runTask<{ style: ImageStyleAnalysis }>({
+            type: "style-extract",
+            label: "Extracting image style",
+            endpoint: "/api/analyze-image-style",
+            body: { image_base64: extractBase64 },
+            onSuccess: (data) => {
+                setExtractResult(data.style);
+                setExtractStyleName(data.style.style_name || "");
+                // Auto-generate a thumbnail preview in the background
+                if (data.style.image_prompt_style) {
+                    setGeneratingThumbnail(true);
+                    runTask<{ thumbnail_base64: string }>({
+                        type: "thumbnail",
+                        label: `Thumbnail: ${data.style.style_name || "extracted style"}`,
+                        endpoint: "/api/generate-style-thumbnail",
+                        body: { image_prompt_style: data.style.image_prompt_style, style_name: data.style.style_name },
+                        onSuccess: (d2) => { if (d2.thumbnail_base64) setExtractThumbnail(`data:image/jpeg;base64,${d2.thumbnail_base64}`); },
+                    }).finally(() => setGeneratingThumbnail(false));
+                }
+            },
+            onError: (err) => { setExtractErr(err); },
+        });
+        setExtracting(false);
     }
 
     async function addExtractedStyle() {
@@ -217,6 +239,7 @@ export default function CompaniesPage() {
             narrative: extractResult.narrative,
             storytelling_cues: extractResult.storytelling_cues,
             image_prompt_style: extractResult.image_prompt_style,
+            thumbnail_url: extractThumbnail ?? undefined,
         };
 
         // Standalone mode — save directly to company via API
@@ -358,9 +381,12 @@ export default function CompaniesPage() {
 
     const fetchCompanies = useCallback(async () => {
         setLoading(true); setErr(null);
-        try { const r = await fetch("/api/companies"); const data = await r.json(); if (!r.ok) throw new Error(data.error || "Failed to fetch"); setCompanies(data); }
+        try {
+            const url = showArchived ? "/api/companies?include_archived=true" : "/api/companies";
+            const r = await fetch(url); const data = await r.json(); if (!r.ok) throw new Error(data.error || "Failed to fetch"); setCompanies(data);
+        }
         catch (e: any) { setErr(e.message); } finally { setLoading(false); }
-    }, []);
+    }, [showArchived]);
     useEffect(() => { fetchCompanies(); }, [fetchCompanies]);
 
     function openCreate() { setEditingId(null); setForm(EMPTY_FORM); setShowForm(true); setImportUrl(""); setImportErr(null); setImportSuccess(false); setImportNotes(null); }
@@ -490,6 +516,25 @@ export default function CompaniesPage() {
         catch (e: any) { alert(e.message); } finally { setDeletingId(null); }
     }
 
+    async function toggleArchive(id: string, currentlyArchived: boolean) {
+        setArchivingId(id);
+        try {
+            const r = await fetch(`/api/companies/${id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ archived: !currentlyArchived }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || "Archive toggle failed");
+            // If we're hiding archived and we just archived it, remove from list
+            if (!showArchived && !currentlyArchived) {
+                setCompanies((prev) => prev.filter((c) => c.id !== id));
+            } else {
+                setCompanies((prev) => prev.map((c) => c.id === id ? { ...c, archived: !currentlyArchived } : c));
+            }
+        } catch (e: any) { alert(e.message); } finally { setArchivingId(null); }
+    }
+
     const vc = voiceCompanyId ? companies.find((c) => c.id === voiceCompanyId) : null;
     const pc = promptCompanyId ? companies.find((c) => c.id === promptCompanyId) : null;
 
@@ -497,7 +542,24 @@ export default function CompaniesPage() {
         <AppLayout>
             <div className="space-y-6">
                 {/* Header */}
-                <div className="flex justify-end">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={showArchived}
+                                onChange={(e) => setShowArchived(e.target.checked)}
+                                className="h-3.5 w-3.5 rounded"
+                            />
+                            <Archive className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="text-muted-foreground">Show archived</span>
+                            {showArchived && companies.filter((c) => c.archived).length > 0 && (
+                                <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
+                                    {companies.filter((c) => c.archived).length}
+                                </Badge>
+                            )}
+                        </label>
+                    </div>
                     <Button onClick={openCreate} className="gap-1.5"><Plus className="h-4 w-4" /> New Company</Button>
                 </div>
 
@@ -717,8 +779,12 @@ export default function CompaniesPage() {
                                                 <Card key={idx}>
                                                     <div className="flex justify-between items-center px-4 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors select-none"
                                                         onClick={() => setExpandedStyles((prev) => { const next = new Set(prev); if (next.has(idx)) next.delete(idx); else next.add(idx); return next; })}>
-                                                        <span className="text-sm font-medium flex items-center gap-1.5">
-                                                            {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                                                        <span className="text-sm font-medium flex items-center gap-2">
+                                                            {cat.thumbnail_url ? (
+                                                                <img src={cat.thumbnail_url} alt={cat.label} className="w-8 h-8 rounded-md object-cover border border-border shadow-sm shrink-0" />
+                                                            ) : (
+                                                                isExpanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                                                            )}
                                                             {cat.label || `Style #${idx + 1}`}
                                                             {cat.id && <span className="text-xs text-muted-foreground">({cat.id})</span>}
                                                             {cat.type === "composite" && <Badge variant="outline" className="text-[10px] h-4 gap-0.5">🧩 Composite</Badge>}
@@ -856,45 +922,119 @@ export default function CompaniesPage() {
                 )}
 
                 <div className="space-y-1.5">
-                    {companies.map((c) => {
-                        const styleCount = Array.isArray(c.image_style_categories) ? c.image_style_categories.length : 0;
+                    {(() => {
+                        const activeCompanies = companies.filter((c) => !c.archived);
+                        const archivedCompanies = companies.filter((c) => c.archived);
                         return (
-                        <div
-                            key={c.id}
-                            className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors cursor-pointer group"
-                            onClick={() => router.push(`/company?id=${c.id}`)}
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); router.push(`/company?id=${c.id}`); } }}
-                        >
-                            <div className="flex-1 min-w-0 flex items-center gap-3">
-                                <h3 className="text-sm font-medium truncate group-hover:text-primary transition-colors">{c.name}</h3>
-                                {generatingDefaultsIds.has(c.id) && (
-                                    <Badge variant="outline" className="text-[10px] h-4 gap-0.5 border-primary/40 text-primary animate-pulse shrink-0">
-                                        <Sparkles className="h-2.5 w-2.5" /> Generating defaults…
-                                    </Badge>
-                                )}
-                                <span className="text-xs text-muted-foreground shrink-0">{new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                <Button variant="ghost" size="sm" onClick={() => openVoicePanel(c.id)} className={cn("h-7 px-2 gap-1 text-xs", c.voice_profile && "text-primary")}><Mic className="h-3 w-3" /> Voice</Button>
-                                <Button variant="ghost" size="sm" onClick={() => openPromptPanel(c.id)} className="h-7 px-2 gap-1 text-xs"><FileText className="h-3 w-3" /> Prompts</Button>
-                                <Button variant="ghost" size="sm" onClick={() => openImageExtract(c.id)} className={cn("h-7 px-2 gap-1 text-xs", styleCount > 0 && "text-primary")}>
-                                    <ImagePlus className="h-3 w-3" /> Styles
-                                    {styleCount > 0 && <Badge variant="secondary" className="h-4 min-w-[16px] px-1 text-[10px] ml-0.5">{styleCount}</Badge>}
-                                </Button>
-                                {confirmDeleteId === c.id ? (
-                                    <div className="flex gap-1">
-                                        <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => deleteCompany(c.id)} disabled={deletingId === c.id}>{deletingId === c.id ? "…" : "Confirm"}</Button>
-                                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setConfirmDeleteId(null)}>Cancel</Button>
+                            <>
+                            {activeCompanies.map((c) => {
+                                const styleCount = Array.isArray(c.image_style_categories) ? c.image_style_categories.length : 0;
+                                return (
+                                <div
+                                    key={c.id}
+                                    className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors cursor-pointer group"
+                                    onClick={() => router.push(`/company?id=${c.id}`)}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); router.push(`/company?id=${c.id}`); } }}
+                                >
+                                    <div className="flex-1 min-w-0 flex items-center gap-3">
+                                        <h3 className="text-sm font-medium truncate group-hover:text-primary transition-colors">{c.name}</h3>
+                                        {generatingDefaultsIds.has(c.id) && (
+                                            <Badge variant="outline" className="text-[10px] h-4 gap-0.5 border-primary/40 text-primary animate-pulse shrink-0">
+                                                <Sparkles className="h-2.5 w-2.5" /> Generating defaults…
+                                            </Badge>
+                                        )}
+                                        <span className="text-xs text-muted-foreground shrink-0">{new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
                                     </div>
-                                ) : (
-                                    <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteId(c.id)} className="h-7 px-2 text-destructive hover:text-destructive"><Trash2 className="h-3 w-3" /></Button>
-                                )}
-                            </div>
-                        </div>
+                                    <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                        <Button variant="ghost" size="sm" onClick={() => openVoicePanel(c.id)} className={cn("h-7 px-2 gap-1 text-xs", c.voice_profile && "text-primary")}><Mic className="h-3 w-3" /> Voice</Button>
+                                        <Button variant="ghost" size="sm" onClick={() => openPromptPanel(c.id)} className="h-7 px-2 gap-1 text-xs"><FileText className="h-3 w-3" /> Prompts</Button>
+                                        <Button variant="ghost" size="sm" onClick={() => openImageExtract(c.id)} className={cn("h-7 px-2 gap-1 text-xs", styleCount > 0 && "text-primary")}>
+                                            <ImagePlus className="h-3 w-3" /> Styles
+                                            {styleCount > 0 && <Badge variant="secondary" className="h-4 min-w-[16px] px-1 text-[10px] ml-0.5">{styleCount}</Badge>}
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => toggleArchive(c.id, false)}
+                                            disabled={archivingId === c.id}
+                                            className="h-7 px-2 gap-1 text-xs text-muted-foreground hover:text-foreground"
+                                            title="Archive this company"
+                                        >
+                                            {archivingId === c.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Archive className="h-3 w-3" />}
+                                        </Button>
+                                        {confirmDeleteId === c.id ? (
+                                            <div className="flex gap-1">
+                                                <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => deleteCompany(c.id)} disabled={deletingId === c.id}>{deletingId === c.id ? "…" : "Confirm"}</Button>
+                                                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setConfirmDeleteId(null)}>Cancel</Button>
+                                            </div>
+                                        ) : (
+                                            <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteId(c.id)} className="h-7 px-2 text-destructive hover:text-destructive"><Trash2 className="h-3 w-3" /></Button>
+                                        )}
+                                    </div>
+                                </div>
+                                );
+                            })}
+
+                            {/* Archived Section */}
+                            {showArchived && archivedCompanies.length > 0 && (
+                                <>
+                                <div className="flex items-center gap-3 pt-4 pb-1">
+                                    <Separator className="flex-1" />
+                                    <span className="text-xs text-muted-foreground font-medium flex items-center gap-1.5 shrink-0">
+                                        <Archive className="h-3 w-3" />
+                                        Archived ({archivedCompanies.length})
+                                    </span>
+                                    <Separator className="flex-1" />
+                                </div>
+                                {archivedCompanies.map((c) => {
+                                    const styleCount = Array.isArray(c.image_style_categories) ? c.image_style_categories.length : 0;
+                                    return (
+                                    <div
+                                        key={c.id}
+                                        className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border/50 bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer group opacity-60 hover:opacity-100"
+                                        onClick={() => router.push(`/company?id=${c.id}`)}
+                                        role="button"
+                                        tabIndex={0}
+                                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); router.push(`/company?id=${c.id}`); } }}
+                                    >
+                                        <div className="flex-1 min-w-0 flex items-center gap-3">
+                                            <h3 className="text-sm font-medium truncate group-hover:text-primary transition-colors">{c.name}</h3>
+                                            <Badge variant="secondary" className="text-[10px] h-4 gap-0.5 shrink-0">
+                                                <Archive className="h-2.5 w-2.5" /> Archived
+                                            </Badge>
+                                            <span className="text-xs text-muted-foreground shrink-0">{new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => toggleArchive(c.id, true)}
+                                                disabled={archivingId === c.id}
+                                                className="h-7 px-2 gap-1 text-xs text-primary hover:text-primary"
+                                                title="Restore this company"
+                                            >
+                                                {archivingId === c.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <ArchiveRestore className="h-3 w-3" />}
+                                                <span>Restore</span>
+                                            </Button>
+                                            {confirmDeleteId === c.id ? (
+                                                <div className="flex gap-1">
+                                                    <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => deleteCompany(c.id)} disabled={deletingId === c.id}>{deletingId === c.id ? "…" : "Confirm"}</Button>
+                                                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setConfirmDeleteId(null)}>Cancel</Button>
+                                                </div>
+                                            ) : (
+                                                <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteId(c.id)} className="h-7 px-2 text-destructive hover:text-destructive"><Trash2 className="h-3 w-3" /></Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    );
+                                })}
+                                </>
+                            )}
+                            </>
                         );
-                    })}
+                    })()}
                 </div>
 
                 {/* Voice Profile Modal */}
@@ -1263,15 +1403,54 @@ export default function CompaniesPage() {
                                     </AlertDescription>
                                 </Alert>
 
-                                {/* Style Name */}
-                                <div className="space-y-1.5">
-                                    <Label className="text-sm font-semibold">Style Name</Label>
-                                    <Input
-                                        value={extractStyleName}
-                                        onChange={(e) => setExtractStyleName(e.target.value)}
-                                        placeholder="e.g. Warm Editorial Glow"
-                                        className="text-sm"
-                                    />
+                                {/* Thumbnail Preview + Style Name */}
+                                <div className="flex gap-4 items-start">
+                                    <div className="shrink-0">
+                                        <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">Preview</Label>
+                                        <div className="w-24 h-24 rounded-xl border border-border bg-muted/30 overflow-hidden shadow-sm relative">
+                                            {extractThumbnail ? (
+                                                <img src={extractThumbnail} alt="Style preview" className="w-full h-full object-cover" />
+                                            ) : generatingThumbnail ? (
+                                                <div className="w-full h-full flex flex-col items-center justify-center gap-1.5">
+                                                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                                                    <span className="text-[10px] text-muted-foreground">Generating…</span>
+                                                </div>
+                                            ) : (
+                                                <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-muted-foreground">
+                                                    <Camera className="h-5 w-5" />
+                                                    <span className="text-[10px]">No preview</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        {!generatingThumbnail && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (!extractResult?.image_prompt_style) return;
+                                                    setGeneratingThumbnail(true); setExtractThumbnail(null);
+                                                    runTask<{ thumbnail_base64: string }>({
+                                                        type: "thumbnail",
+                                                        label: `Thumbnail: ${extractStyleName || extractResult.style_name}`,
+                                                        endpoint: "/api/generate-style-thumbnail",
+                                                        body: { image_prompt_style: extractResult.image_prompt_style, style_name: extractStyleName || extractResult.style_name },
+                                                        onSuccess: (d2) => { if (d2.thumbnail_base64) setExtractThumbnail(`data:image/jpeg;base64,${d2.thumbnail_base64}`); },
+                                                    }).finally(() => setGeneratingThumbnail(false));
+                                                }}
+                                                className="mt-1.5 text-[10px] text-primary hover:underline cursor-pointer"
+                                            >
+                                                {extractThumbnail ? "↻ Regenerate" : "⟳ Generate preview"}
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 space-y-1.5">
+                                        <Label className="text-sm font-semibold">Style Name</Label>
+                                        <Input
+                                            value={extractStyleName}
+                                            onChange={(e) => setExtractStyleName(e.target.value)}
+                                            placeholder="e.g. Warm Editorial Glow"
+                                            className="text-sm"
+                                        />
+                                    </div>
                                 </div>
 
                                 {/* Visual Analysis Grid */}

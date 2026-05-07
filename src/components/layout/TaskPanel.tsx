@@ -88,6 +88,8 @@ const TYPE_LABELS: Record<string, string> = {
   "recommend-style": "Style",
   composite: "Composite",
   shorten: "Shorten",
+  thumbnail: "Thumbnail",
+  "style-extract": "Style Extract",
 };
 
 /* ── Elapsed Timer Hook ────────────────────────────────── */

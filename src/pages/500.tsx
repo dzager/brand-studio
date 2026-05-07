@@ -18,7 +18,7 @@ export default function Custom500() {
               Something went wrong on our end. Please try again later.
             </p>
             <Button asChild className="mt-2">
-              <Link href="/">Back to Studio</Link>
+              <Link href="/studio">Back to Studio</Link>
             </Button>
           </CardContent>
         </Card>

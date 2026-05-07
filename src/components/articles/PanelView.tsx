@@ -847,7 +847,7 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                     <TabsContent value="generate" className="space-y-3">
                         {imageStyles.length > 0 && (
                             <div>
-                                <Label className="text-xs">Image Style</Label>
+                                <Label className="text-xs">Hero style</Label>
                                 <select value={selectedStyle} onChange={(e) => { setSelectedStyle(e.target.value); setImagePromptInput(""); setInsertGenPrompt(""); setInsertPreview(null); setRefreshErr(null); setPvCsProductUrl(null); setPvCsProductThumb(null); setPvCsProductResults([]); setPvCsProductQuery(""); setPvCsBgPrompt(""); setPvCsBgImageUrl(""); resetComposite(); }}
                                     className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm">
                                     {imageStyles.map((s) => (
@@ -985,7 +985,7 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                                     <div className="space-y-3">
                                         {imageStyles.length > 0 && (
                                             <div>
-                                                <Label className="text-xs">Image Style</Label>
+                                                <Label className="text-xs">Hero style</Label>
                                                 <select value={selectedStyle} onChange={(e) => { setSelectedStyle(e.target.value); setImagePromptInput(""); setInsertGenPrompt(""); setInsertPreview(null); setRefreshErr(null); setPvCsProductUrl(null); setPvCsProductThumb(null); setPvCsProductResults([]); setPvCsProductQuery(""); setPvCsBgPrompt(""); setPvCsBgImageUrl(""); resetComposite(); }}
                                                     className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm">
                                                     {imageStyles.map((s) => (

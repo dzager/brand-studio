@@ -20,7 +20,9 @@ export type TaskType =
   | "interlink"
   | "recommend-style"
   | "composite"
-  | "shorten";
+  | "shorten"
+  | "thumbnail"
+  | "style-extract";
 
 export interface Task {
   id: string;

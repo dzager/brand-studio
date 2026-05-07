@@ -52,6 +52,8 @@ export type ImageStyleCategory = {
     narrative: string;
     storytelling_cues: string[];
     image_prompt_style: string;
+    // Visual preview thumbnail (base64 data URI or URL)
+    thumbnail_url?: string;
     // Composite blend fields
     type?: "prompt" | "composite";        // defaults to "prompt"
     composite_bg_prompt?: string;          // default background scene description

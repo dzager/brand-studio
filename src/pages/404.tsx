@@ -18,7 +18,7 @@ export default function Custom404() {
               The page you're looking for doesn't exist or has been moved.
             </p>
             <Button asChild className="mt-2">
-              <Link href="/">Back to Studio</Link>
+              <Link href="/studio">Back to Studio</Link>
             </Button>
           </CardContent>
         </Card>

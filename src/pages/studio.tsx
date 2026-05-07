@@ -654,9 +654,9 @@ export default function Home() {
                         </span>
                     </summary>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
-                        {/* Image Style */}
+                        {/* Hero Style */}
                         <div className="space-y-1.5">
-                            <Label htmlFor="image-style" className="text-xs font-medium">Image style</Label>
+                            <Label htmlFor="image-style" className="text-xs font-medium">Hero style</Label>
                             <div className="flex gap-2 items-center">
                                 <select id="image-style" value={imageStyle} onChange={(e) => {
                                         const newStyleId = e.target.value;

@@ -202,7 +202,7 @@ export default function ArticlesPage() {
                         </div>
                         <p className="text-muted-foreground mb-2">No articles yet.</p>
                         <Button asChild variant="link">
-                            <Link href="/">Create your first one →</Link>
+                            <Link href="/studio">Create your first one →</Link>
                         </Button>
                     </div>
                 )}

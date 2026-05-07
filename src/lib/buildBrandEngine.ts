@@ -19,6 +19,7 @@ export type CompanyRecord = {
     photography_style: string | null;
     color_primary: string | null;
     color_secondary: string | null;
+    brand_colors: { name: string; hex: string }[] | null;
     avoid_phrases: string | null;
     image_style_categories: ImageStyleCategory[] | null;
     voice_profile: VoiceProfile | null;
@@ -75,6 +76,24 @@ export function buildBrandEngine(company: CompanyRecord): BrandEngine {
     }
     if (company.color_secondary) {
         base.design_tokens.colors.primary.marigold = company.color_secondary;
+    }
+
+    // Additional brand colors — map extra palette entries into extended/secondary slots
+    if (company.brand_colors && company.brand_colors.length > 0) {
+        // First two are typically primary/secondary (already handled via color_primary/secondary)
+        const extras = company.brand_colors.slice(2);
+        const extendedKeys: (keyof typeof base.design_tokens.colors.extended)[] = ["juniper", "oat", "oat_dark", "oat_light"];
+        const secondaryKeys: (keyof typeof base.design_tokens.colors.secondary)[] = ["jade", "pomelo", "currant", "nightshade"];
+        const allSlots = [
+            ...extendedKeys.map(k => ({ group: "extended" as const, key: k })),
+            ...secondaryKeys.map(k => ({ group: "secondary" as const, key: k })),
+        ];
+        extras.forEach((bc, i) => {
+            if (i < allSlots.length) {
+                const slot = allSlots[i];
+                (base.design_tokens.colors[slot.group] as any)[slot.key] = bc.hex;
+            }
+        });
     }
 
     // Avoid phrases

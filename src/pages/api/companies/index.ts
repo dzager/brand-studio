@@ -23,6 +23,7 @@ export default async function handler(
 
     try {
         if (req.method === "GET") {
+            const includeArchived = req.query.include_archived === "true";
             // Check if this user is scoped to specific companies via any membership
             const isAdmin = await isPlatformAdmin(user.id);
             const accounts = await getUserAccounts(user.id);
@@ -38,11 +39,12 @@ export default async function handler(
             // If any membership has a company_id set, restrict to those companies
             if (!isAdmin && scopedCompanyIds.length > 0) {
                 console.log("[companies/GET] SCOPED — returning only:", scopedCompanyIds);
-                const { data, error } = await admin
+                let query = admin
                     .from("companies")
                     .select("*")
-                    .in("id", scopedCompanyIds)
-                    .order("created_at", { ascending: false });
+                    .in("id", scopedCompanyIds);
+                if (!includeArchived) query = query.or("archived.is.null,archived.eq.false");
+                const { data, error } = await query.order("created_at", { ascending: false });
 
                 if (error) throw error;
                 return res.status(200).json(data || []);
@@ -52,11 +54,12 @@ export default async function handler(
             if (!isAdmin) {
                 const accountIds = accounts.map((a) => a.account_id);
                 console.log("[companies/GET] ACCOUNT-SCOPED — returning companies for accounts:", accountIds);
-                const { data, error } = await admin
+                let query2 = admin
                     .from("companies")
                     .select("*")
-                    .in("account_id", accountIds)
-                    .order("created_at", { ascending: false });
+                    .in("account_id", accountIds);
+                if (!includeArchived) query2 = query2.or("archived.is.null,archived.eq.false");
+                const { data, error } = await query2.order("created_at", { ascending: false });
 
                 if (error) throw error;
                 return res.status(200).json(data || []);
@@ -64,10 +67,11 @@ export default async function handler(
 
             console.log("[companies/GET] ADMIN — returning all companies");
             // Platform admins see all companies
-            const { data, error } = await admin
+            let query3 = admin
                 .from("companies")
-                .select("*")
-                .order("created_at", { ascending: false });
+                .select("*");
+            if (!includeArchived) query3 = query3.or("archived.is.null,archived.eq.false");
+            const { data, error } = await query3.order("created_at", { ascending: false });
 
             if (error) throw error;
             return res.status(200).json(data);
@@ -121,6 +125,7 @@ export default async function handler(
                 photography_style,
                 color_primary,
                 color_secondary,
+                brand_colors,
                 avoid_phrases,
                 image_style_categories,
                 voice_profile,
@@ -146,6 +151,7 @@ export default async function handler(
                 photography_style: photography_style?.trim() || null,
                 color_primary: color_primary?.trim() || "#000000",
                 color_secondary: color_secondary?.trim() || "#FFFFFF",
+                brand_colors: brand_colors ?? [],
                 avoid_phrases: avoid_phrases?.trim() || null,
                 account_id: targetAccountId,
             };

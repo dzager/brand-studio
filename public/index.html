@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Organic — AI Content Studio</title>
-  <meta name="description" content="Organic feeling content generation for organic traffic. AI content studio with a built-in brand engine, multi-model fact-checking, and automatic humanization." />
+  <title>Organic — AI Content Platform</title>
+  <meta name="description" content="The AI content platform that writes in your brand's voice. Multi-brand content operations with built-in clustering, fact-checking, visual style matching, and automatic humanization." />
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -325,7 +325,7 @@
     .why { padding: 140px 0; }
     .why-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 0;
       border-top: 1px solid var(--border);
     }
@@ -360,7 +360,7 @@
     .pipeline { padding: 140px 0; }
     .pipeline-row {
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: repeat(4, 1fr);
       gap: 0;
       border-top: 1px solid var(--border);
       border-bottom: 1px solid var(--border);
@@ -773,7 +773,7 @@
       .section-header { grid-template-columns: 1fr; gap: 16px; }
       .why-grid { grid-template-columns: repeat(2, 1fr); }
       .why-card { border-bottom: 1px solid var(--border); }
-      .pipeline-row { grid-template-columns: repeat(3, 1fr); }
+      .pipeline-row { grid-template-columns: repeat(2, 1fr); }
       .pipeline-step { border-bottom: 1px solid var(--border); }
       .pricing-grid { grid-template-columns: 1fr; }
       .pricing-tier { border-right: none; border-bottom: 1px solid var(--border); }
@@ -844,19 +844,20 @@
     ───────────────────────────────────────────── */
     const TERMINAL_SEQ_1 = [
       { text: '$ organic generate --company greencard-law', style: '' },
-      { text: '[00:01] Loading brand profile…', style: 'dim' },
-      { text: '[00:02] Brand engine: tone=empathetic, pov=second', style: 'dim' },
+      { text: '[00:01] Loading brand profile + voice…', style: 'dim' },
+      { text: '[00:02] Brand engine: tone=empathetic, pov=second, archetype=guide', style: 'dim' },
       { text: '[00:03] Topic: "H-1B to Green Card: EB-2 Timeline Guide"', style: 'dim' },
-      { text: '[00:04] Prompt assembled: 3,214 tokens', style: 'dim' },
-      { text: '[00:05] Writing draft via gpt-5.1…', style: 'amber' },
-      { text: '[00:11] Draft complete: 2,340 words', style: '' },
-      { text: '[00:12] Humanizing: rewriting 19 AI patterns…', style: 'amber' },
-      { text: '[00:17] Humanization pass complete', style: '' },
-      { text: '[00:18] Generating hero image via gpt-image-1…', style: 'amber' },
-      { text: '[00:24] Image composited: 1344×768', style: '' },
-      { text: '[00:25] Fact-check consul: gemini + grok verifying…', style: 'amber' },
-      { text: '[00:33] All claims verified. 5 USCIS citations added.', style: 'green' },
-      { text: '[00:34] ✓ Published to WordPress. Organic complete.', style: 'green' },
+      { text: '[00:04] Overlap check: 0 similar articles. Safe to publish.', style: 'dim' },
+      { text: '[00:05] Prompt assembled: 3,214 tokens', style: 'dim' },
+      { text: '[00:06] Writing draft via gpt-5.5…', style: 'amber' },
+      { text: '[00:14] Draft complete: 2,340 words', style: '' },
+      { text: '[00:15] Humanizing: rewriting 19 AI patterns…', style: 'amber' },
+      { text: '[00:20] Humanization pass complete', style: '' },
+      { text: '[00:21] Generating hero image (editorial style)…', style: 'amber' },
+      { text: '[00:28] Image composited: 1344×768', style: '' },
+      { text: '[00:29] Fact-check consul: gemini + grok + base verifying…', style: 'amber' },
+      { text: '[00:38] All claims verified. 5 USCIS citations added.', style: 'green' },
+      { text: '[00:39] ✓ Published. Organic complete.', style: 'green' },
     ];
 
     const TERMINAL_SEQ_2 = [
@@ -878,7 +879,22 @@
       { text: '[03:01] ✓ Cluster published. 7 articles, 38 citations.', style: 'green' },
     ];
 
-    const TERMINAL_SEQUENCES = [TERMINAL_SEQ_1, TERMINAL_SEQ_2];
+    const TERMINAL_SEQ_3 = [
+      { text: '$ organic brand --import https://trovatrip.com', style: '' },
+      { text: '[00:01] Crawling homepage + 4 subpages…', style: 'dim' },
+      { text: '[00:06] Extracted: name, tagline, mission, tone, colors', style: '' },
+      { text: '[00:07] Generating voice profile from writing samples…', style: 'amber' },
+      { text: '[00:12] Voice: conversational, second-person, active verbs', style: '' },
+      { text: '[00:13] Generating editorial guidelines…', style: 'amber' },
+      { text: '[00:18] Editorial guidelines complete: 1,240 tokens', style: '' },
+      { text: '[00:19] Generating SEO content strategy…', style: 'amber' },
+      { text: '[00:24] SEO strategy complete: keyword clustering enabled', style: '' },
+      { text: '[00:25] Extracting 2 image styles from brand photography…', style: 'amber' },
+      { text: '[00:31] Image styles created: "editorial" + "lifestyle"', style: '' },
+      { text: '[00:32] ✓ Brand profile complete. Ready to create content.', style: 'green' },
+    ];
+
+    const TERMINAL_SEQUENCES = [TERMINAL_SEQ_1, TERMINAL_SEQ_2, TERMINAL_SEQ_3];
 
     function Terminal() {
       const [seqIndex, setSeqIndex] = useState(0);
@@ -935,12 +951,12 @@
           <div className="container">
             <div className="hero-grid">
               <div>
-                <div className="eyebrow">Issue 01 · The Content Studio</div>
+                <div className="eyebrow">The AI Content Platform</div>
                 <h1 className="hero-headline">
                   All Organic content generation &amp; traffic.
                 </h1>
                 <p className="hero-lede">
-                  AI content studio with a built-in brand engine, multi-model fact-checking, and automatic humanization. Every article reads like your best writer wrote it — and ranks like your SEO team built it.
+                  Organic turns a single prompt into on-brand articles, content clusters, and hero images — with built-in fact-checking, humanization, and visual style matching. Manage every brand from one studio.
                 </p>
                 <div className="hero-ctas">
                   <button className="btn-primary" onClick={onOpenWaitlist}>Get started free →</button>
@@ -949,18 +965,18 @@
                 <div className="hero-stats">
                   <div className="hero-stat">
                     <div className="hero-stat-number">200+</div>
-                    <div className="hero-stat-label">Banned phrases</div>
+                    <div className="hero-stat-label">Banned AI phrases</div>
                   </div>
                   <div className="hero-stat">
-                    <div className="hero-stat-number">17</div>
-                    <div className="hero-stat-label">AI patterns rewritten</div>
+                    <div className="hero-stat-number">6+</div>
+                    <div className="hero-stat-label">Writing models</div>
                   </div>
                   <div className="hero-stat">
-                    <div className="hero-stat-number">2</div>
+                    <div className="hero-stat-number">3</div>
                     <div className="hero-stat-label">Fact-check models</div>
                   </div>
                   <div className="hero-stat">
-                    <div className="hero-stat-number">5</div>
+                    <div className="hero-stat-number">7</div>
                     <div className="hero-stat-label">Pipeline stages</div>
                   </div>
                 </div>
@@ -981,22 +997,32 @@
       {
         num: '01',
         title: 'Brand engine',
-        body: 'The prompt writes in your brand\'s voice, not its own — because your style guide, voice profile, and banned words shape every prompt.',
+        body: 'Voice profiles, editorial guidelines, banned words, and brand archetypes shape every prompt. Import any brand from a URL in seconds.',
       },
       {
         num: '02',
         title: 'Humanization',
-        body: '17 known AI writing patterns detected and rewritten. 200+ cliché phrases banned. Output passes every detector we have tested.',
+        body: '17 known AI writing patterns detected and rewritten. 200+ cliché phrases banned. Auto-humanize runs per company. Output passes every detector we have tested.',
       },
       {
         num: '03',
         title: 'Fact-check consul',
-        body: 'Two independent models cross-verify every claim. Citations are sourced and anchored to publication dates. No hallucinations ship.',
+        body: 'Three independent models cross-verify every claim. One-click rewrites for disputed facts. Citations sourced and anchored to publication dates.',
       },
       {
         num: '04',
         title: 'SEO + AEO + GEO',
         body: 'Structured data, FAQ schema, keyword clusters, and answer-engine optimization built into every article. Rank on Google. Appear in AI answers.',
+      },
+      {
+        num: '05',
+        title: 'Content architecture',
+        body: 'Pillar pages, supporting articles, and long-tail content organized into topical clusters. Internal links mapped automatically. Overlap detection prevents cannibalization.',
+      },
+      {
+        num: '06',
+        title: 'Multi-brand studio',
+        body: 'Manage unlimited brands from one dashboard. Each company gets its own voice profile, image styles, editorial rules, and prompt templates.',
       },
     ];
 
@@ -1007,7 +1033,7 @@
             <div className="section-header">
               <div className="eyebrow">Why Organic</div>
               <h2 className="section-headline">
-                Four clusters of agents make <em>On Brand</em> AI content <em>publish-ready.</em>
+                Six capabilities make <em>On Brand</em> AI content <em>publish-ready.</em>
               </h2>
             </div>
             <div className="why-grid">
@@ -1028,11 +1054,13 @@
        Pipeline
     ───────────────────────────────────────────── */
     const PIPELINE_STEPS = [
-      { num: '01', name: 'Write', body: 'Long-form draft from your brand-tuned prompt.', chips: ['gpt-5.4'] },
-      { num: '02', name: 'Humanize', body: 'Rewrite AI patterns. Remove banned phrases.', chips: ['gpt-5.4'] },
-      { num: '03', name: 'Image', body: 'Hero and inline images composited on brand.', chips: ['gpt-image-2'] },
-      { num: '04', name: 'Fact-check', body: 'Cross-model verification. Citations added.', chips: ['gemini-3.1-pro', 'grok-4'] },
-      { num: '05', name: 'Publish', body: 'Push to WordPress, Webflow, or custom CMS.', chips: ['—'] },
+      { num: '01', name: 'Brand', body: 'Load company voice, style rules, and editorial guidelines.', chips: ['brand-engine'] },
+      { num: '02', name: 'Write', body: 'Long-form draft from your brand-tuned prompt.', chips: ['gpt-5.5'] },
+      { num: '03', name: 'Humanize', body: 'Rewrite AI patterns. Remove banned phrases.', chips: ['gpt-5.5'] },
+      { num: '04', name: 'Image', body: 'Hero composited in your brand\'s visual style.', chips: ['gpt-image-1'] },
+      { num: '05', name: 'Verify', body: 'Cross-model fact-check. Citations anchored.', chips: ['gemini-3.1-pro', 'grok-4'] },
+      { num: '06', name: 'Edit', body: 'Rich editor with YouTube, tables, and inline images.', chips: ['tiptap'] },
+      { num: '07', name: 'Publish', body: 'Push to WordPress, Webflow, or export HTML.', chips: ['api'] },
     ];
 
     function Pipeline() {
@@ -1042,7 +1070,7 @@
             <div className="section-header">
               <div className="eyebrow">Pipeline</div>
               <h2 className="section-headline">
-                Five stages. <em>One click.</em>
+                Seven stages. <em>One click.</em>
               </h2>
             </div>
             <div className="pipeline-row">
@@ -1112,7 +1140,7 @@
       }, [handleMove]);
 
       const beforeTags = ['"dive in"', '"landscape"', '"crucial"', 'no data', 'no citations'];
-      const afterTags = ['22% cost drop', '47-day permits', 'WA-specific', 'cited', '2023 anchor'];
+      const afterTags = ['22% cost drop', '47-day permits', 'WA-specific', 'cited', '2023 anchor', 'FAQ schema'];
 
       return (
         <section className="beforeafter section-border" id="beforeafter">
@@ -1182,7 +1210,7 @@
         perArticle: '$3.96/article',
         featured: false,
         badge: null,
-        features: ['25 articles/month', '$3.50 per extra article', 'Solo use', '5 domains', 'Research + Optimize'],
+        features: ['25 articles/month', '$3.50 per extra article', 'Solo use', 'Content clusters + overlap detection', 'Brand import from URL'],
         cta: 'Start free',
       },
       {
@@ -1192,7 +1220,7 @@
         perArticle: '$3.74/article',
         featured: true,
         badge: 'POPULAR',
-        features: ['80 articles/month', '$3.00 per extra article', '3 team seats (+$25/extra)', 'Unlimited domains', 'Access to API and MCP'],
+        features: ['80 articles/month', '$3.00 per extra article', '3 team seats (+$25/extra)', 'Visual style extraction + model bake-off', 'API, MCP server, and webhooks'],
         cta: 'Start free',
       },
       {
@@ -1202,7 +1230,7 @@
         perArticle: '$3.33/article',
         featured: false,
         badge: null,
-        features: ['300 articles/month', '$2.50 per extra article', '10 team seats (+$20/extra)', 'Unlimited domains', 'Priority support'],
+        features: ['300 articles/month', '$2.50 per extra article', '10 team seats (+$20/extra)', 'Unlimited brands + custom prompt templates', 'Priority support + dedicated onboarding'],
         cta: 'Start free',
       },
     ];
@@ -1259,7 +1287,7 @@
               <em>More Organic.</em>
             </h2>
             <p className="final-cta-lede">
-              Your brand voice. Real facts. Zero AI aftertaste.
+              Import your brand. Generate your first cluster. Publish in minutes.
             </p>
             <button className="btn-primary" onClick={onOpenWaitlist}>Get started free →</button>
           </div>
@@ -1277,10 +1305,11 @@
             <div className="footer-inner">
               <div className="footer-left">© All Organic, INC, a PSL Company</div>
               <div className="footer-right">
-                <a href="#" className="footer-link">Docs</a>
-                <a href="#" className="footer-link">API</a>
+                <a href="docs.html" className="footer-link">Docs</a>
                 <a href="changelog.html" className="footer-link">Changelog</a>
+                <a href="#" className="footer-link">MCP Server</a>
                 <a href="#" className="footer-link">Twitter</a>
+                <a href="#" className="footer-link">Privacy</a>
               </div>
             </div>
           </div>
