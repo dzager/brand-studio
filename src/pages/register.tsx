@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import Head from "next/head";
@@ -14,17 +14,25 @@ import {
     User,
     CreditCard,
     Users,
+    ImagePlus,
+    X,
+    Camera,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ── Steps ──────────────────────────────────────────────────────────
 // NOTE: Plan and Team steps are hidden while payments are paused.
-// To re-enable, restore steps 3 (Plan) and 4 (Team) and update
+// To re-enable, restore steps 4 (Plan) and 5 (Team) and update
 // the navigation logic + handleSubmit to redirect to Stripe checkout.
 const STEPS = [
     { id: 1, label: "Account", icon: User },
     { id: 2, label: "Company", icon: Building2 },
+    { id: 3, label: "Brand Images", icon: Camera },
 ];
+
+const MAX_IMAGES = 6;
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 const PLAN_IDS: PlanId[] = ["starter", "standard", "scale"];
 
@@ -48,10 +56,15 @@ export default function RegisterPage() {
     const [importUrl, setImportUrl] = useState("");
     const [importing, setImporting] = useState(false);
 
-    // Step 3: Plan
+    // Step 3: Brand Images
+    const [brandImages, setBrandImages] = useState<{ src: string; name: string }[]>([]);
+    const [dragOver, setDragOver] = useState(false);
+    const imageInputRef = useRef<HTMLInputElement>(null);
+
+    // Step 4: Plan (hidden while payments paused)
     const [selectedPlan, setSelectedPlan] = useState<PlanId>("starter");
 
-    // Step 4: Team invites
+    // Step 5: Team invites (hidden while payments paused)
     const [inviteEmails, setInviteEmails] = useState<string[]>([""]);
 
     // Redirect if already authenticated
@@ -92,6 +105,39 @@ export default function RegisterPage() {
         }
     }
 
+    // ── Image upload helpers ────────────────────────────────────────
+    const processFiles = useCallback((files: FileList | File[]) => {
+        const fileArr = Array.from(files);
+        const valid = fileArr.filter(
+            (f) => ACCEPTED_TYPES.includes(f.type) && f.size <= MAX_IMAGE_SIZE
+        );
+        if (valid.length === 0) return;
+
+        valid.slice(0, MAX_IMAGES - brandImages.length).forEach((file) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const src = ev.target?.result as string;
+                setBrandImages((prev) => {
+                    if (prev.length >= MAX_IMAGES) return prev;
+                    return [...prev, { src, name: file.name }];
+                });
+            };
+            reader.readAsDataURL(file);
+        });
+    }, [brandImages.length]);
+
+    function handleImageDrop(e: React.DragEvent) {
+        e.preventDefault();
+        setDragOver(false);
+        if (e.dataTransfer.files.length > 0) {
+            processFiles(e.dataTransfer.files);
+        }
+    }
+
+    function removeImage(index: number) {
+        setBrandImages((prev) => prev.filter((_, i) => i !== index));
+    }
+
     // ── Submit registration ────────────────────────────────────────
     async function handleSubmit() {
         setLoading(true);
@@ -115,6 +161,7 @@ export default function RegisterPage() {
                         mission: mission.trim() || null,
                         tone: tone.trim() || "confident, clear, modern",
                     },
+                    brand_images: brandImages.map((img) => img.src),
                     plan: selectedPlan,
                     invite_emails: validInvites,
                 }),
@@ -152,8 +199,10 @@ export default function RegisterPage() {
             case 2:
                 return !!companyName.trim();
             case 3:
-                return true;
+                return true; // images are optional
             case 4:
+                return true;
+            case 5:
                 return true;
             default:
                 return false;
@@ -427,8 +476,127 @@ export default function RegisterPage() {
                         </div>
                     )}
 
-                    {/* ─── Step 3: Plan ─────────────────────────────── */}
+                    {/* ─── Step 3: Brand Images ────────────────────── */}
                     {step === 3 && (
+                        <div className="space-y-6">
+                            <div className="text-center mb-8">
+                                <h1 className="text-2xl font-semibold tracking-tight">
+                                    Add brand images
+                                </h1>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    Upload photos, screenshots, or graphics that
+                                    represent your brand&apos;s visual style.
+                                    We&apos;ll analyze them to inform your image
+                                    generation settings.
+                                </p>
+                            </div>
+
+                            {/* Drop zone */}
+                            <div
+                                onDragOver={(e) => {
+                                    e.preventDefault();
+                                    setDragOver(true);
+                                }}
+                                onDragLeave={() => setDragOver(false)}
+                                onDrop={handleImageDrop}
+                                onClick={() =>
+                                    brandImages.length < MAX_IMAGES &&
+                                    imageInputRef.current?.click()
+                                }
+                                className={cn(
+                                    "rounded-xl border-2 border-dashed transition-all cursor-pointer p-8 flex flex-col items-center gap-3 group",
+                                    dragOver
+                                        ? "border-primary bg-primary/5 scale-[1.01]"
+                                        : "border-border hover:border-primary/50 bg-muted/20 hover:bg-muted/40",
+                                    brandImages.length >= MAX_IMAGES &&
+                                        "opacity-50 cursor-not-allowed"
+                                )}
+                            >
+                                <div
+                                    className={cn(
+                                        "w-12 h-12 rounded-full flex items-center justify-center transition-colors",
+                                        dragOver
+                                            ? "bg-primary/20"
+                                            : "bg-primary/10 group-hover:bg-primary/20"
+                                    )}
+                                >
+                                    <ImagePlus
+                                        className={cn(
+                                            "h-6 w-6",
+                                            dragOver
+                                                ? "text-primary"
+                                                : "text-primary"
+                                        )}
+                                    />
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-sm font-medium">
+                                        {brandImages.length >= MAX_IMAGES
+                                            ? `Maximum of ${MAX_IMAGES} images reached`
+                                            : "Drop images here or click to browse"}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                        JPEG, PNG, or WebP — up to 10MB each
+                                    </p>
+                                </div>
+                            </div>
+
+                            <input
+                                ref={imageInputRef}
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp"
+                                multiple
+                                className="hidden"
+                                onChange={(e) => {
+                                    if (e.target.files) {
+                                        processFiles(e.target.files);
+                                    }
+                                    e.target.value = "";
+                                }}
+                            />
+
+                            {/* Image previews */}
+                            {brandImages.length > 0 && (
+                                <div className="grid grid-cols-3 gap-3">
+                                    {brandImages.map((img, i) => (
+                                        <div
+                                            key={i}
+                                            className="relative group rounded-lg overflow-hidden border border-border bg-black/5 aspect-square"
+                                        >
+                                            <img
+                                                src={img.src}
+                                                alt={img.name}
+                                                className="w-full h-full object-cover"
+                                            />
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    removeImage(i);
+                                                }}
+                                                className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80"
+                                            >
+                                                <X className="h-3 w-3" />
+                                            </button>
+                                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <p className="text-[10px] text-white truncate">
+                                                    {img.name}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <p className="text-xs text-muted-foreground">
+                                {brandImages.length} of {MAX_IMAGES} images
+                                added. These will be used to extract your
+                                brand&apos;s visual style automatically.
+                            </p>
+                        </div>
+                    )}
+
+                    {/* ─── Step 4: Plan (hidden) ───────────────────── */}
+                    {step === 4 && (
                         <div className="space-y-6">
                             <div className="text-center mb-8">
                                 <h1 className="text-2xl font-semibold tracking-tight">
@@ -512,8 +680,8 @@ export default function RegisterPage() {
                         </div>
                     )}
 
-                    {/* ─── Step 4: Team Invites ─────────────────────── */}
-                    {step === 4 && showTeamStep && (
+                    {/* ─── Step 5: Team Invites (hidden) ─────────── */}
+                    {step === 5 && showTeamStep && (
                         <div className="space-y-6">
                             <div className="text-center mb-8">
                                 <h1 className="text-2xl font-semibold tracking-tight">
@@ -602,32 +770,47 @@ export default function RegisterPage() {
                             Back
                         </button>
 
-                        {step < 2 ? (
-                            <button
-                                onClick={() => {
-                                    setError(null);
-                                    setStep(step + 1);
-                                }}
-                                disabled={!canProceed()}
-                                className="flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-6 py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-                            >
-                                Continue
-                                <ChevronRight className="h-3 w-3" />
-                            </button>
-                        ) : (
-                            <button
-                                onClick={handleSubmit}
-                                disabled={loading || !canProceed()}
-                                className="flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-6 py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-                            >
-                                {loading ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                ) : null}
-                                {loading
-                                    ? "Creating account…"
-                                    : "Create account →"}
-                            </button>
-                        )}
+                        <div className="flex items-center gap-3">
+                            {/* Skip button — only on step 3 (images) */}
+                            {step === 3 && (
+                                <button
+                                    onClick={() => {
+                                        setError(null);
+                                        setStep(step + 1);
+                                    }}
+                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
+                                >
+                                    Skip
+                                </button>
+                            )}
+
+                            {step < 3 ? (
+                                <button
+                                    onClick={() => {
+                                        setError(null);
+                                        setStep(step + 1);
+                                    }}
+                                    disabled={!canProceed()}
+                                    className="flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-6 py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                                >
+                                    Continue
+                                    <ChevronRight className="h-3 w-3" />
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleSubmit}
+                                    disabled={loading || !canProceed()}
+                                    className="flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-6 py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                                >
+                                    {loading ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : null}
+                                    {loading
+                                        ? "Creating account…"
+                                        : "Create account →"}
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

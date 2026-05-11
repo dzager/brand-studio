@@ -9,7 +9,7 @@ export type ModelDefaults = {
 const STORAGE_KEY = "brand-studio:model-defaults";
 
 const FACTORY_DEFAULTS: ModelDefaults = {
-    writing: "gpt-5.4",
+    writing: "gpt-5.5",
     imageGeneration: "gpt-image-2",
     utility: "gpt-4.1-mini",
 };

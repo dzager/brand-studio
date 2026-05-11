@@ -250,21 +250,41 @@ export default function ProductTour() {
     }
   }, [tourActive, allSteps.length]);
 
+  // Clean up orphaned Joyride portal elements on unmount
+  useEffect(() => {
+    return () => {
+      // Joyride creates portal elements that may not be cleaned up
+      document.querySelectorAll(
+        '.__floater, .react-joyride__overlay, .react-joyride__spotlight, [data-react-joyride]'
+      ).forEach((el) => el.remove());
+      // Also remove any lingering overlay backdrop
+      document.querySelectorAll('[class*="joyride"]').forEach((el) => {
+        if (el.parentElement === document.body) el.remove();
+      });
+    };
+  }, []);
+
   const handleEvent = useCallback(
     (data: EventData, controls: Controls) => {
       const { status, action, index, type } = data;
 
       if (status === STATUS.FINISHED) {
+        setRun(false);
+        setStepIndex(0);
         completeTour();
         return;
       }
 
       if (status === STATUS.SKIPPED || action === ACTIONS.SKIP) {
+        setRun(false);
+        setStepIndex(0);
         dismissTour();
         return;
       }
 
       if (action === ACTIONS.CLOSE) {
+        setRun(false);
+        setStepIndex(0);
         dismissTour();
         return;
       }

@@ -1,7 +1,7 @@
 // TaskPanel.tsx — Bottom-docked activity monitor for concurrent AI tasks
 // Shows running, completed, and failed tasks with progress bars and live timers
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useTaskStore, type Task, type TaskStatus } from "@/lib/taskStore";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -21,8 +21,10 @@ import {
   Layers,
   Ban,
   StopCircle,
+  Lightbulb,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { matchFactsForCompany, shuffleArray, type FunFact } from "@/lib/funFacts";
 
 /* ── Helpers ───────────────────────────────────────────── */
 
@@ -90,6 +92,9 @@ const TYPE_LABELS: Record<string, string> = {
   shorten: "Shorten",
   thumbnail: "Thumbnail",
   "style-extract": "Style Extract",
+  research: "Research",
+  "research-brief": "Brief",
+  "research-article": "Research → Article",
 };
 
 /* ── Elapsed Timer Hook ────────────────────────────────── */
@@ -115,6 +120,77 @@ function useElapsedTime(startedAt: number, isActive: boolean) {
   }, [startedAt, isActive]);
 
   return elapsed;
+}
+
+/* ── Fun Fact Ticker ───────────────────────────────────── */
+
+const FUN_FACT_INTERVAL = 8000; // 8 seconds per fact
+
+function FunFactTicker({ companyName }: { companyName?: string }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  const facts = useMemo(() => {
+    const matched = matchFactsForCompany(companyName || "");
+    return shuffleArray(matched).slice(0, 10);
+  }, [companyName]);
+
+  useEffect(() => {
+    if (facts.length === 0) return;
+    const timer = setInterval(() => {
+      setIsAnimating(true);
+      setTimeout(() => {
+        setCurrentIndex((prev) => (prev + 1) % facts.length);
+        setIsAnimating(false);
+      }, 250);
+    }, FUN_FACT_INTERVAL);
+    return () => clearInterval(timer);
+  }, [facts.length]);
+
+  const fact = facts[currentIndex];
+  if (!fact) return null;
+
+  return (
+    <div className="relative overflow-hidden rounded-lg border border-blue-500/15 bg-blue-500/[0.04] px-3.5 py-2.5">
+      {/* Progress bar along the bottom */}
+      <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-blue-500/10 overflow-hidden">
+        <div
+          className="h-full bg-blue-500/30"
+          style={{
+            animation: `funFactProgress ${FUN_FACT_INTERVAL}ms linear infinite`,
+          }}
+        />
+      </div>
+
+      <div
+        key={currentIndex}
+        className={cn(
+          "transition-all duration-250",
+          isAnimating ? "opacity-0 translate-y-1" : "opacity-100 translate-y-0"
+        )}
+      >
+        <div className="flex items-start gap-2.5">
+          <Lightbulb className="h-3.5 w-3.5 text-blue-400 shrink-0 mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-[10px] uppercase tracking-wider font-medium text-blue-400/70">
+                Did you know
+              </span>
+              <span className="text-[9px] text-muted-foreground/50">
+                {fact.category}
+              </span>
+            </div>
+            <p className="text-[13px] font-medium text-foreground/90 leading-snug">
+              {fact.headline}
+            </p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed mt-0.5 line-clamp-2">
+              {fact.body}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /* ── Task Row ──────────────────────────────────────────── */
@@ -257,6 +333,32 @@ export default function TaskPanel() {
     prevActiveCountRef.current = activeTasks.length;
   }, [activeTasks.length]);
 
+  // Derive company name from the first active task that has a companyId
+  // Looks up against the DOM for the company name, or falls back to empty
+  const [activeCompanyName, setActiveCompanyName] = useState<string>("");
+
+  useEffect(() => {
+    if (!hasActiveTasks) {
+      setActiveCompanyName("");
+      return;
+    }
+    // Find the first active task with a companyId in its meta
+    const activeWithCompany = activeTasks.find((t) => t.meta?.companyId);
+    const companyId = activeWithCompany?.meta?.companyId;
+    if (!companyId) {
+      setActiveCompanyName("");
+      return;
+    }
+    // Fetch company name
+    fetch(`/api/companies/${companyId}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.name) setActiveCompanyName(data.name);
+        else setActiveCompanyName("");
+      })
+      .catch(() => setActiveCompanyName(""));
+  }, [hasActiveTasks, activeTasks]);
+
   // Don't render if not mounted
   if (!mounted) return null;
 
@@ -364,10 +466,10 @@ export default function TaskPanel() {
         <div
           className={cn(
             "overflow-hidden transition-all duration-300 ease-in-out",
-            expanded ? "max-h-[340px]" : "max-h-0",
+            expanded ? "max-h-[440px]" : "max-h-0",
           )}
         >
-          <div className="px-3 pb-3 space-y-1.5 overflow-y-auto max-h-[300px] scroll-smooth">
+          <div className="px-3 pb-3 space-y-1.5 overflow-y-auto max-h-[400px] scroll-smooth">
             {visibleTasks.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">
                 No tasks to show
@@ -376,6 +478,11 @@ export default function TaskPanel() {
               visibleTasks.map((task) => (
                 <TaskRow key={task.id} task={task} onRemove={removeTask} onCancel={cancelTask} />
               ))
+            )}
+
+            {/* ── Fun Fact Ticker — shown when tasks are actively running ── */}
+            {hasActiveTasks && (
+              <FunFactTicker companyName={activeCompanyName || undefined} />
             )}
           </div>
         </div>

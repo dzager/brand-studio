@@ -95,6 +95,29 @@ export default async function handler(
             .from("companies")
             .select("*", { count: "exact", head: true });
 
+        // ── DAU / WAU / MAU from auth.users last_sign_in_at ──
+        const now = new Date();
+        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+        const { data: authData } = await admin.auth.admin.listUsers({
+            page: 1,
+            perPage: 500,
+        });
+        const authUsers = authData?.users || [];
+
+        let dau = 0;
+        let wau = 0;
+        let mau = 0;
+        for (const u of authUsers) {
+            if (!u.last_sign_in_at) continue;
+            const lastSignIn = new Date(u.last_sign_in_at);
+            if (lastSignIn >= oneDayAgo) dau++;
+            if (lastSignIn >= sevenDaysAgo) wau++;
+            if (lastSignIn >= thirtyDaysAgo) mau++;
+        }
+
         return res.status(200).json({
             mrr,
             totalAccounts: totalAccounts || 0,
@@ -104,6 +127,9 @@ export default async function handler(
             overageRevenueThisMonth: totalOverageRevenue,
             totalMembers: totalMembers || 0,
             totalCompanies: totalCompanies || 0,
+            dau,
+            wau,
+            mau,
         });
     } catch (err) {
         console.error("Admin dashboard API error:", err);

@@ -12,6 +12,7 @@ import {
     TrendingUp,
     AlertTriangle,
     ExternalLink,
+    Activity,
     ChevronRight,
     ChevronDown,
     X,
@@ -44,6 +45,9 @@ interface DashboardStats {
     overageRevenueThisMonth: number;
     totalMembers: number;
     totalCompanies: number;
+    dau: number;
+    wau: number;
+    mau: number;
 }
 
 interface AccountRow {
@@ -373,6 +377,7 @@ export default function AdminDashboard() {
                         ))}
                     </div>
                 ) : stats ? (
+                    <>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <StatCard
                             icon={DollarSign}
@@ -397,6 +402,29 @@ export default function AdminDashboard() {
                             accent="text-amber-600"
                         />
                     </div>
+
+                    {/* ── Active Users Row ──────────────────────────── */}
+                    <div className="grid grid-cols-3 gap-4">
+                        <StatCard
+                            icon={Activity}
+                            label="DAU (24h)"
+                            value={stats.dau.toString()}
+                            accent="text-indigo-600"
+                        />
+                        <StatCard
+                            icon={Activity}
+                            label="WAU (7d)"
+                            value={stats.wau.toString()}
+                            accent="text-indigo-600"
+                        />
+                        <StatCard
+                            icon={Activity}
+                            label="MAU (30d)"
+                            value={stats.mau.toString()}
+                            accent="text-indigo-600"
+                        />
+                    </div>
+                    </>
                 ) : null}
 
                 {/* ── Tab Navigation ────────────────────────────────── */}

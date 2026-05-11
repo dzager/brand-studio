@@ -168,17 +168,15 @@ export default function ArticlesPage() {
     return (
         <AppLayout fullWidth>
             <div className="flex flex-col h-[calc(100vh-7rem)]">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-4 shrink-0">
-                    <div>
-                        <h2 className="text-xl font-semibold tracking-tight">Content Architecture</h2>
-                        <p className="text-sm text-muted-foreground mt-0.5">
-                            {articles.length} article{articles.length !== 1 ? "s" : ""} · {clusters.length} cluster{clusters.length !== 1 ? "s" : ""}
-                        </p>
-                    </div>
+
+
+
+
+                <div className="px-4 pt-4 pb-2">
+                    <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
+                        Organize your content into topic clusters — a pillar page anchors each cluster while supporting and long-tail articles build depth and internal linking, helping search engines recognize your topical authority.
+                    </p>
                 </div>
-
-
 
                 {loading && (
                     <div className="space-y-3 p-4">

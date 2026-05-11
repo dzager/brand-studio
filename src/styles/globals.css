@@ -566,6 +566,216 @@
   opacity: 0.9;
 }
 
+/* ── Content Creation Wizard ───────────────────────────────────────────── */
+
+.wizard-progress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.wizard-step-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 999px;
+  border: none;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  cursor: default;
+  transition: all 0.2s;
+}
+
+.wizard-step-pill.active {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.wizard-step-pill.complete {
+  background: oklch(0.205 0 0 / 8%);
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.dark .wizard-step-pill.complete {
+  background: oklch(0.92 0 0 / 10%);
+}
+
+.wizard-step-pill.complete:hover {
+  background: oklch(0.205 0 0 / 14%);
+}
+
+.dark .wizard-step-pill.complete:hover {
+  background: oklch(0.92 0 0 / 16%);
+}
+
+/* Step content animation */
+.wizard-step-content {
+  animation: wizard-enter 0.25s ease-out;
+}
+
+@keyframes wizard-enter {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.wizard-exit-left {
+  animation: wizard-slide-out-left 0.2s ease-in forwards;
+}
+
+.wizard-exit-right {
+  animation: wizard-slide-out-right 0.2s ease-in forwards;
+}
+
+@keyframes wizard-slide-out-left {
+  to {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+}
+
+@keyframes wizard-slide-out-right {
+  to {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+}
+
+/* Wizard card */
+.wizard-card {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 32px 28px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.dark .wizard-card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* Company cards */
+.wizard-company-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 2px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+  width: 100%;
+}
+
+.wizard-company-card:hover {
+  border-color: var(--primary);
+  background: oklch(0.205 0 0 / 2%);
+}
+
+.dark .wizard-company-card:hover {
+  background: oklch(0.92 0 0 / 4%);
+}
+
+.wizard-company-card.selected {
+  border-color: var(--primary);
+  background: oklch(0.205 0 0 / 4%);
+}
+
+.dark .wizard-company-card.selected {
+  background: oklch(0.92 0 0 / 6%);
+}
+
+.wizard-company-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: oklch(0.205 0 0 / 8%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.dark .wizard-company-avatar {
+  background: oklch(0.92 0 0 / 10%);
+}
+
+/* Format cards */
+.wizard-format-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 20px;
+  border-radius: 14px;
+  border: 2px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.wizard-format-card:hover {
+  border-color: var(--primary);
+  background: oklch(0.205 0 0 / 2%);
+}
+
+.dark .wizard-format-card:hover {
+  background: oklch(0.92 0 0 / 4%);
+}
+
+.wizard-format-card.selected {
+  border-color: var(--primary);
+  background: oklch(0.205 0 0 / 3%);
+}
+
+.dark .wizard-format-card.selected {
+  background: oklch(0.92 0 0 / 5%);
+}
+
+.wizard-format-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+/* Summary row */
+.wizard-summary-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--muted);
+}
+
+.dark .wizard-summary-row {
+  background: oklch(0.22 0 0);
+}
+
 /* Joyride overrides */
 .__floater.__floater--open {
   filter: none !important;
@@ -573,4 +783,11 @@
 
 [data-testid="button-skip"] {
   display: none !important;
+}
+
+/* ── Fun Fact Ticker (Activity Panel) ──────────────────────────────────── */
+
+@keyframes funFactProgress {
+  from { width: 0%; }
+  to { width: 100%; }
 }

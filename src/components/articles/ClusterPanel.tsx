@@ -109,6 +109,8 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
     const [batchGenerating, setBatchGenerating] = useState(false);
     const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
     const [pageGenErr, setPageGenErr] = useState<string | null>(null);
+    const [confirmDeleteArticle, setConfirmDeleteArticle] = useState<string | null>(null);
+    const [deletingArticle, setDeletingArticle] = useState<string | null>(null);
 
     // Meme modal — entertains users during generation
     const [memeDismissed, setMemeDismissed] = useState(false);
@@ -446,6 +448,19 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
 
     function isPageGenerated(slug: string) {
         return (cluster?.articles ?? []).some((a) => a.slug === slug);
+    }
+
+    async function deleteArticle(articleId: string) {
+        setDeletingArticle(articleId);
+        try {
+            const r = await fetch(`/api/articles/${articleId}`, { method: "DELETE" });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || "Delete failed");
+            await loadCluster();
+            onUpdate();
+            window.dispatchEvent(new Event("article-created"));
+        } catch (e: any) { alert(`Delete failed: ${e.message}`); }
+        finally { setDeletingArticle(null); setConfirmDeleteArticle(null); }
     }
 
     function openAddPageForm(type: string) {
@@ -926,7 +941,7 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
 
                         return (
                             <div key={pageKey} className={cn(
-                                "flex items-center gap-2.5 px-3 py-2 rounded-md transition-colors",
+                                "flex items-center gap-2.5 px-3 py-2 rounded-md transition-colors group",
                                 generated ? "bg-green-500/5" : "hover:bg-muted/40"
                             )}>
                                 <TooltipProvider>
@@ -951,10 +966,35 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                                         <div className="text-[13px] font-medium truncate">{page.title}</div>
                                     )}
                                     <div className="text-[11px] text-muted-foreground truncate">{page.keyword}</div>
+                                    {page.description && (
+                                        <div className="text-[11px] text-muted-foreground/70 mt-0.5 line-clamp-2 leading-relaxed">{page.description}</div>
+                                    )}
                                 </div>
-                                <div className="shrink-0">
+                                <div className="shrink-0 flex items-center gap-1">
                                     {generated ? (
-                                        <span className="text-[11px] text-green-600 dark:text-green-400 font-medium">✓</span>
+                                        <>
+                                            <span className="text-[11px] text-green-600 dark:text-green-400 font-medium">✓</span>
+                                            {articleMatch && (
+                                                confirmDeleteArticle === articleMatch.id ? (
+                                                    <div className="flex items-center gap-0.5">
+                                                        <Button variant="ghost" size="sm" onClick={() => deleteArticle(articleMatch.id)}
+                                                            disabled={deletingArticle === articleMatch.id}
+                                                            className="h-6 px-1.5 text-[10px] text-destructive hover:text-destructive hover:bg-destructive/10">
+                                                            {deletingArticle === articleMatch.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : "Delete"}
+                                                        </Button>
+                                                        <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteArticle(null)}
+                                                            className="h-6 px-1 text-[10px] text-muted-foreground">
+                                                            <X className="h-3 w-3" />
+                                                        </Button>
+                                                    </div>
+                                                ) : (
+                                                    <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteArticle(articleMatch.id)}
+                                                        className="h-6 px-1.5 text-muted-foreground/40 hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <Trash2 className="h-3 w-3" />
+                                                    </Button>
+                                                )
+                                            )}
+                                        </>
                                     ) : (
                                         <Button variant="ghost" size="sm" onClick={() => generatePage(type, idx, pageKey)}
                                             disabled={!!generatingPage || batchGenerating} className="h-6 px-2 text-xs">

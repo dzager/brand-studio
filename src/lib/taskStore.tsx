@@ -22,7 +22,10 @@ export type TaskType =
   | "composite"
   | "shorten"
   | "thumbnail"
-  | "style-extract";
+  | "style-extract"
+  | "research"
+  | "research-brief"
+  | "research-article";
 
 export interface Task {
   id: string;

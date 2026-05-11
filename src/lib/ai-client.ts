@@ -86,7 +86,7 @@ export function getModel(modelId: string): LanguageModel {
  * Validates and resolves a model ID from user input.
  * Returns the model ID if available, or fallback.
  */
-export function resolveModelId(requestedModel: string | undefined, fallback = "gpt-5.4"): string {
+export function resolveModelId(requestedModel: string | undefined, fallback = "gpt-5.5"): string {
     const available = getAvailableModels();
     if (typeof requestedModel === "string" && available.some((m) => m.id === requestedModel)) {
         return requestedModel;
@@ -96,7 +96,7 @@ export function resolveModelId(requestedModel: string | undefined, fallback = "g
         return fallback;
     }
     // Use first available
-    return available[0]?.id ?? "gpt-5.4";
+    return available[0]?.id ?? "gpt-5.5";
 }
 
 // ── Text Generation Helpers ─────────────────────────────────────────────
@@ -164,7 +164,7 @@ export function getOpenAIClient(): OpenAI {
  * Uses GPT Image 2 when OpenAI key is available, otherwise falls back to Gemini.
  */
 export const DEFAULT_IMAGE_MODEL = "gpt-image-2";
-export const DEFAULT_WRITING_MODEL = "gpt-5.4";
+export const DEFAULT_WRITING_MODEL = "gpt-5.5";
 export const DEFAULT_UTILITY_MODEL = "gpt-4.1-mini";
 
 /**

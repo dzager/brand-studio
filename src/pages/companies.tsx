@@ -618,7 +618,7 @@ export default function CompaniesPage() {
                                             {importing ? (
                                                 <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Scanning…</>
                                             ) : (
-                                                <><Globe className="h-3.5 w-3.5" /> Scan Website</>
+                                                <><Globe className="h-3.5 w-3.5" /> Continue</>
                                             )}
                                         </Button>
                                     </div>
@@ -646,6 +646,15 @@ export default function CompaniesPage() {
                                             </AlertDescription>
                                         </Alert>
                                     )}
+                                </div>
+                            )}
+
+                            {/* Divider — only for new companies */}
+                            {!editingId && (
+                                <div className="flex items-center gap-3 py-1">
+                                    <Separator className="flex-1" />
+                                    <span className="text-xs text-muted-foreground select-none">Or fill in details manually</span>
+                                    <Separator className="flex-1" />
                                 </div>
                             )}
 
