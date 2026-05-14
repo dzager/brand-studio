@@ -8,12 +8,13 @@ import OutlineView from "@/components/articles/OutlineView";
 import PanelView from "@/components/articles/PanelView";
 import ClusterPanel from "@/components/articles/ClusterPanel";
 import { AiClusterModal, ManualClusterModal, AutoClusterModal } from "@/components/articles/ClusterModals";
+import CreateArticleModal from "@/components/articles/CreateArticleModal";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { List, FileText, AlertCircle } from "lucide-react";
+import { List, FileText, AlertCircle, Plus } from "lucide-react";
 
 
 
@@ -66,6 +67,7 @@ export default function ArticlesPage() {
     const [showAiCluster, setShowAiCluster] = useState(false);
     const [showManualCluster, setShowManualCluster] = useState(false);
     const [showAutoCluster, setShowAutoCluster] = useState(false);
+    const [showCreateModal, setShowCreateModal] = useState(false);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -172,10 +174,13 @@ export default function ArticlesPage() {
 
 
 
-                <div className="px-4 pt-4 pb-2">
+                <div className="px-4 pt-4 pb-2 flex items-start justify-between gap-4">
                     <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
                         Organize your content into topic clusters — a pillar page anchors each cluster while supporting and long-tail articles build depth and internal linking, helping search engines recognize your topical authority.
                     </p>
+                    <Button onClick={() => setShowCreateModal(true)} className="gap-1.5 shrink-0">
+                        <Plus className="h-4 w-4" /> Create
+                    </Button>
                 </div>
 
                 {loading && (
@@ -281,6 +286,11 @@ export default function ArticlesPage() {
                 onOpenChange={setShowAutoCluster}
                 companies={companyList}
                 onCreated={handleClusterCreated}
+            />
+            <CreateArticleModal
+                open={showCreateModal}
+                onOpenChange={setShowCreateModal}
+                onCreated={fetchData}
             />
         </AppLayout>
     );

@@ -791,3 +791,16 @@
   from { width: 0%; }
   to { width: 100%; }
 }
+
+/* ── Terminal Panel Cursor ─────────────────────────────────────────────── */
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* ── Create Article Modal ──────────────────────────────────────────────── */
+
+.create-modal-wizard > div {
+  min-height: auto !important;
+}

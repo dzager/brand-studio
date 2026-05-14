@@ -47,10 +47,10 @@ import { useAuth } from "@/hooks/useAuth";
 const ProductTour = dynamic(() => import("@/components/layout/ProductTour"), { ssr: false });
 
 const NAV_ITEMS = [
+  { href: "/articles", label: "Articles", icon: FileText, description: "Content architecture", minRole: "member" },
   { href: "/studio", label: "Studio", icon: Home, description: "Create content", minRole: "member" },
   { href: "/company", label: "Company", icon: Palette, description: "Brand profile", minRole: "member", hidden: true },
   { href: "/companies", label: "Companies", icon: Building2, description: "Manage brands", minRole: "member" },
-  { href: "/articles", label: "Articles", icon: FileText, description: "Content architecture", minRole: "member" },
   { href: "/research", label: "Research", icon: Search, description: "Topic deep dives", minRole: "member" },
   { href: "/admin", label: "Admin", icon: Shield, description: "Platform dashboard", minRole: "admin" },
 ];
