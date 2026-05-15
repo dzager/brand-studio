@@ -14,7 +14,7 @@ export default function LoginPage() {
 
     // Redirect if already authenticated
     if (user) {
-        router.replace("/studio");
+        router.replace("/articles");
         return null;
     }
 
@@ -30,7 +30,7 @@ export default function LoginPage() {
             setError(result.error);
             setLoading(false);
         } else {
-            router.push("/studio");
+            router.push("/articles");
         }
     }
 

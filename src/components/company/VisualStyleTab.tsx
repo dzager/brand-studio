@@ -103,51 +103,6 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
 
     return (
         <div className="space-y-3">
-            <Section title="Colors & Visual Style" icon={Palette} defaultOpen badge={<Badge variant="secondary" className="text-[10px] ml-1">{form.brand_colors.length}</Badge>}>
-                <div className="space-y-4 pt-3">
-                    <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Brand Palette</Label>
-                            {editing && <Button variant="outline" size="sm" className="h-7 text-xs gap-1 border-dashed" onClick={() => setForm(prev => ({ ...prev, brand_colors: [...prev.brand_colors, { name: "", hex: "#888888" }] }))}><Plus className="h-3 w-3" /> Add Color</Button>}
-                        </div>
-                        <div className="flex gap-0.5 rounded-lg overflow-hidden border border-border shadow-sm h-8">
-                            {form.brand_colors.map((c, i) => (
-                                <div key={i} className="flex-1 relative group" style={{ backgroundColor: c.hex }} title={`${c.name || 'Unnamed'}: ${c.hex}`}>
-                                    <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: isLightColor(c.hex) ? '#000' : '#fff' }}>{c.name || c.hex}</span>
-                                </div>
-                            ))}
-                            {form.brand_colors.length === 0 && <div className="flex-1 bg-muted flex items-center justify-center text-xs text-muted-foreground">No colors</div>}
-                        </div>
-                        {editing && (
-                            <div className="space-y-2">
-                                {form.brand_colors.map((c, idx) => (
-                                    <div key={idx} className="flex items-center gap-2 group">
-                                        <div className="relative"><div className="w-9 h-9 rounded-lg border border-border shadow-sm cursor-pointer overflow-hidden" style={{ backgroundColor: c.hex }}><input type="color" value={c.hex} onChange={(e) => { const nc = [...form.brand_colors]; nc[idx] = { ...nc[idx], hex: e.target.value }; setForm(prev => ({ ...prev, brand_colors: nc })); }} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" /></div></div>
-                                        <Input value={c.name} onChange={(e) => { const nc = [...form.brand_colors]; nc[idx] = { ...nc[idx], name: e.target.value }; setForm(prev => ({ ...prev, brand_colors: nc })); }} placeholder={idx === 0 ? "Primary" : idx === 1 ? "Secondary" : "Color name"} className="w-28 text-xs h-9" />
-                                        <Input value={c.hex} onChange={(e) => { const nc = [...form.brand_colors]; nc[idx] = { ...nc[idx], hex: e.target.value }; setForm(prev => ({ ...prev, brand_colors: nc })); }} className="w-24 text-xs font-mono h-9" placeholder="#000000" />
-                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={() => setForm(prev => ({ ...prev, brand_colors: prev.brand_colors.filter((_, i) => i !== idx) }))}><X className="h-3 w-3" /></Button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        {!editing && (
-                            <div className="flex flex-wrap gap-3">
-                                {(company.brand_colors && company.brand_colors.length > 0 ? company.brand_colors : [
-                                    { name: "Primary", hex: company.color_primary ?? "#000000" },
-                                    { name: "Secondary", hex: company.color_secondary ?? "#FFFFFF" },
-                                ]).map((c, i) => (
-                                    <div key={i} className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-lg border border-border shadow-sm" style={{ backgroundColor: c.hex }} />
-                                        <div><div className="text-xs font-medium">{c.name}</div><code className="text-[10px] text-muted-foreground">{c.hex}</code></div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                    <Field label="Photography / Image Style" value={editing ? form.photography_style : company.photography_style} editing={editing} onChange={v => setField("photography_style", v)} rows={3} />
-                </div>
-            </Section>
-
             <Section title="Image Styles" icon={Layers} badge={(() => { const s = form.image_style_categories; const h = Array.isArray(s) && s.length > 0; return h ? <Badge variant="secondary" className="text-[10px] ml-1">{s.length}</Badge> : <Badge variant="outline" className="text-[10px] ml-1 text-muted-foreground">Default</Badge>; })()}>
                 <div className="space-y-3 pt-3">
                     {editing && (
@@ -240,6 +195,51 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
                             )}
                         </>
                     )}
+                </div>
+            </Section>
+
+            <Section title="Colors & Visual Style" icon={Palette} defaultOpen badge={<Badge variant="secondary" className="text-[10px] ml-1">{form.brand_colors.length}</Badge>}>
+                <div className="space-y-4 pt-3">
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Brand Palette</Label>
+                            {editing && <Button variant="outline" size="sm" className="h-7 text-xs gap-1 border-dashed" onClick={() => setForm(prev => ({ ...prev, brand_colors: [...prev.brand_colors, { name: "", hex: "#888888" }] }))}><Plus className="h-3 w-3" /> Add Color</Button>}
+                        </div>
+                        <div className="flex gap-0.5 rounded-lg overflow-hidden border border-border shadow-sm h-8">
+                            {form.brand_colors.map((c, i) => (
+                                <div key={i} className="flex-1 relative group" style={{ backgroundColor: c.hex }} title={`${c.name || 'Unnamed'}: ${c.hex}`}>
+                                    <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: isLightColor(c.hex) ? '#000' : '#fff' }}>{c.name || c.hex}</span>
+                                </div>
+                            ))}
+                            {form.brand_colors.length === 0 && <div className="flex-1 bg-muted flex items-center justify-center text-xs text-muted-foreground">No colors</div>}
+                        </div>
+                        {editing && (
+                            <div className="space-y-2">
+                                {form.brand_colors.map((c, idx) => (
+                                    <div key={idx} className="flex items-center gap-2 group">
+                                        <div className="relative"><div className="w-9 h-9 rounded-lg border border-border shadow-sm cursor-pointer overflow-hidden" style={{ backgroundColor: c.hex }}><input type="color" value={c.hex} onChange={(e) => { const nc = [...form.brand_colors]; nc[idx] = { ...nc[idx], hex: e.target.value }; setForm(prev => ({ ...prev, brand_colors: nc })); }} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" /></div></div>
+                                        <Input value={c.name} onChange={(e) => { const nc = [...form.brand_colors]; nc[idx] = { ...nc[idx], name: e.target.value }; setForm(prev => ({ ...prev, brand_colors: nc })); }} placeholder={idx === 0 ? "Primary" : idx === 1 ? "Secondary" : "Color name"} className="w-28 text-xs h-9" />
+                                        <Input value={c.hex} onChange={(e) => { const nc = [...form.brand_colors]; nc[idx] = { ...nc[idx], hex: e.target.value }; setForm(prev => ({ ...prev, brand_colors: nc })); }} className="w-24 text-xs font-mono h-9" placeholder="#000000" />
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={() => setForm(prev => ({ ...prev, brand_colors: prev.brand_colors.filter((_, i) => i !== idx) }))}><X className="h-3 w-3" /></Button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {!editing && (
+                            <div className="flex flex-wrap gap-3">
+                                {(company.brand_colors && company.brand_colors.length > 0 ? company.brand_colors : [
+                                    { name: "Primary", hex: company.color_primary ?? "#000000" },
+                                    { name: "Secondary", hex: company.color_secondary ?? "#FFFFFF" },
+                                ]).map((c, i) => (
+                                    <div key={i} className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-lg border border-border shadow-sm" style={{ backgroundColor: c.hex }} />
+                                        <div><div className="text-xs font-medium">{c.name}</div><code className="text-[10px] text-muted-foreground">{c.hex}</code></div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <Field label="Photography / Image Style" value={editing ? form.photography_style : company.photography_style} editing={editing} onChange={v => setField("photography_style", v)} rows={3} />
                 </div>
             </Section>
 

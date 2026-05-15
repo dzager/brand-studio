@@ -254,7 +254,7 @@ export default function ResearchDetail({ projectId, onDelete, onFollowUpCreated 
 
             {/* Tab Content */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
-                {activeTab === "overview" && analysis && <OverviewTab analysis={analysis} />}
+                {activeTab === "overview" && analysis && <OverviewTab analysis={analysis} onCreateArticle={onCreateArticle} creatingArticle={creatingArticle} />}
                 {activeTab === "overview" && !analysis && (
                     <p className="text-sm text-muted-foreground text-center py-12">No analysis available yet.</p>
                 )}
@@ -319,7 +319,7 @@ export default function ResearchDetail({ projectId, onDelete, onFollowUpCreated 
 
 // ── Overview Tab ─────────────────────────────────────────────────────────
 
-function OverviewTab({ analysis }: { analysis: Analysis }) {
+function OverviewTab({ analysis, onCreateArticle, creatingArticle }: { analysis: Analysis; onCreateArticle: (angle: string) => void; creatingArticle: boolean }) {
     return (
         <div className="space-y-5">
             {/* Key Findings */}
@@ -330,9 +330,19 @@ function OverviewTab({ analysis }: { analysis: Analysis }) {
                     </h3>
                     <div className="space-y-1.5">
                         {analysis.key_findings.map((f, i) => (
-                            <div key={i} className="flex gap-2 text-sm">
-                                <span className="text-primary font-medium shrink-0">{i + 1}.</span>
-                                <span className="text-foreground/85">{f}</span>
+                            <div key={i} className="flex items-start gap-2 text-sm group rounded-md px-2 py-1.5 -mx-2 hover:bg-muted/40 transition-colors">
+                                <span className="text-primary font-medium shrink-0 mt-0.5">{i + 1}.</span>
+                                <span className="text-foreground/85 flex-1">{f}</span>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 text-[10px] gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-primary hover:text-primary"
+                                    onClick={() => onCreateArticle(f)}
+                                    disabled={creatingArticle}
+                                >
+                                    <FileText className="h-3 w-3" />
+                                    Create Article
+                                </Button>
                             </div>
                         ))}
                     </div>
@@ -348,10 +358,22 @@ function OverviewTab({ analysis }: { analysis: Analysis }) {
                     </h3>
                     <div className="grid gap-2">
                         {analysis.statistics.map((s, i) => (
-                            <Card key={i} className="border-border/50">
-                                <CardContent className="p-2.5">
-                                    <p className="text-sm font-medium">{s.stat}</p>
-                                    <p className="text-xs text-muted-foreground mt-0.5">{s.context}</p>
+                            <Card key={i} className="border-border/50 group hover:border-primary/30 transition-colors">
+                                <CardContent className="p-2.5 flex items-start gap-2">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium">{s.stat}</p>
+                                        <p className="text-xs text-muted-foreground mt-0.5">{s.context}</p>
+                                    </div>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-6 text-[10px] gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-primary hover:text-primary mt-0.5"
+                                        onClick={() => onCreateArticle(`${s.stat} — ${s.context}`)}
+                                        disabled={creatingArticle}
+                                    >
+                                        <FileText className="h-3 w-3" />
+                                        Create Article
+                                    </Button>
                                 </CardContent>
                             </Card>
                         ))}
@@ -386,8 +408,19 @@ function OverviewTab({ analysis }: { analysis: Analysis }) {
                     </h3>
                     <ul className="space-y-1">
                         {analysis.contrarian_angles.map((a, i) => (
-                            <li key={i} className="text-sm text-foreground/80 flex gap-1.5">
-                                <span className="text-amber-400 shrink-0">⚡</span>{a}
+                            <li key={i} className="text-sm text-foreground/80 flex items-start gap-1.5 group rounded-md px-2 py-1.5 -mx-2 hover:bg-muted/40 transition-colors">
+                                <span className="text-amber-400 shrink-0 mt-0.5">⚡</span>
+                                <span className="flex-1">{a}</span>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 text-[10px] gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-primary hover:text-primary"
+                                    onClick={() => onCreateArticle(a)}
+                                    disabled={creatingArticle}
+                                >
+                                    <FileText className="h-3 w-3" />
+                                    Create Article
+                                </Button>
                             </li>
                         ))}
                     </ul>
@@ -403,11 +436,50 @@ function OverviewTab({ analysis }: { analysis: Analysis }) {
                     </h3>
                     <ul className="space-y-1">
                         {analysis.content_gaps.map((g, i) => (
-                            <li key={i} className="text-sm text-foreground/80 flex gap-1.5">
-                                <span className="text-green-400 shrink-0">🔍</span>{g}
+                            <li key={i} className="text-sm text-foreground/80 flex items-start gap-1.5 group rounded-md px-2 py-1.5 -mx-2 hover:bg-muted/40 transition-colors">
+                                <span className="text-green-400 shrink-0 mt-0.5">🔍</span>
+                                <span className="flex-1">{g}</span>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 text-[10px] gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-primary hover:text-primary"
+                                    onClick={() => onCreateArticle(g)}
+                                    disabled={creatingArticle}
+                                >
+                                    <FileText className="h-3 w-3" />
+                                    Create Article
+                                </Button>
                             </li>
                         ))}
                     </ul>
+                </div>
+            </>)}
+
+            {/* Suggested Angles */}
+            {analysis.suggested_angles?.length > 0 && (<>
+                <Separator />
+                <div>
+                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                        <Sparkles className="h-3.5 w-3.5 text-primary" /> Suggested Angles
+                    </h3>
+                    <div className="space-y-1">
+                        {analysis.suggested_angles.map((a, i) => (
+                            <div key={i} className="text-sm text-foreground/80 flex items-start gap-1.5 group rounded-md px-2 py-1.5 -mx-2 hover:bg-muted/40 transition-colors">
+                                <span className="text-primary/60 shrink-0 mt-0.5">→</span>
+                                <span className="flex-1">{a}</span>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 text-[10px] gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-primary hover:text-primary"
+                                    onClick={() => onCreateArticle(a)}
+                                    disabled={creatingArticle}
+                                >
+                                    <FileText className="h-3 w-3" />
+                                    Create Article
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </>)}
         </div>

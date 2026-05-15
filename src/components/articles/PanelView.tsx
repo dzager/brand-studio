@@ -490,41 +490,48 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     }
 
     async function refreshImage() {
-        if (!article.image_prompt) return;
         setRefreshingImage(true); setRefreshErr(null);
-        try {
-            const payload: Record<string, unknown> = {
-                base_prompt: article.image_prompt,
-                custom_prompt: imagePromptInput.trim() || undefined,
-                image_style: selectedStyle,
-                company_id: article.company_id ?? undefined,
-            };
-            // Add composite params if applicable
-            if (pvIsCompositeStyle && pvCsProductUrl) {
-                payload.composite_product_image_url = pvCsProductUrl;
-                payload.article_title = article.title;
-                payload.article_excerpt = article.excerpt;
-                if (pvCsBgImageUrl.trim()) payload.composite_bg_image_url = pvCsBgImageUrl.trim();
-                if (pvCsBgPrompt.trim()) payload.composite_bg_prompt = pvCsBgPrompt.trim();
-            }
-            const r = await fetch("/api/regenerate-image", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-            });
-            const data = await r.json();
-            if (!r.ok) throw new Error(data.error || "Regeneration failed");
-            const saveResp = await fetch(`/api/articles/${article.id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ image_base64: data.image_base64, image_prompt: data.base_prompt || data.final_prompt, image_style: selectedStyle }),
-            });
-            const saveData = await saveResp.json();
-            if (!saveResp.ok) throw new Error(saveData.error || "Failed to save");
-            onUpdate({ ...article, image_base64: data.image_base64, image_prompt: data.base_prompt || data.final_prompt, image_style: selectedStyle });
-            setImagePromptInput("");
-        } catch (e: any) { setRefreshErr(e.message); }
-        finally { setRefreshingImage(false); }
+        // Close the modal immediately — generation moves to activity viewer
+        setShowInsertModal(false);
+        // Use article title/excerpt as clean context — do NOT send old image_prompt
+        // which contains baked-in style directives from previous generations
+        const cleanBase = `Hero image for article: ${article.title}${article.excerpt ? `. ${article.excerpt}` : ""}`;
+        const payload: Record<string, unknown> = {
+            base_prompt: cleanBase,
+            custom_prompt: imagePromptInput.trim() || undefined,
+            image_style: selectedStyle,
+            company_id: article.company_id ?? undefined,
+        };
+        // Add composite params if applicable
+        if (pvIsCompositeStyle && pvCsProductUrl) {
+            payload.composite_product_image_url = pvCsProductUrl;
+            payload.article_title = article.title;
+            payload.article_excerpt = article.excerpt;
+            if (pvCsBgImageUrl.trim()) payload.composite_bg_image_url = pvCsBgImageUrl.trim();
+            if (pvCsBgPrompt.trim()) payload.composite_bg_prompt = pvCsBgPrompt.trim();
+        }
+        await runTask({
+            type: "image-regen",
+            label: `Hero: ${article.title.slice(0, 50)}`,
+            endpoint: "/api/regenerate-image",
+            body: payload,
+            meta: { articleId: article.id, companyId: article.company_id, imageTask: true },
+            onSuccess: async (data: any) => {
+                try {
+                    const saveResp = await fetch(`/api/articles/${article.id}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ image_base64: data.image_base64, image_prompt: data.final_prompt, image_style: selectedStyle }),
+                    });
+                    const saveData = await saveResp.json();
+                    if (!saveResp.ok) throw new Error(saveData.error || "Failed to save");
+                    onUpdate({ ...article, image_base64: data.image_base64, image_prompt: data.final_prompt, image_style: selectedStyle });
+                    setImagePromptInput("");
+                } catch (e: any) { setRefreshErr(e.message); }
+                setRefreshingImage(false);
+            },
+            onError: (errMsg) => { setRefreshErr(errMsg); setRefreshingImage(false); },
+        });
     }
 
     async function checkSimilarity() {
@@ -687,15 +694,37 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     }
 
     async function onInsertGenerate() {
-        const prompt = insertGenPrompt.trim() || article.image_prompt || `Editorial photo for: ${article.title}`;
+        // Use article title/excerpt as clean context — do NOT fall back to old image_prompt
+        const cleanBase = `Hero image for article: ${article.title}${article.excerpt ? `. ${article.excerpt}` : ""}`;
+        const customPrompt = insertGenPrompt.trim() || undefined;
         setInsertGenerating(true); setInsertErr(null); setInsertPreview(null);
-        try {
-            const r = await fetch("/api/regenerate-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ base_prompt: prompt, image_style: selectedStyle, company_id: article.company_id ?? undefined }) });
-            const data = await r.json();
-            if (!r.ok) throw new Error(data?.error || "Generation failed");
-            setInsertPreview({ src: data.image_base64, type: "base64" });
-        } catch (e: any) { setInsertErr(e.message); }
-        finally { setInsertGenerating(false); }
+        // Close the modal — generation moves to activity viewer
+        const capturedInsertMode = insertMode;
+        setShowInsertModal(false);
+        await runTask({
+            type: "image-regen",
+            label: `Image: ${article.title.slice(0, 50)}`,
+            endpoint: "/api/regenerate-image",
+            body: { base_prompt: cleanBase, custom_prompt: customPrompt, image_style: selectedStyle, company_id: article.company_id ?? undefined },
+            meta: { articleId: article.id, companyId: article.company_id, imageTask: true, insertMode: capturedInsertMode },
+            onSuccess: async (data: any) => {
+                setInsertPreview({ src: data.image_base64, type: "base64" });
+                // If it was a featured image request, auto-save
+                if (capturedInsertMode === "featured") {
+                    try {
+                        const r = await fetch(`/api/articles/${article.id}`, {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ image_base64: data.image_base64 }),
+                        });
+                        const saveData = await r.json();
+                        if (r.ok) onUpdate({ ...article, ...saveData });
+                    } catch {}
+                }
+                setInsertGenerating(false);
+            },
+            onError: (errMsg) => { setInsertErr(errMsg); setInsertGenerating(false); },
+        });
     }
 
     useEffect(() => {
@@ -857,14 +886,12 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                             </div>
                         )}
                         <div className="flex gap-2">
-                            <Input placeholder={article.image_prompt ? "Leave empty to use original prompt…" : "Describe the image…"} value={insertGenPrompt} onChange={(e) => setInsertGenPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onInsertGenerate(); }} />
+                            <Input placeholder="Add extra direction (optional)…" value={insertGenPrompt} onChange={(e) => setInsertGenPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onInsertGenerate(); }} />
                             <Button onClick={onInsertGenerate} disabled={insertGenerating}>
                                 {insertGenerating ? "Generating…" : "Generate"}
                             </Button>
                         </div>
-                        {!insertGenPrompt.trim() && article.image_prompt && (
-                            <p className="text-xs text-muted-foreground">💡 Will use: <em>{article.image_prompt.slice(0, 120)}{article.image_prompt.length > 120 ? "…" : ""}</em></p>
-                        )}
+                        <p className="text-xs text-muted-foreground">💡 Will generate from selected style + article context{insertGenPrompt.trim() ? " + your prompt" : ""}</p>
                     </TabsContent>
 
                     <TabsContent value="composite" className="space-y-3">
@@ -1787,7 +1814,7 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
 
             {/* Featured Image */}
             {displayArticle.image_base64 && (
-                <div className="relative group">
+                <div id="featured-image" className="relative group">
                     <img src={`data:image/png;base64,${displayArticle.image_base64}`} alt={article.title}
                         className="w-full rounded-xl" />
                     <Button variant="secondary" size="sm" onClick={() => { setShowInsertModal(true); setInsertMode("featured"); setInsertGenPrompt(""); setInsertPreview(null); setInsertErr(null); setInsertTab("generate"); }}

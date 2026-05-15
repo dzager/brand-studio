@@ -139,7 +139,7 @@ export default function AdminDashboard() {
     // Redirect non-admins
     useEffect(() => {
         if (!authLoading && !isAdmin) {
-            router.replace("/studio");
+            router.replace("/articles");
         }
     }, [authLoading, isAdmin, router]);
 

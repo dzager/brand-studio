@@ -17,6 +17,8 @@ import {
     ImagePlus,
     X,
     Camera,
+    PenLine,
+    Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +57,7 @@ export default function RegisterPage() {
     const [tone, setTone] = useState("confident, clear, modern");
     const [importUrl, setImportUrl] = useState("");
     const [importing, setImporting] = useState(false);
+    const [companyMode, setCompanyMode] = useState<"choose" | "import" | "manual">("choose");
 
     // Step 3: Brand Images
     const [brandImages, setBrandImages] = useState<{ src: string; name: string }[]>([]);
@@ -69,7 +72,7 @@ export default function RegisterPage() {
 
     // Redirect if already authenticated
     if (user) {
-        router.replace("/studio");
+        router.replace("/articles");
         return null;
     }
 
@@ -98,6 +101,9 @@ export default function RegisterPage() {
             if (data.fallback) {
                 setError("Website couldn't be crawled — fields were pre-filled using AI knowledge of this brand. Please review carefully.");
             }
+
+            // Switch to manual mode so user can review pre-filled fields
+            setCompanyMode("manual");
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -178,9 +184,9 @@ export default function RegisterPage() {
                 password,
             });
 
-            // Payments paused — skip Stripe checkout and go straight to studio.
+            // Payments paused — skip Stripe checkout and go straight to articles.
             // To re-enable, restore the Stripe Checkout redirect block here.
-            router.push("/studio");
+            router.push("/articles");
         } catch (err: any) {
             setError(err.message);
             setLoading(false);
@@ -197,7 +203,7 @@ export default function RegisterPage() {
                     password.length >= 6
                 );
             case 2:
-                return !!companyName.trim();
+                return companyMode === "manual" && !!companyName.trim();
             case 3:
                 return true; // images are optional
             case 4:
@@ -374,105 +380,177 @@ export default function RegisterPage() {
                                     Set up your company
                                 </h1>
                                 <p className="text-sm text-muted-foreground mt-1">
-                                    Tell us about your brand. You can import
-                                    from your website or fill in manually.
+                                    {companyMode === "choose"
+                                        ? "How would you like to get started?"
+                                        : companyMode === "import"
+                                        ? "We'll crawl your site and pre-fill your brand details."
+                                        : "Tell us about your brand."}
                                 </p>
                             </div>
 
-                            {/* URL Import */}
-                            <div className="rounded-lg border border-dashed border-border p-4 bg-muted/30">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <Globe className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-sm font-medium">
-                                        Import from website
-                                    </span>
-                                </div>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="url"
-                                        value={importUrl}
-                                        onChange={(e) =>
-                                            setImportUrl(e.target.value)
-                                        }
-                                        placeholder="https://yourcompany.com"
-                                        className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring transition-shadow"
-                                    />
+                            {/* ── Mode chooser ────────────────────────── */}
+                            {companyMode === "choose" && (
+                                <div className="grid grid-cols-2 gap-4">
                                     <button
-                                        onClick={handleImportUrl}
-                                        disabled={
-                                            importing || !importUrl.trim()
-                                        }
-                                        className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                        onClick={() => setCompanyMode("import")}
+                                        className="group rounded-xl border-2 border-border hover:border-primary p-6 text-left transition-all hover:shadow-md hover:bg-primary/[0.03]"
                                     >
-                                        {importing ? (
-                                            <Loader2 className="h-3 w-3 animate-spin" />
-                                        ) : (
-                                            <Globe className="h-3 w-3" />
-                                        )}
-                                        {importing ? "Importing…" : "Import"}
+                                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                                            <Sparkles className="h-5 w-5 text-primary" />
+                                        </div>
+                                        <p className="font-semibold text-sm mb-1">
+                                            Import from website
+                                        </p>
+                                        <p className="text-xs text-muted-foreground leading-relaxed">
+                                            Enter your URL and we&apos;ll auto-fill your brand name, tagline, mission, and tone.
+                                        </p>
+                                    </button>
+                                    <button
+                                        onClick={() => setCompanyMode("manual")}
+                                        className="group rounded-xl border-2 border-border hover:border-primary p-6 text-left transition-all hover:shadow-md hover:bg-primary/[0.03]"
+                                    >
+                                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                                            <PenLine className="h-5 w-5 text-primary" />
+                                        </div>
+                                        <p className="font-semibold text-sm mb-1">
+                                            Enter manually
+                                        </p>
+                                        <p className="text-xs text-muted-foreground leading-relaxed">
+                                            Fill in your company details yourself. You can always update them later.
+                                        </p>
                                     </button>
                                 </div>
-                            </div>
+                            )}
 
-                            <div>
-                                <label className="block text-sm font-medium mb-1.5">
-                                    Company name *
-                                </label>
-                                <input
-                                    type="text"
-                                    value={companyName}
-                                    onChange={(e) =>
-                                        setCompanyName(e.target.value)
-                                    }
-                                    placeholder="Acme Corporation"
-                                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring transition-shadow"
-                                />
-                            </div>
+                            {/* ── Import mode ─────────────────────────── */}
+                            {companyMode === "import" && (
+                                <>
+                                    <div className="rounded-xl border-2 border-primary/30 bg-primary/[0.03] p-5">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center">
+                                                <Sparkles className="h-3.5 w-3.5 text-primary" />
+                                            </div>
+                                            <span className="text-sm font-semibold">
+                                                Import from website
+                                            </span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="url"
+                                                value={importUrl}
+                                                onChange={(e) =>
+                                                    setImportUrl(e.target.value)
+                                                }
+                                                placeholder="https://yourcompany.com"
+                                                autoFocus
+                                                className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring transition-shadow"
+                                            />
+                                            <button
+                                                onClick={handleImportUrl}
+                                                disabled={
+                                                    importing || !importUrl.trim()
+                                                }
+                                                className="rounded-lg bg-primary text-primary-foreground px-5 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 transition-opacity"
+                                            >
+                                                {importing ? (
+                                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                                ) : (
+                                                    <Globe className="h-3 w-3" />
+                                                )}
+                                                {importing ? "Importing…" : "Import"}
+                                            </button>
+                                        </div>
+                                    </div>
 
-                            <div>
-                                <label className="block text-sm font-medium mb-1.5">
-                                    Tagline
-                                </label>
-                                <input
-                                    type="text"
-                                    value={tagline}
-                                    onChange={(e) => setTagline(e.target.value)}
-                                    placeholder="Your brand's one-liner"
-                                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring transition-shadow"
-                                />
-                            </div>
+                                    <div className="relative flex items-center gap-3">
+                                        <div className="flex-1 border-t border-border" />
+                                        <span className="text-xs text-muted-foreground">or</span>
+                                        <div className="flex-1 border-t border-border" />
+                                    </div>
 
-                            <div>
-                                <label className="block text-sm font-medium mb-1.5">
-                                    Mission
-                                </label>
-                                <textarea
-                                    value={mission}
-                                    onChange={(e) => setMission(e.target.value)}
-                                    placeholder="What does your company do and for whom?"
-                                    rows={3}
-                                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring transition-shadow resize-none"
-                                />
-                            </div>
+                                    <button
+                                        onClick={() => setCompanyMode("manual")}
+                                        className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5 py-2"
+                                    >
+                                        <PenLine className="h-3.5 w-3.5" />
+                                        Fill in details manually instead
+                                    </button>
+                                </>
+                            )}
 
-                            <div>
-                                <label className="block text-sm font-medium mb-1.5">
-                                    Brand tone
-                                </label>
-                                <input
-                                    type="text"
-                                    value={tone}
-                                    onChange={(e) => setTone(e.target.value)}
-                                    placeholder="e.g. confident, clear, modern"
-                                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring transition-shadow"
-                                />
-                            </div>
+                            {/* ── Manual mode ─────────────────────────── */}
+                            {companyMode === "manual" && (
+                                <>
+                                    <button
+                                        onClick={() => setCompanyMode("choose")}
+                                        className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                                    >
+                                        <ChevronLeft className="h-3 w-3" />
+                                        Back to options
+                                    </button>
 
-                            <p className="text-xs text-muted-foreground">
-                                You can add more details like voice profile,
-                                editorial guidelines, and image styles after
-                                setup in the Companies page.
-                            </p>
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1.5">
+                                            Company name *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={companyName}
+                                            onChange={(e) =>
+                                                setCompanyName(e.target.value)
+                                            }
+                                            placeholder="Acme Corporation"
+                                            autoFocus
+                                            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring transition-shadow"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1.5">
+                                            Tagline
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={tagline}
+                                            onChange={(e) => setTagline(e.target.value)}
+                                            placeholder="Your brand's one-liner"
+                                            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring transition-shadow"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1.5">
+                                            Mission
+                                        </label>
+                                        <textarea
+                                            value={mission}
+                                            onChange={(e) => setMission(e.target.value)}
+                                            placeholder="What does your company do and for whom?"
+                                            rows={3}
+                                            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring transition-shadow resize-none"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1.5">
+                                            Brand tone
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={tone}
+                                            onChange={(e) => setTone(e.target.value)}
+                                            placeholder="e.g. confident, clear, modern"
+                                            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring transition-shadow"
+                                        />
+                                    </div>
+
+                                    <p className="text-xs text-muted-foreground">
+                                        You can add more details like voice profile,
+                                        editorial guidelines, and image styles after
+                                        setup in the Companies page.
+                                    </p>
+                                </>
+                            )}
                         </div>
                     )}
 

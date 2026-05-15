@@ -133,7 +133,7 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
                     <TabsTrigger value="visual" className="gap-1.5">
                         <Palette className="h-3.5 w-3.5" />
                         Visual
-                        <Badge variant="secondary" className="text-[10px] ml-0.5 h-4">{form.brand_colors.length}</Badge>
+                        <Badge variant="secondary" className="text-[10px] ml-0.5 h-4">{form.image_style_categories.length}</Badge>
                     </TabsTrigger>
                     <TabsTrigger value="prompts" className="gap-1.5">
                         <FileText className="h-3.5 w-3.5" /> Prompts

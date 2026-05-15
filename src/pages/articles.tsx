@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
-import Link from "next/link";
+
 import type { GetServerSideProps } from "next";
 
 import AppLayout from "@/components/layout/AppLayout";
@@ -204,8 +204,8 @@ export default function ArticlesPage() {
                             <FileText className="h-8 w-8 text-muted-foreground" />
                         </div>
                         <p className="text-muted-foreground mb-2">No articles yet.</p>
-                        <Button asChild variant="link">
-                            <Link href="/studio">Create your first one →</Link>
+                        <Button variant="link" onClick={() => setShowCreateModal(true)}>
+                            Create your first one →
                         </Button>
                     </div>
                 )}

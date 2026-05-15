@@ -66,7 +66,7 @@ export default function InviteAcceptPage() {
             setTimeout(() => {
                 const target = data.cluster_id
                     ? `/articles?cluster=${data.cluster_id}`
-                    : "/studio";
+                    : "/articles";
                 router.push(target);
             }, 1500);
         } catch (err: any) {
@@ -126,7 +126,7 @@ export default function InviteAcceptPage() {
                                 <p className="text-sm text-muted-foreground">
                                     {invitation?.cluster_name
                                         ? `Redirecting to the "${invitation.cluster_name}" cluster…`
-                                        : "Redirecting to your studio…"}
+                                        : "Redirecting to your articles…"}
                                 </p>
                             </div>
                         )}

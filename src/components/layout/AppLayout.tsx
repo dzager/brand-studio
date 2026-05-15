@@ -48,7 +48,7 @@ const ProductTour = dynamic(() => import("@/components/layout/ProductTour"), { s
 
 const NAV_ITEMS = [
   { href: "/articles", label: "Articles", icon: FileText, description: "Content architecture", minRole: "member" },
-  { href: "/studio", label: "Studio", icon: Home, description: "Create content", minRole: "member" },
+  { href: "/studio", label: "Studio", icon: Home, description: "Create content", minRole: "member", hidden: true, alwaysHidden: true },
   { href: "/company", label: "Company", icon: Palette, description: "Brand profile", minRole: "member", hidden: true },
   { href: "/companies", label: "Companies", icon: Building2, description: "Manage brands", minRole: "member" },
   { href: "/research", label: "Research", icon: Search, description: "Topic deep dives", minRole: "member" },
@@ -170,6 +170,8 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
   const isScopedMember = !isAdmin && !!activeAccount?.company_id;
   const visibleNavItems = navItems.filter(
     (item) => {
+      // Permanently hidden items (e.g. Studio)
+      if ((item as any).alwaysHidden) return false;
       // Role check
       if ((roleHierarchy[item.minRole] || 1) > userRoleLevel) return false;
       // Company-scoped members see /company instead of /companies

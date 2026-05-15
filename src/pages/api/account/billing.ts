@@ -79,7 +79,7 @@ export default async function handler(
                         : user.email,
                     customer: account.stripe_customer_id || undefined,
                     line_items: [{ price: priceId, quantity: 1 }],
-                    success_url: `${req.headers.origin}/studio?checkout=success`,
+                    success_url: `${req.headers.origin}/articles?checkout=success`,
                     cancel_url: `${req.headers.origin}/register?checkout=cancelled`,
                     metadata: {
                         account_id: account.id,
@@ -107,7 +107,7 @@ export default async function handler(
                 const portal =
                     await stripe.billingPortal.sessions.create({
                         customer: account.stripe_customer_id,
-                        return_url: `${req.headers.origin}/studio`,
+                        return_url: `${req.headers.origin}/articles`,
                     });
 
                 return res.status(200).json({ url: portal.url });

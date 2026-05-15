@@ -22,7 +22,7 @@ import {
 // ── Tour Steps ──────────────────────────────────────────────────────────
 
 function buildSteps(pathname: string): Step[] {
-  if (pathname === "/studio") {
+  if (pathname === "/articles") {
     return [
       {
         target: "body",
@@ -32,7 +32,7 @@ function buildSteps(pathname: string): Step[] {
           custom: true,
           heading: "Welcome to Organic",
           body: "Organic generates brand-consistent, SEO-optimized content from a single prompt. Let\u2019s walk through the key features.",
-          hint: "~90 second tour \u00b7 skip anytime",
+          hint: "~60 second tour \u00b7 skip anytime",
         },
       },
       {
@@ -41,34 +41,7 @@ function buildSteps(pathname: string): Step[] {
         content: "",
         data: {
           heading: "Navigation",
-          body: "The sidebar gives you quick access to the Studio (create content), Companies (brand settings), and Articles (content library & clusters).",
-        },
-      },
-      {
-        target: "#company-select",
-        placement: "bottom",
-        content: "",
-        data: {
-          heading: "Select Your Company",
-          body: "Every piece of content is powered by a company\u2019s brand engine \u2014 voice profile, editorial guidelines, image styles, and SEO rules. Select one to start creating.",
-        },
-      },
-      {
-        target: "#mode-cluster",
-        placement: "bottom",
-        content: "",
-        data: {
-          heading: "Content Cluster",
-          body: "Generate a complete topical cluster strategy with pillar, supporting, and long-tail pages \u2014 all keyword-coordinated and internally linked.",
-        },
-      },
-      {
-        target: "#mode-single",
-        placement: "bottom",
-        content: "",
-        data: {
-          heading: "Single Article",
-          body: "Create one blog post at a time. Each includes a prompt area, image style picker, model selector, and advanced options for word count and composition.",
+          body: "The sidebar gives you quick access to Articles (content library & clusters), Companies (brand settings), and Research (topic deep dives).",
         },
       },
       {
@@ -81,22 +54,13 @@ function buildSteps(pathname: string): Step[] {
         },
       },
       {
-        target: "[data-tour='nav-articles']",
-        placement: "right",
-        content: "",
-        data: {
-          heading: "Content Architecture",
-          body: "View all articles and clusters in a visual graph or outline tree. Generate entire clusters in batch, share with collaborators, and manage your content library.",
-        },
-      },
-      {
         target: "body",
         placement: "center",
         content: "",
         data: {
           custom: true,
           heading: "You\u2019re Ready!",
-          body: "Select a company, write a prompt, and hit Create. After generation you can humanize the output, fact-check claims, regenerate images, and publish directly to WordPress.",
+          body: "Use the Create button to generate articles and clusters. After generation you can humanize the output, fact-check claims, regenerate images, and publish directly to WordPress.",
           hint: "Replay anytime from the \u24d8 button in the sidebar",
         },
       },
@@ -119,21 +83,7 @@ function buildSteps(pathname: string): Step[] {
     ];
   }
 
-  if (pathname === "/articles") {
-    return [
-      {
-        target: "body",
-        placement: "center",
-        content: "",
-        data: {
-          custom: true,
-          heading: "Content Architecture",
-          body: "Your articles and clusters live here. Switch between Graph View (visual network) and Outline View (sidebar tree). Generate entire clusters, interlink pages, and export bundles.",
-          hint: "Articles within clusters receive sibling context so they naturally link to each other",
-        },
-      },
-    ];
-  }
+
 
   return [];
 }

@@ -242,7 +242,7 @@ export default function ContentWizard(props: WizardProps) {
                 {companies.map((c) => (
                   <button
                     key={c.id}
-                    onClick={() => setCompanyId(c.id)}
+                    onClick={() => { setCompanyId(c.id); goTo(2); }}
                     disabled={isScopedMember && companies.length === 1}
                     className={cn(
                       "wizard-company-card",

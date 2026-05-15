@@ -3,11 +3,21 @@
  *
  * Creates a new user, account, company, and initial usage period.
  * Optionally sends invitations to team members.
+ * Optionally processes brand images to extract image style categories.
  */
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getAdminSupabase } from "@/lib/supabase";
 import { getPlanLimits, isValidPlan, type PlanId } from "@/lib/plans";
+import { getOpenAIClient } from "@/lib/ai-client";
 import slugify from "slugify";
+
+export const config = {
+    api: {
+        bodyParser: {
+            sizeLimit: "50mb", // allow base64 brand images
+        },
+    },
+};
 
 export default async function handler(
     req: NextApiRequest,
@@ -17,7 +27,7 @@ export default async function handler(
         return res.status(405).json({ error: "Method not allowed" });
     }
 
-    const { email, password, full_name, company, plan, invite_emails } =
+    const { email, password, full_name, company, plan, invite_emails, brand_images } =
         req.body;
 
     // ── Validate inputs ────────────────────────────────────────────
@@ -178,6 +188,18 @@ export default async function handler(
             }
         }
 
+        // ── 7. Process brand images (async, fire-and-forget) ────────
+        if (Array.isArray(brand_images) && brand_images.length > 0) {
+            const companyId = newCompany.id;
+            extractBrandImageStyles(brand_images, companyId, admin)
+                .then((count) => {
+                    console.log(`[register] ✅ Extracted ${count} image style(s) for company ${companyId}`);
+                })
+                .catch((err) => {
+                    console.error(`[register] Image style extraction failed for ${companyId}:`, err);
+                });
+        }
+
         return res.status(201).json({
             user_id: userId,
             account_id: account.id,
@@ -190,4 +212,110 @@ export default async function handler(
             err instanceof Error ? err.message : "Registration failed";
         return res.status(500).json({ error: message });
     }
+}
+
+// ── Image Style Extraction ─────────────────────────────────────────────
+
+type ImageStyleAnalysis = {
+    style_name: string;
+    image_prompt_style: string;
+    narrative: string;
+    storytelling_cues: string[];
+};
+
+/**
+ * Analyzes uploaded brand images via GPT vision and saves the extracted
+ * image style categories to the company record. Processes images sequentially
+ * to avoid rate-limiting, with individual error isolation.
+ */
+async function extractBrandImageStyles(
+    images: string[],
+    companyId: string,
+    admin: ReturnType<typeof getAdminSupabase>
+): Promise<number> {
+    const client = getOpenAIClient();
+    const extracted: Array<{
+        id: string;
+        label: string;
+        narrative: string;
+        storytelling_cues: string[];
+        image_prompt_style: string;
+    }> = [];
+
+    const systemPrompt = `You are a world-class art director analyzing brand reference images. Extract the visual style characteristics and produce a JSON object with:
+{
+  "style_name": "A concise 2-4 word name for this visual style",
+  "image_prompt_style": "A comprehensive prompt paragraph (150-300 words) capturing ALL visual characteristics optimized for AI image generation — color, lighting, lens, film stock, mood, composition, post-processing.",
+  "narrative": "A 1-2 sentence description of the overall visual story.",
+  "storytelling_cues": ["array of 4-8 short phrases describing visual storytelling elements"]
+}
+Be extremely specific and technical. Return ONLY the JSON object.`;
+
+    for (const imageData of images.slice(0, 6)) {
+        try {
+            // Normalize data URI
+            let base64Data = imageData;
+            let mimeType = "image/png";
+            const match = imageData.match(/^data:(image\/\w+);base64,(.+)$/);
+            if (match) {
+                mimeType = match[1];
+                base64Data = match[2];
+            }
+
+            const response = await client.chat.completions.create({
+                model: "gpt-5.4",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    {
+                        role: "user",
+                        content: [
+                            { type: "text", text: "Analyze this brand reference image and extract its visual style." },
+                            {
+                                type: "image_url",
+                                image_url: {
+                                    url: `data:${mimeType};base64,${base64Data}`,
+                                    detail: "high",
+                                },
+                            },
+                        ],
+                    },
+                ],
+                temperature: 0.4,
+                response_format: { type: "json_object" },
+            });
+
+            const raw = response.choices?.[0]?.message?.content ?? "";
+            const parsed = JSON.parse(raw) as ImageStyleAnalysis;
+
+            if (parsed.image_prompt_style && parsed.style_name) {
+                const id = parsed.style_name
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, "_")
+                    .replace(/^_|_$/g, "");
+
+                extracted.push({
+                    id,
+                    label: parsed.style_name,
+                    narrative: parsed.narrative || "",
+                    storytelling_cues: parsed.storytelling_cues || [],
+                    image_prompt_style: parsed.image_prompt_style,
+                });
+            }
+        } catch (err) {
+            console.warn(`[register] Skipping image style extraction (parse/API error):`, err instanceof Error ? err.message : err);
+        }
+    }
+
+    if (extracted.length > 0) {
+        const { error } = await admin
+            .from("companies")
+            .update({ image_style_categories: extracted })
+            .eq("id", companyId);
+
+        if (error) {
+            console.error(`[register] Failed to save image styles for ${companyId}:`, error);
+        }
+    }
+
+    return extracted.length;
 }

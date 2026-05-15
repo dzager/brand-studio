@@ -34,45 +34,48 @@ export function BrandIdentityTab({ company, form, setForm, setField, editing }: 
                 </div>
             </Section>
 
-            {/* Editorial Guidelines */}
-            <Section
-                title="Editorial Guidelines"
-                icon={BookOpen}
-                badge={(editing ? form.editorial_guidelines : company.editorial_guidelines) ? <Badge variant="secondary" className="text-[10px] ml-1">{(editing ? form.editorial_guidelines : company.editorial_guidelines)!.length} chars</Badge> : <Badge variant="outline" className="text-[10px] ml-1 text-muted-foreground">Default</Badge>}
-            >
-                <div className="pt-3">
-                    {editing ? (
-                        <Textarea value={form.editorial_guidelines} onChange={e => setField("editorial_guidelines", e.target.value)} rows={12} className="text-xs font-mono" />
-                    ) : company.editorial_guidelines ? (
-                        <div className="relative">
-                            <pre className="whitespace-pre-wrap text-xs leading-relaxed bg-muted rounded-md p-4 max-h-96 overflow-y-auto">{company.editorial_guidelines}</pre>
-                            <CopyButton text={company.editorial_guidelines} id="editorial" copiedId={copiedId} onCopy={copyToClipboard} />
-                        </div>
-                    ) : (
-                        <p className="text-sm text-muted-foreground italic">No editorial guidelines configured.</p>
-                    )}
-                </div>
-            </Section>
+            {/* Editorial + SEO Guidelines — two-column layout */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Editorial Guidelines */}
+                <Section
+                    title="Editorial Guidelines"
+                    icon={BookOpen}
+                    badge={(editing ? form.editorial_guidelines : company.editorial_guidelines) ? <Badge variant="secondary" className="text-[10px] ml-1">{(editing ? form.editorial_guidelines : company.editorial_guidelines)!.length} chars</Badge> : <Badge variant="outline" className="text-[10px] ml-1 text-muted-foreground">Default</Badge>}
+                >
+                    <div className="pt-3">
+                        {editing ? (
+                            <Textarea value={form.editorial_guidelines} onChange={e => setField("editorial_guidelines", e.target.value)} rows={12} className="text-xs font-mono" />
+                        ) : company.editorial_guidelines ? (
+                            <div className="relative">
+                                <pre className="whitespace-pre-wrap text-xs leading-relaxed bg-muted rounded-md p-4 max-h-96 overflow-y-auto">{company.editorial_guidelines}</pre>
+                                <CopyButton text={company.editorial_guidelines} id="editorial" copiedId={copiedId} onCopy={copyToClipboard} />
+                            </div>
+                        ) : (
+                            <p className="text-sm text-muted-foreground italic">No editorial guidelines configured.</p>
+                        )}
+                    </div>
+                </Section>
 
-            {/* SEO Content Guidelines */}
-            <Section
-                title="SEO Content Guidelines"
-                icon={SearchIcon}
-                badge={(editing ? form.seo_content_guidelines : company.seo_content_guidelines) ? <Badge variant="secondary" className="text-[10px] ml-1">{(editing ? form.seo_content_guidelines : company.seo_content_guidelines)!.length} chars</Badge> : <Badge variant="outline" className="text-[10px] ml-1 text-muted-foreground">Default</Badge>}
-            >
-                <div className="pt-3">
-                    {editing ? (
-                        <Textarea value={form.seo_content_guidelines} onChange={e => setField("seo_content_guidelines", e.target.value)} rows={12} className="text-xs font-mono" />
-                    ) : company.seo_content_guidelines ? (
-                        <div className="relative">
-                            <pre className="whitespace-pre-wrap text-xs leading-relaxed bg-muted rounded-md p-4 max-h-96 overflow-y-auto">{company.seo_content_guidelines}</pre>
-                            <CopyButton text={company.seo_content_guidelines} id="seo" copiedId={copiedId} onCopy={copyToClipboard} />
-                        </div>
-                    ) : (
-                        <p className="text-sm text-muted-foreground italic">No SEO content guidelines configured.</p>
-                    )}
-                </div>
-            </Section>
+                {/* SEO Content Guidelines */}
+                <Section
+                    title="SEO Content Guidelines"
+                    icon={SearchIcon}
+                    badge={(editing ? form.seo_content_guidelines : company.seo_content_guidelines) ? <Badge variant="secondary" className="text-[10px] ml-1">{(editing ? form.seo_content_guidelines : company.seo_content_guidelines)!.length} chars</Badge> : <Badge variant="outline" className="text-[10px] ml-1 text-muted-foreground">Default</Badge>}
+                >
+                    <div className="pt-3">
+                        {editing ? (
+                            <Textarea value={form.seo_content_guidelines} onChange={e => setField("seo_content_guidelines", e.target.value)} rows={12} className="text-xs font-mono" />
+                        ) : company.seo_content_guidelines ? (
+                            <div className="relative">
+                                <pre className="whitespace-pre-wrap text-xs leading-relaxed bg-muted rounded-md p-4 max-h-96 overflow-y-auto">{company.seo_content_guidelines}</pre>
+                                <CopyButton text={company.seo_content_guidelines} id="seo" copiedId={copiedId} onCopy={copyToClipboard} />
+                            </div>
+                        ) : (
+                            <p className="text-sm text-muted-foreground italic">No SEO content guidelines configured.</p>
+                        )}
+                    </div>
+                </Section>
+            </div>
 
             {/* Content Settings */}
             <Section title="Content Settings" icon={Settings2}>

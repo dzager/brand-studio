@@ -4,86 +4,42 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Organic — AI Content Platform</title>
-  <meta name="description" content="The AI content platform that writes in your brand's voice. Multi-brand content operations with built-in clustering, fact-checking, visual style matching, and automatic humanization." />
+  <meta name="description" content="The AI content platform that sounds like your brand, not like AI. Multi-brand content operations with humanization, three-model fact-checking, and visual style matching." />
 
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-
-  <!-- ABCArizona Flare (self-hosted) -->
+  <!-- ABC Arizona super-family (self-hosted): Serif display, Sans body, Mix italic kickers -->
   <style>
-    @font-face {
-      font-family: 'ABCArizona';
-      src: url('fonts/ABCArizonaText-Thin-Trial.otf') format('opentype');
-      font-weight: 100;
-      font-style: normal;
-      font-display: swap;
-    }
-    @font-face {
-      font-family: 'ABCArizona';
-      src: url('fonts/ABCArizonaText-ThinItalic-Trial.otf') format('opentype');
-      font-weight: 100;
-      font-style: italic;
-      font-display: swap;
-    }
-    @font-face {
-      font-family: 'ABCArizona';
-      src: url('fonts/ABCArizonaText-Light-Trial.otf') format('opentype');
-      font-weight: 300;
-      font-style: normal;
-      font-display: swap;
-    }
-    @font-face {
-      font-family: 'ABCArizona';
-      src: url('fonts/ABCArizonaText-LightItalic-Trial.otf') format('opentype');
-      font-weight: 300;
-      font-style: italic;
-      font-display: swap;
-    }
-    @font-face {
-      font-family: 'ABCArizona';
-      src: url('fonts/ABCArizonaText-Regular-Trial.otf') format('opentype');
-      font-weight: 400;
-      font-style: normal;
-      font-display: swap;
-    }
-    @font-face {
-      font-family: 'ABCArizona';
-      src: url('fonts/ABCArizonaText-RegularItalic-Trial.otf') format('opentype');
-      font-weight: 400;
-      font-style: italic;
-      font-display: swap;
-    }
-    @font-face {
-      font-family: 'ABCArizona';
-      src: url('fonts/ABCArizonaText-Medium-Trial.otf') format('opentype');
-      font-weight: 500;
-      font-style: normal;
-      font-display: swap;
-    }
-    @font-face {
-      font-family: 'ABCArizona';
-      src: url('fonts/ABCArizonaText-MediumItalic-Trial.otf') format('opentype');
-      font-weight: 500;
-      font-style: italic;
-      font-display: swap;
-    }
-    @font-face {
-      font-family: 'ABCArizona';
-      src: url('fonts/ABCArizonaText-Bold-Trial.otf') format('opentype');
-      font-weight: 700;
-      font-style: normal;
-      font-display: swap;
-    }
-    @font-face {
-      font-family: 'ABCArizona';
-      src: url('fonts/ABCArizonaText-BoldItalic-Trial.otf') format('opentype');
-      font-weight: 700;
-      font-style: italic;
-      font-display: swap;
-    }
+    /* Serif — display */
+    @font-face { font-family: 'ArizonaSerif'; src: url('fonts/ABCArizonaSerif-Thin-Trial.otf') format('opentype'); font-weight: 100; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'ArizonaSerif'; src: url('fonts/ABCArizonaSerif-ThinItalic-Trial.otf') format('opentype'); font-weight: 100; font-style: italic; font-display: swap; }
+    @font-face { font-family: 'ArizonaSerif'; src: url('fonts/ABCArizonaSerif-Light-Trial.otf') format('opentype'); font-weight: 300; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'ArizonaSerif'; src: url('fonts/ABCArizonaSerif-LightItalic-Trial.otf') format('opentype'); font-weight: 300; font-style: italic; font-display: swap; }
+    @font-face { font-family: 'ArizonaSerif'; src: url('fonts/ABCArizonaSerif-Regular-Trial.otf') format('opentype'); font-weight: 400; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'ArizonaSerif'; src: url('fonts/ABCArizonaSerif-RegularItalic-Trial.otf') format('opentype'); font-weight: 400; font-style: italic; font-display: swap; }
+    @font-face { font-family: 'ArizonaSerif'; src: url('fonts/ABCArizonaSerif-Medium-Trial.otf') format('opentype'); font-weight: 500; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'ArizonaSerif'; src: url('fonts/ABCArizonaSerif-MediumItalic-Trial.otf') format('opentype'); font-weight: 500; font-style: italic; font-display: swap; }
+    @font-face { font-family: 'ArizonaSerif'; src: url('fonts/ABCArizonaSerif-Bold-Trial.otf') format('opentype'); font-weight: 700; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'ArizonaSerif'; src: url('fonts/ABCArizonaSerif-BoldItalic-Trial.otf') format('opentype'); font-weight: 700; font-style: italic; font-display: swap; }
+
+    /* Sans — body */
+    @font-face { font-family: 'ArizonaSans'; src: url('fonts/ABCArizonaSans-Light-Trial.otf') format('opentype'); font-weight: 300; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'ArizonaSans'; src: url('fonts/ABCArizonaSans-Regular-Trial.otf') format('opentype'); font-weight: 400; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'ArizonaSans'; src: url('fonts/ABCArizonaSans-RegularItalic-Trial.otf') format('opentype'); font-weight: 400; font-style: italic; font-display: swap; }
+    @font-face { font-family: 'ArizonaSans'; src: url('fonts/ABCArizonaSans-Medium-Trial.otf') format('opentype'); font-weight: 500; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'ArizonaSans'; src: url('fonts/ABCArizonaSans-Bold-Trial.otf') format('opentype'); font-weight: 700; font-style: normal; font-display: swap; }
+
+    /* Mix — italic kickers */
+    @font-face { font-family: 'ArizonaMix'; src: url('fonts/ABCArizonaMix-RegularItalic-Trial.otf') format('opentype'); font-weight: 400; font-style: italic; font-display: swap; }
+    @font-face { font-family: 'ArizonaMix'; src: url('fonts/ABCArizonaMix-Regular-Trial.otf') format('opentype'); font-weight: 400; font-style: normal; font-display: swap; }
   </style>
+
+  <!-- TEMP: accent preview — set data-accent before render to avoid flash. Remove once chosen. -->
+  <script>
+    try {
+      var p = new URLSearchParams(location.search);
+      var a = p.get('accent') || localStorage.getItem('organic_accent') || 'olive';
+      document.documentElement.setAttribute('data-accent', a);
+    } catch (e) {}
+  </script>
 
   <!-- React 18 UMD -->
   <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
@@ -93,700 +49,818 @@
   <style>
     /* ─── Reset ─── */
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    button { font: inherit; color: inherit; background: none; border: none; }
+    a { color: inherit; }
 
-    /* ─── Tokens ─── */
+    /* ─── Tokens (olive-earth palette) ─── */
     :root {
-      --bg: #F8F8F7;
-      --ink: #120801;
-      --primary: #3a4a2f;
-      --muted: #8a8474;
-      --border: rgba(18, 8, 1, 0.14);
-      --border-strong: rgba(18, 8, 1, 0.30);
-      --font-display: 'ABCArizona', Georgia, serif;
-      --font-body: 'Inter', sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
+      /* Two paper surfaces, alternating */
+      --paper:        #ffffff;                /* pure white */
+      --paper-deep:   oklch(96% 0.002 80);    /* barely-there warm gray — section bands */
+
+      /* Tinted near-black, never pure #000 */
+      --ink:          oklch(10% 0.005 30);
+      --ink-soft:     oklch(28% 0.006 30);
+      --muted:        oklch(46% 0.008 70);
+
+      /* Brand accent — dark olive green (current default) */
+      --olive:        oklch(38% 0.06 135);
+      --olive-light:  oklch(44% 0.07 135);
+      --olive-deep:   oklch(32% 0.05 135);
+
+      /* Warm dark brown for dark sections */
+      --earth:        oklch(14% 0.012 60);
+
+      /* Accent (driven by [data-accent] picker). Defaults to olive so monochrome+olive looks unchanged. */
+      --accent:         var(--olive);
+      --accent-light:   var(--olive-light);
+      --accent-deep:    var(--olive-deep);
+      --accent-on-ink:  oklch(72% 0.10 135);   /* light olive that pops on earth */
+
+      --border:       oklch(10% 0.005 30 / 0.14);
+      --border-strong:oklch(10% 0.005 30 / 0.28);
+
+      --font-display: 'ArizonaSerif', Georgia, serif;
+      --font-body:    'ArizonaSans', system-ui, -apple-system, sans-serif;
+      --font-mix:     'ArizonaMix', Georgia, serif;
+      --font-mono:    ui-monospace, 'SF Mono', Menlo, monospace;
+
       --max-w: 1440px;
       --px: 64px;
+    }
+
+    /* TEMP: accent override schemes for preview. Remove the unused ones once chosen. */
+    [data-accent="juniper"] {
+      --accent:        oklch(35% 0.06 175);
+      --accent-light:  oklch(42% 0.07 175);
+      --accent-deep:   oklch(25% 0.06 175);
+      --accent-on-ink: oklch(72% 0.10 175);
+    }
+    [data-accent="clay"] {
+      --accent:        oklch(38% 0.08 25);
+      --accent-light:  oklch(46% 0.10 25);
+      --accent-deep:   oklch(28% 0.08 25);
+      --accent-on-ink: oklch(70% 0.13 25);
+    }
+    [data-accent="ochre"] {
+      --accent:        oklch(50% 0.10 75);
+      --accent-light:  oklch(58% 0.12 75);
+      --accent-deep:   oklch(40% 0.10 75);
+      --accent-on-ink: oklch(78% 0.13 75);
+    }
+    [data-accent="slate"] {
+      --accent:        oklch(22% 0.02 250);
+      --accent-light:  oklch(30% 0.03 250);
+      --accent-deep:   oklch(15% 0.02 250);
+      --accent-on-ink: oklch(78% 0.04 250);
+    }
+    [data-accent="none"] {
+      --accent:        var(--ink);
+      --accent-light:  var(--ink-soft);
+      --accent-deep:   var(--ink);
+      --accent-on-ink: var(--paper);
     }
 
     html { scroll-behavior: smooth; }
 
     body {
-      background: var(--bg);
+      background-color: var(--paper);
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.04  0 0 0 0 0.03  0 0 0 0 0.02  0 0 0 0.03 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
       color: var(--ink);
       font-family: var(--font-body);
-      font-size: 16px;
-      line-height: 1.6;
+      font-size: 17px;
+      line-height: 1.55;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }
 
-    /* ─── Utility ─── */
+    /* ─── Layout primitives ─── */
     .container { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--px); }
-    .eyebrow {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--primary);
-    }
-    .section-border { border-top: 1px solid var(--border); }
-
-    /* ─── Nav ─── */
-    .nav { padding: 24px 0; }
-    .nav-inner { display: flex; align-items: center; justify-content: space-between; }
-    .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
-    .nav-logo-text { font-family: var(--font-display); font-size: 22px; font-weight: 500; }
-    .nav-links { display: flex; align-items: center; gap: 32px; }
-    .nav-link {
-      font-family: var(--font-body);
-      font-size: 14px;
-      font-weight: 400;
-      color: var(--ink);
-      text-decoration: none;
-      transition: color 0.2s;
-    }
-    .nav-link:hover { color: var(--primary); }
-    .nav-actions { display: flex; align-items: center; gap: 16px; }
-    .nav-signin {
-      font-size: 14px;
-      color: var(--muted);
-      text-decoration: none;
-      transition: color 0.2s;
-    }
-    .nav-signin:hover { color: var(--ink); }
 
     /* ─── Buttons ─── */
-    .btn-primary {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 12px 24px;
-      background: var(--ink);
-      color: var(--bg);
+    .btn {
+      display: inline-flex; align-items: baseline; gap: 8px;
+      padding: 14px 22px;
       font-family: var(--font-body);
-      font-size: 14px;
-      font-weight: 500;
-      border: none;
-      cursor: pointer;
-      text-decoration: none;
-      transition: opacity 0.2s;
+      font-size: 15px; font-weight: 500;
+      text-decoration: none; cursor: pointer;
+      transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s, background 0.18s, color 0.18s, border-color 0.18s;
+      letter-spacing: 0.005em;
     }
-    .btn-primary:hover { opacity: 0.85; }
+    .btn:active { transform: translateY(1px); }
+    .btn--ink     { background: var(--accent);  color: var(--paper); }
+    .btn--ink:hover     { background: var(--accent-light); opacity: 1; }
+    .btn--paper   { background: var(--paper); color: var(--ink); }
+    .btn--paper:hover   { opacity: 0.9; }
+    .btn--ghost   { background: transparent; color: var(--ink); border: 1px solid var(--border-strong); }
+    .btn--ghost:hover { border-color: var(--ink); background: oklch(10% 0.005 30 / 0.05); }
+    .btn-arrow {
+      display: inline-block;
+      font-family: var(--font-display);
+      font-style: italic;
+      font-weight: 300;
+      font-size: 1.1em;
+      transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .btn:hover .btn-arrow { transform: translateX(3px); }
 
-    .btn-secondary {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 12px 24px;
-      background: transparent;
+    /* ─── Italic kicker ─── */
+    .kicker {
+      font-family: var(--font-mix);
+      font-style: italic;
+      font-weight: 400;
+      font-size: 17px;
       color: var(--ink);
-      font-family: var(--font-body);
-      font-size: 14px;
-      font-weight: 500;
-      border: 1px solid var(--border-strong);
-      cursor: pointer;
-      text-decoration: none;
-      transition: border-color 0.2s, color 0.2s;
+      letter-spacing: 0;
     }
-    .btn-secondary:hover { border-color: var(--ink); }
 
-    .btn-moss {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 12px 24px;
-      background: var(--primary);
-      color: var(--bg);
-      font-family: var(--font-body);
-      font-size: 14px;
+    /* ─── Display em (no color — italic + weight bump carries the emphasis) ─── */
+    .em-display {
+      font-style: italic;
       font-weight: 500;
-      border: none;
-      cursor: pointer;
-      text-decoration: none;
-      transition: opacity 0.2s;
+      color: var(--ink);
     }
-    .btn-moss:hover { opacity: 0.9; }
+
+    /* ─── Nav ─── */
+    .nav { padding: 22px 0; }
+    .nav-inner { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+    .nav-logo { display: flex; align-items: center; }
+    .nav-links { display: flex; align-items: center; gap: 28px; }
+    .nav-link {
+      font-size: 15px; text-decoration: none; color: var(--ink); opacity: 0.72;
+      transition: opacity 0.18s;
+    }
+    .nav-link:hover { opacity: 1; }
+    .nav-actions { display: flex; align-items: center; gap: 14px; }
+    .nav-signin { font-size: 15px; color: var(--ink-soft); text-decoration: none; transition: color 0.18s; }
+    .nav-signin:hover { color: var(--ink); }
 
     /* ─── Hero ─── */
-    .hero { padding: 120px 0 0; }
-    .hero-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 64px; align-items: start; }
+    .hero { padding: 64px 0 88px; }
+    .hero-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 72px; align-items: center; }
     .hero-headline {
       font-family: var(--font-display);
-      font-size: 64px;
-      font-weight: 300;
-      line-height: 1.0;
-      letter-spacing: -0.06em;
-      margin: 20px 0 28px;
+      font-weight: 100;
+      font-size: 3.5vw;
+      line-height: 0.94;
+      letter-spacing: -0.055em;
+      font-kerning: normal;
+      font-feature-settings: "kern" 1;
+      margin: 22px 0 26px;
     }
-    .hero-headline em {
-      font-style: italic;
-      color: var(--ink);
-    }
+    .hero-headline em { font-style: italic; font-weight: 400; color: var(--accent); letter-spacing: -0.055em; }
     .hero-lede {
-      font-size: 19px;
-      line-height: 1.6;
-      color: var(--ink);
+      font-size: clamp(17px, 1.35vw, 20px);
+      line-height: 1.5;
+      color: var(--ink-soft);
       max-width: 520px;
       margin-bottom: 32px;
     }
-    .hero-ctas { display: flex; gap: 12px; margin-bottom: 72px; }
-    .hero-stats {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 0;
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-      padding: 36px 0;
-      margin-bottom: 72px;
+    .hero-ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 52px; }
+    .hero-tags {
+      display: flex; flex-wrap: wrap; gap: 16px 26px;
+      font-family: var(--font-mix);
+      font-style: italic;
+      font-size: 14.5px;
+      color: var(--ink-soft);
     }
-    .hero-stat {
-      padding: 0 24px;
-      border-right: 1px solid var(--border);
-    }
-    .hero-stat:first-child { padding-left: 0; }
-    .hero-stat:last-child { border-right: none; padding-right: 0; }
-    .hero-stat-number {
-      font-family: var(--font-display);
-      font-size: 42px;
-      font-weight: 300;
-      color: var(--primary);
-      line-height: 1;
-      letter-spacing: -0.02em;
-    }
-    .hero-stat-label {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 400;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-top: 8px;
-    }
+    .hero-tag::before { content: "·"; margin-right: 10px; color: var(--accent); }
+    .hero-tag:first-child::before { content: ""; margin-right: 0; }
 
-    /* ─── Terminal ─── */
-    .terminal {
-      background: #1a1a1a;
-      border: 1px solid rgba(255,255,255,0.08);
+    /* ─── Article preview ─── */
+    .preview { position: relative; }
+    .preview::before,
+    .preview::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: oklch(94% 0.003 80);
+      border-radius: 2px;
+      box-shadow: 0 4px 16px -8px rgba(15,8,5,0.15);
+      z-index: -1;
+    }
+    .preview::before {
+      transform: rotate(1.5deg) translateY(6px) scale(0.97);
+      opacity: 0.7;
+    }
+    .preview::after {
+      transform: rotate(-2.2deg) translateY(10px) scale(0.94);
+      opacity: 0.45;
+    }
+    .preview-card {
+      background: oklch(96% 0.003 80);
+      box-shadow: 0 22px 60px -32px rgba(15,8,5,0.34), 0 2px 8px -4px rgba(15,8,5,0.14);
       overflow: hidden;
+      transform: rotate(-0.4deg);
+      transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+                  opacity 0.5s ease;
+      opacity: 1;
     }
-    .terminal-chrome {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 14px 18px;
-      background: #222;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
+    .preview-card.fade-out {
+      opacity: 0;
+      transform: rotate(-0.4deg) translateY(12px);
+      transition: opacity 0.35s ease, transform 0.35s ease;
     }
-    .terminal-dot {
-      width: 12px; height: 12px; border-radius: 50%;
+    .preview-card.fade-in {
+      animation: cardFadeIn 0.5s ease forwards;
     }
-    .terminal-dot--red { background: #c47a5a; }
-    .terminal-dot--yellow { background: #c9a84c; }
-    .terminal-dot--green { background: #5a7a4a; }
-    .terminal-title {
-      font-family: var(--font-mono);
-      font-size: 12px;
-      color: rgba(255,255,255,0.4);
-      margin-left: 8px;
+    @keyframes cardFadeIn {
+      from { opacity: 0; transform: rotate(-0.4deg) translateY(-12px); }
+      to   { opacity: 1; transform: rotate(-0.4deg) translateY(0); }
     }
-    .terminal-body {
-      padding: 20px;
-      font-family: var(--font-mono);
-      font-size: 13px;
-      line-height: 1.65;
-      color: rgba(255,255,255,0.7);
-      min-height: 320px;
+    .preview:hover .preview-card { transform: rotate(0deg) translateY(-4px); }
+    .preview-image-wrap {
+      position: relative;
+      aspect-ratio: 5 / 4;
+      background: linear-gradient(135deg, var(--ink), oklch(28% 0.006 30));
+      overflow: hidden;
+      border-radius: 12px;
     }
-    .terminal-line { white-space: pre; }
-    .terminal-line--dim { color: rgba(255,255,255,0.3); }
-    .terminal-line--green { color: #7aad5a; }
-    .terminal-line--amber { color: #c9a84c; }
-    .terminal-cursor {
-      display: inline-block;
-      color: rgba(255,255,255,0.7);
-      animation: blink 1s step-end infinite;
+    .preview-image {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      filter: contrast(1.08) brightness(0.95) grayscale(1);
+      mix-blend-mode: luminosity;
+      opacity: 0.95;
     }
-    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
-
-    /* ─── Section header grid ─── */
-    .section-header {
-      display: grid;
-      grid-template-columns: 280px 1fr;
-      gap: 32px;
-      margin-bottom: 72px;
-      align-items: start;
+    .preview-image-tint {
+      position: absolute; inset: 0;
+      background: oklch(38% 0.06 135 / 0.12);
+      mix-blend-mode: color;
+      pointer-events: none;
     }
-    .section-headline {
+    .preview-image-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, transparent 55%, oklch(10% 0.005 30 / 0.55) 100%);
+      pointer-events: none;
+    }
+    .preview-image-tag {
+      position: absolute;
+      left: 20px; bottom: 16px;
+      font-family: var(--font-mix); font-style: italic; font-size: 14px;
+      color: var(--paper);
+      letter-spacing: 0;
+    }
+    .preview-body { padding: 28px 30px 30px; }
+    .preview-meta {
+      display: flex; align-items: baseline; gap: 12px;
+      font-family: var(--font-mix); font-style: italic; font-size: 14px;
+      color: var(--ink-soft);
+      margin-bottom: 14px;
+    }
+    .preview-meta-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--accent); display: inline-block; }
+    .preview-title {
       font-family: var(--font-display);
-      font-size: 48px;
       font-weight: 300;
-      line-height: 1.1;
-      letter-spacing: -0.04em;
+      font-size: clamp(20px, 1.8vw, 26px);
+      line-height: 1.14;
+      letter-spacing: -0.022em;
+      color: var(--ink);
+      margin-bottom: 12px;
     }
-    .section-headline em { font-style: italic; color: var(--ink); }
+    .preview-title em { font-style: italic; font-weight: 500; color: var(--accent); }
+    .preview-excerpt {
+      font-size: 14.5px;
+      line-height: 1.55;
+      color: var(--ink-soft);
+      max-width: 44ch;
+      margin-bottom: 18px;
+    }
+    .preview-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      padding: 4px 9px;
+      border: 1px solid var(--border);
+      color: var(--ink-soft);
+      background: transparent;
+    }
+    .chip--verified { color: var(--accent); border-color: var(--accent); }
+    .chip-dot {
+      width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+    }
+
+    .preview-stamp {
+      position: absolute;
+      top: -12px; right: -10px;
+      font-family: var(--font-body);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--paper);
+      background: var(--olive);
+      padding: 5px 14px;
+      border-radius: 100px;
+      pointer-events: none;
+      z-index: 2;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    }
+
+    /* ─── Section frame ─── */
+    .section { padding: clamp(72px, 11vw, 132px) 0; }
+    .section--stone { background: var(--paper-deep); }
+    .section-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 14px;
+      margin-bottom: clamp(40px, 6vw, 68px);
+      max-width: 880px;
+    }
+    .section-head__title {
+      font-family: var(--font-display);
+      font-weight: 300;
+      font-size: clamp(32px, 3.8vw, 56px);
+      line-height: 1.04;
+      letter-spacing: -0.035em;
+      color: var(--ink);
+    }
+    .section-head__title em { font-style: italic; font-weight: 400; color: var(--accent); }
+    .section-head__sub {
+      font-size: clamp(16px, 1.2vw, 18px);
+      line-height: 1.55;
+      color: var(--ink-soft);
+      max-width: 60ch;
+    }
 
     /* ─── Why Organic ─── */
-    .why { padding: 140px 0; }
-    .why-grid {
+    .why-feature {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+      gap: 64px;
+      align-items: center;
+      margin-bottom: 64px;
+    }
+    .why-feature__media {
+      position: relative;
+      aspect-ratio: 5 / 4;
+      overflow: hidden;
+      background: linear-gradient(135deg, var(--ink), oklch(28% 0.006 30));
+      border-radius: 12px;
+    }
+    .why-feature__img {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      filter: contrast(1.08) brightness(0.94) grayscale(1);
+      mix-blend-mode: luminosity;
+      opacity: 0.95;
+    }
+    .why-feature__media-tint {
+      position: absolute; inset: 0;
+      background: oklch(38% 0.06 135 / 0.12);
+      mix-blend-mode: color;
+      pointer-events: none;
+    }
+    .why-feature__media-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, transparent 50%, oklch(10% 0.005 30 / 0.6) 100%);
+      pointer-events: none;
+    }
+    .why-feature__media-tag {
+      position: absolute;
+      left: 24px; bottom: 20px;
+      font-family: var(--font-mix); font-style: italic; font-size: 14px;
+      color: var(--paper);
+    }
+    .why-feature__media-stamp {
+      position: absolute;
+      top: 20px; right: 20px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0;
+      color: var(--ink);
+      background: var(--paper);
+      padding: 5px 9px;
+      border: 1px solid var(--ink);
+    }
+    .why-feature__num {
+      font-family: var(--font-mix); font-style: italic;
+      font-size: 15px;
+      color: var(--ink-soft);
+      margin-bottom: 14px;
+    }
+    .why-feature__title {
+      font-family: var(--font-display);
+      font-weight: 300;
+      font-size: clamp(30px, 3.4vw, 48px);
+      line-height: 1.06;
+      letter-spacing: -0.03em;
+      color: var(--ink);
+      margin-bottom: 22px;
+    }
+    .why-feature__title em { font-style: italic; font-weight: 500; color: var(--accent); }
+    .why-feature__body {
+      font-size: 16px;
+      line-height: 1.55;
+      color: var(--ink-soft);
+      max-width: 52ch;
+      margin-bottom: 12px;
+    }
+    .why-feature__body + .why-feature__body { margin-top: 0; }
+
+    .why-supporting {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 0;
       border-top: 1px solid var(--border);
     }
-    .why-card {
-      padding: 32px 32px 40px 24px;
+    .why-support {
+      padding: 36px 32px 32px 0;
       border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 10px;
     }
-    .why-card:last-child { border-right: none; padding-right: 0; }
-    .why-card-number {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 2px;
-      color: var(--muted);
-      margin-bottom: 12px;
+    .why-support:nth-child(2) { padding-left: 32px; }
+    .why-support:nth-child(3) { padding-left: 32px; border-right: none; padding-right: 0; }
+    .why-support__num {
+      font-family: var(--font-mix); font-style: italic;
+      font-size: 13.5px;
+      color: var(--ink-soft);
     }
-    .why-card-title {
+    .why-support__title {
       font-family: var(--font-display);
-      font-size: 26px;
-      font-weight: 400;
-      color: var(--primary);
-      margin-bottom: 12px;
-      line-height: 1.2;
+      font-weight: 300;
+      font-size: clamp(20px, 1.8vw, 26px);
+      line-height: 1.1;
+      letter-spacing: -0.022em;
+      color: var(--ink);
     }
-    .why-card-body {
+    .why-support__title em { font-style: italic; font-weight: 500; color: var(--accent); }
+    .why-support__body {
       font-size: 15px;
-      line-height: 1.6;
-      color: var(--muted);
+      line-height: 1.55;
+      color: var(--ink-soft);
+      max-width: 38ch;
     }
 
     /* ─── Pipeline ─── */
-    .pipeline { padding: 140px 0; }
-    .pipeline-row {
+    .pipeline-flow {
+      position: relative;
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 0;
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
+      margin-top: 24px;
     }
-    .pipeline-step {
-      padding: 32px 24px;
-      border-right: 1px solid var(--border);
+    .pipeline-flow::before {
+      content: "";
+      position: absolute;
+      top: 22px;
+      left: calc(100% / 14);
+      right: calc(100% / 14);
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent) 8%, var(--accent) 92%, transparent);
     }
-    .pipeline-step:last-child { border-right: none; }
-    .pipeline-step-number {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 2px;
-      color: var(--muted);
-      margin-bottom: 10px;
+    .pipeline-node { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 12px; gap: 14px; }
+    .pipeline-node__dot {
+      width: 44px; height: 44px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--paper);
+      border: 1px solid var(--ink);
+      color: var(--ink);
+      font-family: var(--font-mix);
+      font-style: italic;
+      font-size: 16px;
+      border-radius: 50%;
+      position: relative;
+      z-index: 1;
     }
-    .pipeline-step-name {
+    .pipeline-node:first-child .pipeline-node__dot { background: var(--accent); color: var(--paper); border-color: var(--accent); }
+    .pipeline-node:last-child .pipeline-node__dot  { background: var(--accent); color: var(--paper); border-color: var(--accent); }
+    .pipeline-node__name {
       font-family: var(--font-display);
-      font-size: 22px;
       font-weight: 400;
-      color: var(--primary);
-      margin-bottom: 8px;
-      line-height: 1.3;
+      font-size: 18px;
+      letter-spacing: -0.015em;
+      color: var(--ink);
     }
-    .pipeline-step-body {
-      font-size: 14px;
-      line-height: 1.5;
-      color: var(--muted);
-      margin-bottom: 16px;
-    }
-    .pipeline-chip {
-      display: inline-block;
+    .pipeline-node__chip {
       font-family: var(--font-mono);
       font-size: 11px;
-      letter-spacing: 0.5px;
-      padding: 4px 10px;
-      border: 1px solid var(--border-strong);
-      color: var(--muted);
-      margin-right: 6px;
-      margin-bottom: 6px;
+      color: var(--ink-soft);
+      letter-spacing: 0;
     }
 
     /* ─── Before / After ─── */
-    .beforeafter { padding: 140px 0; }
-    .slider-container {
-      position: relative;
+    .ba { position: relative; overflow: hidden; border: 1px solid var(--border); background: oklch(96% 0.003 80); }
+    .ba-side { padding: clamp(36px, 5vw, 60px); min-height: 320px; }
+    .ba-after { background: oklch(96% 0.003 80); }
+    .ba-before-wrap {
+      position: absolute; top: 0; left: 0; height: 100%;
       overflow: hidden;
-      border: 1px solid var(--border);
-      user-select: none;
-      cursor: col-resize;
-    }
-    .slider-side {
-      padding: 48px 56px;
-      min-height: 340px;
-    }
-    .slider-after {
-      background: #F0F0EF;
-    }
-    .slider-before-wrap {
-      position: absolute;
-      top: 0; left: 0;
-      height: 100%;
-      overflow: hidden;
-      border-right: 2px solid var(--ink);
+      border-right: 1.5px solid var(--ink);
       z-index: 2;
     }
-    .slider-before {
-      background: var(--bg);
-      padding: 48px 56px;
-      min-height: 340px;
-      width: 100%;
+    .ba-before { background: oklch(91% 0.004 80); padding: clamp(36px, 5vw, 60px); min-height: 320px; width: 100%; }
+    .ba-label {
+      font-family: var(--font-mix); font-style: italic; font-size: 15px;
+      margin-bottom: 18px;
+      display: inline-flex; align-items: center; gap: 8px;
+      color: var(--ink-soft);
     }
-    .slider-label {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      margin-bottom: 20px;
+    .ba-label--after  { color: var(--accent); }
+    .ba-text {
+      font-family: var(--font-body);
+      font-weight: 400;
+      font-size: clamp(15px, 1.05vw, 16.5px);
+      line-height: 1.55;
+      max-width: 56ch;
+      letter-spacing: 0;
     }
-    .slider-label--before { color: var(--muted); }
-    .slider-label--after { color: var(--primary); }
-    .slider-text {
-      font-family: Georgia, 'Times New Roman', serif;
-      font-size: 18px;
-      line-height: 1.75;
-      max-width: 560px;
+    .ba-text--before { font-style: italic; color: var(--muted); }
+    .ba-text--after  {
+      color: var(--ink);
+      font-family: var(--font-display);
+      font-weight: 400;
+      font-style: normal;
+      font-size: clamp(16px, 1.2vw, 18px);
+      line-height: 1.5;
+      letter-spacing: -0.01em;
     }
-    .slider-text--before { font-style: italic; color: var(--muted); }
-    .slider-text--after { font-style: normal; color: var(--ink); }
-    .slider-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
-    .slider-tag {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      letter-spacing: 0.5px;
-      padding: 4px 10px;
+    .ba-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
+    .ba-tag {
+      font-family: var(--font-mono); font-size: 11px;
+      padding: 4px 10px; letter-spacing: 0;
     }
-    .slider-tag--clay {
-      border: 1px solid #c47a5a;
-      color: #c47a5a;
-    }
-    .slider-tag--moss {
-      background: var(--primary);
-      color: var(--bg);
-      border: 1px solid var(--primary);
-    }
-    .slider-handle {
-      position: absolute;
-      top: 0;
-      width: 2px;
-      height: 100%;
-      z-index: 3;
-      pointer-events: none;
-    }
-    .slider-knob {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 40px; height: 40px;
-      background: var(--ink);
+    .ba-tag--muted    { border: 1px solid var(--muted); color: var(--muted); }
+    .ba-tag--verified { background: var(--accent); color: var(--paper); border: 1px solid var(--accent); }
+    .ba-handle { position: absolute; top: 0; width: 1.5px; height: 100%; z-index: 3; pointer-events: none; background: var(--ink); }
+    .ba-knob {
+      position: absolute; top: 50%; transform: translate(-50%, -50%);
+      width: 44px; height: 44px;
+      background: var(--ink); color: var(--paper);
       border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: flex; align-items: center; justify-content: center;
       pointer-events: none;
     }
-    .slider-knob svg { color: var(--bg); }
+    .ba-knob-area {
+      position: absolute; top: 0; height: 100%; width: 80px;
+      z-index: 4; cursor: col-resize;
+    }
+    .live-dot {
+      display: inline-block; width: 8px; height: 8px;
+      background: currentColor; border-radius: 50%;
+      animation: pulse-dot 2.2s infinite;
+    }
+    @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
     /* ─── Pricing ─── */
-    .pricing { padding: 140px 0; }
     .pricing-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 0;
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 0;
       border: 1px solid var(--border);
     }
-    .pricing-tier {
-      padding: 40px 36px;
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
+    .tier { padding: 40px 34px; display: flex; flex-direction: column; border-right: 1px solid var(--border); background: oklch(91% 0.004 80); }
+    .tier:last-child { border-right: none; }
+    .tier--featured { background: var(--olive); color: var(--paper); }
+    .tier__name {
+      font-family: var(--font-mix); font-style: italic; font-size: 17px;
+      color: var(--ink-soft);
+      display: flex; align-items: center; gap: 10px; margin-bottom: 18px;
     }
-    .pricing-tier:last-child { border-right: none; }
-    .pricing-tier--featured {
-      background: var(--primary);
-      color: var(--bg);
-      border-color: var(--primary);
+    .tier--featured .tier__name { color: var(--paper); }
+    .tier__badge {
+      font-family: var(--font-mix); font-style: italic; font-size: 13px;
+      padding: 3px 9px; background: var(--olive); color: var(--paper);
+      letter-spacing: 0;
     }
-    .pricing-tier--featured .pricing-eyebrow { color: rgba(248, 248, 247, 0.6); }
-    .pricing-tier--featured .pricing-price { color: var(--bg); }
-    .pricing-tier--featured .pricing-period { color: rgba(248, 248, 247, 0.5); }
-    .pricing-tier--featured .pricing-feature { color: rgba(248, 248, 247, 0.8); border-color: rgba(248, 248, 247, 0.15); }
-    .pricing-tier--featured .btn-primary { background: var(--bg); color: var(--primary); }
-    .pricing-tier--featured .btn-primary:hover { opacity: 0.9; }
-    .pricing-eyebrow {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 20px;
+    .tier--featured .tier__badge { background: var(--paper); color: var(--ink); }
+    .tier__price {
+      font-family: var(--font-display); font-weight: 300; font-size: 60px;
+      line-height: 1; letter-spacing: -0.04em; color: var(--ink);
     }
-    .pricing-price {
-      font-family: var(--font-display);
-      font-size: 54px;
-      font-weight: 400;
-      line-height: 1;
-      color: var(--ink);
+    .tier--featured .tier__price { color: var(--paper); }
+    .tier__period { font-size: 14px; color: var(--ink-soft); margin-top: 4px; }
+    .tier--featured .tier__period { color: oklch(94% 0.003 80 / 0.6); }
+    .tier__per {
+      font-family: var(--font-mix); font-style: italic; font-size: 14px;
+      color: var(--ink-soft); margin-top: 6px; margin-bottom: 30px;
     }
-    .pricing-period {
-      font-family: var(--font-body);
-      font-size: 14px;
-      color: var(--muted);
-      margin-top: 4px;
-    }
-    .pricing-per-article {
-      font-family: var(--font-mono);
-      font-size: 13px;
-      color: var(--muted);
-      margin-top: 6px;
-      margin-bottom: 32px;
-    }
-    .pricing-tier--featured .pricing-per-article { color: rgba(248, 248, 247, 0.5); }
-    .pricing-eyebrow-badge {
-      display: inline-block;
-      font-family: var(--font-mono);
-      font-size: 9px;
-      font-weight: 600;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      background: var(--primary);
-      color: var(--bg);
-      padding: 3px 8px;
-      margin-left: 8px;
-      vertical-align: middle;
-    }
-    .pricing-tier--featured .pricing-eyebrow-badge {
-      background: var(--bg);
-      color: var(--primary);
-    }
-    .pricing-features {
-      list-style: none;
-      flex: 1;
-      margin-bottom: 32px;
-    }
-    .pricing-feature {
-      font-size: 14px;
-      line-height: 1.5;
-      padding: 12px 0;
+    .tier--featured .tier__per { color: oklch(94% 0.003 80 / 0.75); }
+    .tier__features { list-style: none; flex: 1; margin-bottom: 28px; }
+    .tier__feature {
+      font-size: 15px; line-height: 1.5; padding: 12px 0;
       border-top: 1px solid var(--border);
+      color: var(--ink-soft);
+      display: flex; align-items: baseline; gap: 10px;
     }
-    .pricing-cta { margin-top: auto; }
+    .tier__feature::before { content: "·"; color: var(--ink); font-weight: 600; }
+    .tier--featured .tier__feature {
+      color: oklch(94% 0.003 80 / 0.86);
+      border-color: oklch(94% 0.003 80 / 0.18);
+    }
+    .tier--featured .tier__feature::before { color: var(--paper); }
+    .tier__cta { margin-top: auto; }
+    .tier__cta .btn { width: 100%; justify-content: center; }
 
     /* ─── Final CTA ─── */
     .final-cta {
-      padding: 160px 0;
+      padding: clamp(112px, 16vw, 180px) 0;
       text-align: center;
-      background: var(--ink);
-      color: var(--bg);
-      border-top: none;
+      background: var(--earth);
+      color: var(--paper);
+      position: relative;
+      overflow: hidden;
     }
     .final-cta-headline {
-      font-family: var(--font-display);
-      font-size: 88px;
-      font-weight: 300;
-      line-height: 1.05;
+      font-family: var(--font-display); font-weight: 300;
+      font-size: clamp(44px, 7.5vw, 104px);
+      line-height: 0.98;
       letter-spacing: -0.04em;
-      max-width: 900px;
-      margin: 0 auto 28px;
-      color: var(--bg);
+      max-width: 1000px;
+      margin: 0 auto 26px;
+      color: var(--paper);
     }
-    .final-cta-headline em { font-style: italic; color: rgba(248, 248, 247, 0.5); }
+    .final-cta-headline em { font-style: italic; font-weight: 300; letter-spacing: -0.06em; color: var(--accent-on-ink); }
     .final-cta-lede {
-      font-size: 19px;
-      color: rgba(248, 248, 247, 0.5);
+      font-family: var(--font-mix); font-style: italic;
+      font-size: clamp(17px, 1.4vw, 20px);
+      color: oklch(94% 0.003 80 / 0.7);
       margin-bottom: 36px;
-    }
-    .final-cta .btn-primary {
-      background: var(--bg);
-      color: var(--ink);
     }
 
     /* ─── Footer ─── */
-    .footer {
-      padding: 48px 0;
-      background: var(--ink);
-      border-top: none;
-    }
-    .footer-inner {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .footer-left, .footer-right {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: rgba(248, 248, 247, 0.5);
-    }
-    .footer-right { display: flex; gap: 24px; }
+    .footer { padding: 40px 0 56px; background: var(--earth); color: oklch(94% 0.003 80 / 0.55); }
+    .footer-inner { display: flex; justify-content: space-between; align-items: center; gap: 24px; flex-wrap: wrap; font-size: 14px; }
+    .footer-left { font-family: var(--font-mix); font-style: italic; }
+    .footer-right { display: flex; gap: 22px; }
     .footer-link {
-      color: rgba(248, 248, 247, 0.5);
+      color: oklch(94% 0.003 80 / 0.55);
       text-decoration: none;
-      transition: color 0.2s;
+      transition: color 0.18s;
     }
-    .footer-link:hover { color: var(--bg); }
+    .footer-link:hover { color: var(--accent-on-ink); }
 
-    /* ─── Live dot ─── */
-    .live-dot {
-      display: inline-block;
-      width: 8px; height: 8px;
-      background: var(--primary);
-      border-radius: 50%;
-      margin-right: 6px;
-      animation: pulse-dot 2s infinite;
-    }
-    @keyframes pulse-dot {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
-    }
-
-    /* ─── Waitlist Modal ─── */
+    /* ─── Modal ─── */
     .modal-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 9999;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(18, 8, 1, 0.6);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      animation: modal-fade-in 0.25s ease;
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; align-items: center; justify-content: center;
+      background: oklch(10% 0.005 30 / 0.82);
+      animation: modal-fade-in 0.22s cubic-bezier(0.22, 1, 0.36, 1);
     }
-    @keyframes modal-fade-in {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
+    @keyframes modal-fade-in { from { opacity: 0; } to { opacity: 1; } }
     .modal-card {
-      width: 100%;
-      max-width: 440px;
-      margin: 0 24px;
-      padding: 48px 40px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      box-shadow: 0 25px 60px -12px rgba(18, 8, 1, 0.35);
-      text-align: center;
-      animation: modal-slide-up 0.3s ease;
+      position: relative;
+      width: 100%; max-width: 460px; margin: 0 24px;
+      padding: 44px 38px;
+      background: var(--paper);
+      box-shadow: 0 32px 80px -16px rgba(15,8,5,0.45);
+      animation: modal-slide-up 0.28s cubic-bezier(0.22, 1, 0.36, 1);
     }
-    @keyframes modal-slide-up {
-      from { opacity: 0; transform: translateY(16px); }
-      to { opacity: 1; transform: translateY(0); }
+    @keyframes modal-slide-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+    .modal-kicker {
+      font-family: var(--font-mix); font-style: italic; font-size: 15px;
+      color: var(--ink-soft); margin-bottom: 12px;
     }
     .modal-title {
-      font-family: var(--font-display);
-      font-size: 32px;
-      font-weight: 300;
-      line-height: 1.15;
-      letter-spacing: -0.04em;
-      margin: 0 0 8px;
-      color: var(--ink);
+      font-family: var(--font-display); font-weight: 300;
+      font-size: 34px; line-height: 1.08; letter-spacing: -0.03em;
+      color: var(--ink); margin: 0 0 10px;
     }
-    .modal-title em { font-style: italic; color: var(--ink); }
+    .modal-title em { font-style: italic; font-weight: 500; color: var(--accent); }
     .modal-subtitle {
-      font-size: 15px;
-      color: var(--muted);
-      margin: 0 0 28px;
-      line-height: 1.5;
+      font-size: 16px; color: var(--ink-soft);
+      margin: 0 0 26px; line-height: 1.5; max-width: 36ch;
     }
     .modal-input {
       width: 100%;
-      box-sizing: border-box;
       padding: 14px 16px;
-      border: 1px solid var(--border);
-      background: #F0F0EF;
+      border: 1px solid var(--border-strong);
+      background: oklch(91% 0.004 80);
       color: var(--ink);
       font-family: var(--font-body);
-      font-size: 14px;
+      font-size: 15px;
       outline: none;
       margin-bottom: 12px;
-      transition: border-color 0.2s;
+      transition: border-color 0.18s, background 0.18s;
     }
-    .modal-input:focus {
-      border-color: var(--primary);
-    }
-    .modal-input::placeholder {
-      color: var(--muted);
-    }
+    .modal-input:focus { border-color: var(--accent); background: var(--paper); }
+    .modal-input::placeholder { color: var(--muted); }
     .modal-submit {
-      width: 100%;
-      padding: 14px 16px;
-      border: none;
-      background: var(--ink);
-      color: var(--bg);
-      font-family: var(--font-body);
-      font-size: 14px;
-      font-weight: 500;
+      width: 100%; padding: 14px 16px;
+      background: var(--ink); color: var(--paper);
+      font-family: var(--font-body); font-size: 15px; font-weight: 500;
       cursor: pointer;
-      transition: opacity 0.2s;
+      transition: opacity 0.18s;
+      display: inline-flex; align-items: baseline; justify-content: center; gap: 8px;
     }
-    .modal-submit:hover { opacity: 0.85; }
-    .modal-submit:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-    .modal-error {
-      margin-top: 12px;
-      font-size: 13px;
-      color: #b44a3e;
-    }
+    .modal-submit:hover { opacity: 0.88; }
+    .modal-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+    .modal-error { margin-top: 12px; font-size: 14px; color: var(--muted); font-family: var(--font-mix); font-style: italic; }
     .modal-close {
-      position: absolute;
-      top: 16px;
-      right: 16px;
-      background: none;
-      border: none;
+      position: absolute; top: 14px; right: 14px;
+      width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
       color: var(--muted);
       cursor: pointer;
-      font-size: 20px;
-      line-height: 1;
-      padding: 4px;
-      transition: color 0.2s;
+      font-size: 22px; line-height: 1;
+      transition: color 0.18s, background 0.18s;
     }
-    .modal-close:hover { color: var(--ink); }
-    .modal-success-icon {
-      font-size: 48px;
-      margin-bottom: 16px;
-      line-height: 1;
-    }
-    .modal-eyebrow {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--primary);
-      margin-bottom: 16px;
+    .modal-close:hover { color: var(--ink); background: oklch(91% 0.004 80); }
+    .modal-success-mark {
+      font-family: var(--font-display);
+      font-weight: 300; font-style: italic;
+      font-size: 60px; color: var(--ink);
+      line-height: 1; margin-bottom: 14px;
     }
 
     /* ─── Responsive ─── */
     @media (max-width: 1024px) {
-      :root { --px: 32px; }
-      .hero-headline { font-size: 56px; }
+      .hero { padding: 48px 0 72px; }
       .hero-grid { grid-template-columns: 1fr; gap: 48px; }
-      .hero-stats { grid-template-columns: repeat(2, 1fr); gap: 24px; }
-      .section-header { grid-template-columns: 1fr; gap: 16px; }
-      .why-grid { grid-template-columns: repeat(2, 1fr); }
-      .why-card { border-bottom: 1px solid var(--border); }
-      .pipeline-row { grid-template-columns: repeat(2, 1fr); }
-      .pipeline-step { border-bottom: 1px solid var(--border); }
+      .preview-card { transform: rotate(0deg); }
+
+      .why-feature { grid-template-columns: 1fr; gap: 36px; margin-bottom: 56px; }
+      .why-supporting { grid-template-columns: 1fr; border-top: 1px solid var(--border); }
+      .why-support {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding: 28px 0;
+      }
+      .why-support:nth-child(2), .why-support:nth-child(3) { padding-left: 0; }
+      .why-support:last-child { border-bottom: none; }
+
+      .pipeline-flow { grid-template-columns: 1fr; gap: 0; }
+      .pipeline-flow::before {
+        top: 0; bottom: 0; left: 21px; right: auto;
+        width: 1px; height: auto;
+        background: linear-gradient(180deg, transparent, var(--ink) 8%, var(--ink) 92%, transparent);
+      }
+      .pipeline-node { flex-direction: row; align-items: center; text-align: left; gap: 18px; padding: 12px 0; }
+      .pipeline-node__dot { flex-shrink: 0; }
+
       .pricing-grid { grid-template-columns: 1fr; }
-      .pricing-tier { border-right: none; border-bottom: 1px solid var(--border); }
-      .final-cta-headline { font-size: 56px; }
-      .section-headline { font-size: 36px; }
+      .tier { border-right: none; border-bottom: 1px solid var(--border); }
+      .tier:last-child { border-bottom: none; }
+    }
+    @media (max-width: 900px) { :root { --px: 24px; } }
+    @media (max-width: 640px) {
+      .nav-links { display: none; }
+      .footer-inner { flex-direction: column; align-items: flex-start; }
+      .footer-right { flex-wrap: wrap; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    /* ─── TEMP: Accent picker (dev affordance — remove once accent is chosen) ─── */
+    .accent-picker {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background: var(--paper);
+      border: 1px solid var(--border-strong);
+      box-shadow: 0 12px 32px -12px rgba(20,10,5,0.22);
+      font-family: var(--font-mix);
+      font-style: italic;
+      font-size: 13px;
+      color: var(--ink-soft);
+      user-select: none;
+    }
+    .accent-picker__label { letter-spacing: 0.01em; }
+    .accent-picker__swatches { display: flex; gap: 7px; }
+    .accent-picker__swatch {
+      width: 22px;
+      height: 22px;
+      padding: 0;
+      border: 1px solid var(--border-strong);
+      background: var(--sw, transparent);
+      cursor: pointer;
+      transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+      position: relative;
+    }
+    .accent-picker__swatch:hover { transform: scale(1.10); }
+    .accent-picker__swatch[data-active="true"] {
+      outline: 2px solid var(--ink);
+      outline-offset: 2px;
+    }
+    .accent-picker__swatch--olive   { --sw: oklch(38% 0.06 135); }
+    .accent-picker__swatch--juniper { --sw: oklch(35% 0.06 175); }
+    .accent-picker__swatch--clay    { --sw: oklch(38% 0.08 25); }
+    .accent-picker__swatch--ochre   { --sw: oklch(50% 0.10 75); }
+    .accent-picker__swatch--slate   { --sw: oklch(22% 0.02 250); }
+    .accent-picker__swatch--none {
+      background: linear-gradient(135deg, var(--paper) 50%, var(--ink) 50%);
+    }
+    .accent-picker__name {
+      min-width: 6ch;
+      font-style: normal;
+      letter-spacing: 0.01em;
+      color: var(--ink);
     }
     @media (max-width: 640px) {
-      :root { --px: 20px; }
-      .hero-headline { font-size: 40px; }
-      .nav-links { display: none; }
-      .why-grid { grid-template-columns: 1fr; }
-      .pipeline-row { grid-template-columns: 1fr; }
-      .final-cta-headline { font-size: 40px; }
+      .accent-picker { bottom: 12px; right: 12px; padding: 8px 10px; gap: 8px; }
+      .accent-picker__label, .accent-picker__name { display: none; }
     }
   </style>
 </head>
@@ -796,31 +870,14 @@
   <script type="text/babel">
     const { useState, useEffect, useRef, useCallback } = React;
 
-    /* ─────────────────────────────────────────────
-       Leaf SVG
-    ───────────────────────────────────────────── */
-    function LeafIcon({ size = 24 }) {
-      return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 2C6.5 6 3 10.5 3 15c0 3.5 2.5 6 6 6 1.5 0 3-.5 3-3V2z" fill="var(--primary)" stroke="var(--primary)" />
-          <path d="M12 2c5.5 4 9 8.5 9 13 0 3.5-2.5 6-6 6-1.5 0-3-.5-3-3V2z" fill="none" stroke="var(--primary)" />
-          <path d="M12 8v10" stroke="var(--bg)" strokeWidth="1" />
-          <path d="M12 11l-2 2" stroke="var(--bg)" strokeWidth="1" />
-          <path d="M12 14l2 2" stroke="var(--bg)" strokeWidth="1" />
-        </svg>
-      );
-    }
-
-    /* ─────────────────────────────────────────────
-       Nav
-    ───────────────────────────────────────────── */
-    function Nav({ onOpenWaitlist }) {
+    /* ─── Nav ─── */
+    function Nav({ onStart }) {
       return (
         <nav className="nav">
           <div className="container">
             <div className="nav-inner">
-              <a href="#" className="nav-logo">
-                <img src="organic-logo.png" alt="Organic" style={{ height: '36px', width: 'auto' }} />
+              <a href="#" className="nav-logo" aria-label="Organic — home">
+                <img src="organic-logo.png" alt="Organic" width="142" height="36" style={{ height: '36px', width: 'auto', display: 'block' }} />
               </a>
               <div className="nav-links">
                 <a href="#why" className="nav-link">Product</a>
@@ -831,7 +888,7 @@
               </div>
               <div className="nav-actions">
                 <a href="/login" className="nav-signin">Sign in</a>
-                <a href="/register" className="btn-primary">Start creating →</a>
+                <button className="btn btn--ink" onClick={onStart}>Start free <span className="btn-arrow">↗</span></button>
               </div>
             </div>
           </div>
@@ -839,150 +896,133 @@
       );
     }
 
-    /* ─────────────────────────────────────────────
-       Terminal
-    ───────────────────────────────────────────── */
-    const TERMINAL_SEQ_1 = [
-      { text: '$ organic generate --company greencard-law', style: '' },
-      { text: '[00:01] Loading brand profile + voice…', style: 'dim' },
-      { text: '[00:02] Brand engine: tone=empathetic, pov=second, archetype=guide', style: 'dim' },
-      { text: '[00:03] Topic: "H-1B to Green Card: EB-2 Timeline Guide"', style: 'dim' },
-      { text: '[00:04] Overlap check: 0 similar articles. Safe to publish.', style: 'dim' },
-      { text: '[00:05] Prompt assembled: 3,214 tokens', style: 'dim' },
-      { text: '[00:06] Writing draft via gpt-5.5…', style: 'amber' },
-      { text: '[00:14] Draft complete: 2,340 words', style: '' },
-      { text: '[00:15] Humanizing: rewriting 19 AI patterns…', style: 'amber' },
-      { text: '[00:20] Humanization pass complete', style: '' },
-      { text: '[00:21] Generating hero image (editorial style)…', style: 'amber' },
-      { text: '[00:28] Image composited: 1344×768', style: '' },
-      { text: '[00:29] Fact-check consul: gemini + grok + base verifying…', style: 'amber' },
-      { text: '[00:38] All claims verified. 5 USCIS citations added.', style: 'green' },
-      { text: '[00:39] ✓ Published. Organic complete.', style: 'green' },
+    /* ─── Article Preview ─── */
+    const PREVIEWS = [
+      {
+        topic: 'Greencard Law',
+        date: 'May 2026',
+        words: '2,340 words',
+        title: <span>H-1B to Green Card: the <em>EB-2 Timeline</em></span>,
+        excerpt: 'Residential timelines for employment-based green cards stretched 14% in 2026, with EB-2 priority dates moving slower than EB-3 for the first time in a decade. King County applicants face the longest waits.',
+        chips: ['on-brand', 'editorial', 'fact-checked'],
+        imageSrc: 'immigration-law.png',
+        imageTag: 'Editorial style · paper-and-ink',
+      },
+      {
+        topic: 'TrovaTrip',
+        date: 'May 2026',
+        words: '1,820 words',
+        title: <span>Why <em>group travel</em> is rebounding faster than solo</span>,
+        excerpt: 'Group bookings hit a six-year high in the first quarter of 2026, even as solo travel growth flattened. The pattern holds across three age brackets and four price tiers, and the reasons are stranger than they look.',
+        chips: ['on-brand', 'lifestyle', 'fact-checked'],
+        imageSrc: 'trovatrip-group-travel.png',
+        imageTag: 'Lifestyle style · sun-and-tile',
+      },
+      {
+        topic: 'Northwest Dental',
+        date: 'May 2026',
+        words: '1,640 words',
+        title: <span>Why your <em>dental practice</em> is invisible on Google</span>,
+        excerpt: 'Seven in ten new patients start with a local search, but most dental offices rank below the map pack. The clinics winning that slot post twice a month, answer the same twelve questions, and let the content do the intake. Here is the playbook they follow.',
+        chips: ['on-brand', 'clinical', 'fact-checked'],
+        imageSrc: 'dental-office.png',
+        imageTag: 'Clinical style · clean-light',
+      },
     ];
 
-    const TERMINAL_SEQ_2 = [
-      { text: '$ organic cluster --company greencard-law --topic "family-based immigration"', style: '' },
-      { text: '[00:01] Analyzing topic space…', style: 'dim' },
-      { text: '[00:03] Cluster strategy generated: 1 pillar + 6 supporting pages', style: '' },
-      { text: '[00:04] Pillar: "Family-Based Green Cards: The Complete 2026 Guide"', style: 'dim' },
-      { text: '[00:05] ├─ Supporting: "I-130 Petition Processing Times"', style: 'dim' },
-      { text: '[00:05] ├─ Supporting: "Affidavit of Support: Income Requirements"', style: 'dim' },
-      { text: '[00:06] ├─ Supporting: "Consular Processing vs. Adjustment of Status"', style: 'dim' },
-      { text: '[00:06] ├─ Supporting: "How Marriage Affects Your Green Card Timeline"', style: 'dim' },
-      { text: '[00:07] ├─ Supporting: "USCIS Interview Prep: What to Expect"', style: 'dim' },
-      { text: '[00:07] └─ Long-tail: "Can Stepchildren Get Green Cards?"', style: 'dim' },
-      { text: '[00:08] Internal linking map built: 14 cross-links', style: '' },
-      { text: '[00:09] Generating 7 articles in parallel…', style: 'amber' },
-      { text: '[01:42] All 7 drafts complete: 12,480 total words', style: '' },
-      { text: '[01:43] Humanizing all articles…', style: 'amber' },
-      { text: '[02:10] Fact-check consul: verifying 7 articles…', style: 'amber' },
-      { text: '[03:01] ✓ Cluster published. 7 articles, 38 citations.', style: 'green' },
-    ];
-
-    const TERMINAL_SEQ_3 = [
-      { text: '$ organic brand --import https://trovatrip.com', style: '' },
-      { text: '[00:01] Crawling homepage + 4 subpages…', style: 'dim' },
-      { text: '[00:06] Extracted: name, tagline, mission, tone, colors', style: '' },
-      { text: '[00:07] Generating voice profile from writing samples…', style: 'amber' },
-      { text: '[00:12] Voice: conversational, second-person, active verbs', style: '' },
-      { text: '[00:13] Generating editorial guidelines…', style: 'amber' },
-      { text: '[00:18] Editorial guidelines complete: 1,240 tokens', style: '' },
-      { text: '[00:19] Generating SEO content strategy…', style: 'amber' },
-      { text: '[00:24] SEO strategy complete: keyword clustering enabled', style: '' },
-      { text: '[00:25] Extracting 2 image styles from brand photography…', style: 'amber' },
-      { text: '[00:31] Image styles created: "editorial" + "lifestyle"', style: '' },
-      { text: '[00:32] ✓ Brand profile complete. Ready to create content.', style: 'green' },
-    ];
-
-    const TERMINAL_SEQUENCES = [TERMINAL_SEQ_1, TERMINAL_SEQ_2, TERMINAL_SEQ_3];
-
-    function Terminal() {
-      const [seqIndex, setSeqIndex] = useState(0);
-      const [visibleCount, setVisibleCount] = useState(0);
-
-      const currentSeq = TERMINAL_SEQUENCES[seqIndex];
+    function ArticlePreview() {
+      const [active, setActive] = useState(0);
+      const [display, setDisplay] = useState(0);
+      const [phase, setPhase] = useState('in'); // 'in' | 'out'
+      const cardRef = useRef(null);
 
       useEffect(() => {
-        const interval = setInterval(() => {
-          setVisibleCount(prev => {
-            if (prev >= currentSeq.length) {
-              // Pause, then advance to next sequence
-              setTimeout(() => {
-                setSeqIndex(s => (s + 1) % TERMINAL_SEQUENCES.length);
-                setVisibleCount(0);
-              }, 1200);
-              return prev;
-            }
-            return prev + 1;
-          });
-        }, 650);
-        return () => clearInterval(interval);
-      }, [seqIndex, currentSeq.length]);
+        const id = setInterval(() => {
+          setPhase('out');
+          setTimeout(() => {
+            setActive(n => (n + 1) % PREVIEWS.length);
+          }, 350);
+        }, 5200);
+        return () => clearInterval(id);
+      }, []);
+
+      useEffect(() => {
+        setDisplay(active);
+        setPhase('in');
+      }, [active]);
+
+      const p = PREVIEWS[display];
+      const cardClass = `preview-card ${phase === 'out' ? 'fade-out' : 'fade-in'}`;
 
       return (
-        <div className="terminal">
-          <div className="terminal-chrome">
-            <div className="terminal-dot terminal-dot--red" />
-            <div className="terminal-dot terminal-dot--yellow" />
-            <div className="terminal-dot terminal-dot--green" />
-            <span className="terminal-title">generation.log</span>
-          </div>
-          <div className="terminal-body">
-            {currentSeq.slice(0, visibleCount).map((line, i) => (
-              <div
-                key={`${seqIndex}-${i}`}
-                className={`terminal-line ${line.style === 'dim' ? 'terminal-line--dim' : ''} ${line.style === 'green' ? 'terminal-line--green' : ''} ${line.style === 'amber' ? 'terminal-line--amber' : ''}`}
-              >
-                {line.text}
+        <div className="preview">
+          <div className="preview-stamp">on brand</div>
+          <article className={cardClass} ref={cardRef}>
+            <div className="preview-image-wrap">
+              <img
+                className="preview-image"
+                src={p.imageSrc || `https://picsum.photos/seed/${p.imageSeed}/720/580`}
+                alt={`${p.topic} editorial photograph`}
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                loading="lazy"
+              />
+              <div className="preview-image-tint" />
+              <div className="preview-image-overlay" />
+              <div className="preview-image-tag">{p.imageTag}</div>
+            </div>
+            <div className="preview-body">
+              <div className="preview-meta">
+                <span>{p.topic}</span>
+                <span className="preview-meta-dot" />
+                <span>{p.words}</span>
+                <span className="preview-meta-dot" />
+                <span>{p.date}</span>
               </div>
-            ))}
-            <span className="terminal-cursor">▌</span>
-          </div>
+              <h3 className="preview-title">{p.title}</h3>
+              <p className="preview-excerpt">{p.excerpt}</p>
+              <div className="preview-chips">
+                {p.chips.map(c => (
+                  <span className={`chip${c === 'fact-checked' ? ' chip--verified' : ''}`} key={c}>
+                    {c === 'fact-checked' && <span className="chip-dot" />}{c}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </article>
         </div>
       );
     }
 
-    /* ─────────────────────────────────────────────
-       Hero
-    ───────────────────────────────────────────── */
-    function Hero({ onOpenWaitlist }) {
+    /* ─── Hero ─── */
+    function Hero({ onStart }) {
       return (
-        <section className="hero section-border">
+        <section className="hero">
           <div className="container">
             <div className="hero-grid">
               <div>
-                <div className="eyebrow">The AI Content Platform</div>
+                <div className="kicker">The AI content platform</div>
                 <h1 className="hero-headline">
-                  All Organic content generation &amp; traffic.
+                  Sound like your <em>brand.</em><br />
+                  Not like AI.
                 </h1>
                 <p className="hero-lede">
-                  Organic turns a single prompt into on-brand articles, content clusters, and hero images — with built-in fact-checking, humanization, and visual style matching. Manage every brand from one studio.
+                  One prompt to Organic. The article comes back in your brand's voice, cluster and hero image included. Multiple models verify the claims. The humanizer rewrites the AI tells. One studio, every brand.
                 </p>
                 <div className="hero-ctas">
-                  <button className="btn-primary" onClick={onOpenWaitlist}>Get started free →</button>
-                  <a href="#pipeline" className="btn-secondary">See the pipeline</a>
+                  <button className="btn btn--ink" onClick={onStart}>
+                    Start free <span className="btn-arrow">↗</span>
+                  </button>
+                  <a href="#pipeline" className="btn btn--ghost">See the pipeline</a>
                 </div>
-                <div className="hero-stats">
-                  <div className="hero-stat">
-                    <div className="hero-stat-number">200+</div>
-                    <div className="hero-stat-label">Banned AI phrases</div>
-                  </div>
-                  <div className="hero-stat">
-                    <div className="hero-stat-number">6+</div>
-                    <div className="hero-stat-label">Writing models</div>
-                  </div>
-                  <div className="hero-stat">
-                    <div className="hero-stat-number">3</div>
-                    <div className="hero-stat-label">Fact-check models</div>
-                  </div>
-                  <div className="hero-stat">
-                    <div className="hero-stat-number">7</div>
-                    <div className="hero-stat-label">Pipeline stages</div>
-                  </div>
+                <div className="hero-tags">
+                  <span className="hero-tag">200 banned AI phrases</span>
+                  <span className="hero-tag">6 writing models</span>
+                  <span className="hero-tag">3-way fact-check</span>
+                  <span className="hero-tag">7-stage pipeline</span>
                 </div>
               </div>
               <div>
-                <Terminal />
+                <ArticlePreview />
               </div>
             </div>
           </div>
@@ -990,99 +1030,112 @@
       );
     }
 
-    /* ─────────────────────────────────────────────
-       Why Organic
-    ───────────────────────────────────────────── */
-    const WHY_CARDS = [
-      {
-        num: '01',
-        title: 'Brand engine',
-        body: 'Voice profiles, editorial guidelines, banned words, and brand archetypes shape every prompt. Import any brand from a URL in seconds.',
-      },
-      {
-        num: '02',
-        title: 'Humanization',
-        body: '17 known AI writing patterns detected and rewritten. 200+ cliché phrases banned. Auto-humanize runs per company. Output passes every detector we have tested.',
-      },
-      {
-        num: '03',
-        title: 'Fact-check consul',
-        body: 'Three independent models cross-verify every claim. One-click rewrites for disputed facts. Citations sourced and anchored to publication dates.',
-      },
-      {
-        num: '04',
-        title: 'SEO + AEO + GEO',
-        body: 'Structured data, FAQ schema, keyword clusters, and answer-engine optimization built into every article. Rank on Google. Appear in AI answers.',
-      },
-      {
-        num: '05',
-        title: 'Content architecture',
-        body: 'Pillar pages, supporting articles, and long-tail content organized into topical clusters. Internal links mapped automatically. Overlap detection prevents cannibalization.',
-      },
-      {
-        num: '06',
-        title: 'Multi-brand studio',
-        body: 'Manage unlimited brands from one dashboard. Each company gets its own voice profile, image styles, editorial rules, and prompt templates.',
-      },
-    ];
-
+    /* ─── Why Organic ─── */
     function WhyOrganic() {
       return (
-        <section className="why section-border" id="why">
+        <section className="section section--stone" id="why">
           <div className="container">
-            <div className="section-header">
-              <div className="eyebrow">Why Organic</div>
-              <h2 className="section-headline">
-                Six capabilities make <em>On Brand</em> AI content <em>publish-ready.</em>
+            <div className="section-head">
+              <h2 className="section-head__title">
+                Four reasons it <em>doesn't read like AI.</em>
               </h2>
+              <p className="section-head__sub">
+                Organic isn't a wrapper on a chat model. The output is shaped by a brand engine, rewritten by a humanizer, cross-checked by three models, and tied to a single studio that holds every brand.
+              </p>
             </div>
-            <div className="why-grid">
-              {WHY_CARDS.map(card => (
-                <div className="why-card" key={card.num}>
-                  <div className="why-card-number">{card.num}</div>
-                  <div className="why-card-title">{card.title}</div>
-                  <div className="why-card-body">{card.body}</div>
-                </div>
-              ))}
+
+            <div className="why-feature">
+              <div className="why-feature__media">
+                <img
+                  className="why-feature__img"
+                  src="brand-engine.png"
+                  alt="A brand reference book opened on a desk, marking the editorial source for an Organic brand profile."
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  loading="lazy"
+                />
+                <div className="why-feature__media-tint" />
+                <div className="why-feature__media-overlay" />
+                <div className="why-feature__media-stamp">brand-engine</div>
+                <div className="why-feature__media-tag">Imported from greencard-law.com · 12 sec</div>
+              </div>
+              <div>
+                <div className="why-feature__num">i. Brand engine</div>
+                <h3 className="why-feature__title">
+                  Voice profiles, editorial guidelines, banned words, archetypes. Import any brand from a <em>URL</em> in seconds.
+                </h3>
+                <p className="why-feature__body">
+                  Drop a homepage. Organic crawls the site, pulls writing samples, and produces a structured voice profile: tone descriptors, sentence rhythm, banned phrases, length rules.
+                </p>
+                <p className="why-feature__body">
+                  Edit any field, save it, and every future article writes against it. Reference articles are auto-fetched, cached, and injected as gold-standard few-shot examples. The brand engine is the part you tune once and use forever.
+                </p>
+              </div>
+            </div>
+
+            <div className="why-supporting">
+              <div className="why-support">
+                <div className="why-support__num">ii. Humanization</div>
+                <h3 className="why-support__title">
+                  17 AI patterns rewritten. <em>200</em> cliché phrases banned.
+                </h3>
+                <p className="why-support__body">
+                  Each draft runs through a second pass that detects AI rhythm tells and rewrites them. Auto-humanize is per-brand. Output passes every detector we've tested.
+                </p>
+              </div>
+              <div className="why-support">
+                <div className="why-support__num">iii. Fact-check council</div>
+                <h3 className="why-support__title">
+                  Multiple models <em>cross-verify</em> every claim.
+                </h3>
+                <p className="why-support__body">
+                  Gemini, Grok, and a base model each verify the article. Disputed claims surface inline with one-click rewrites. Citations are sourced, anchored to publication dates, and embedded as schema.
+                </p>
+              </div>
+              <div className="why-support">
+                <div className="why-support__num">iv. Content architecture</div>
+                <h3 className="why-support__title">
+                  Pillar pages and <em>topical clusters.</em>
+                </h3>
+                <p className="why-support__body">
+                  Describe a topic. Organic returns a pillar plus six supporting pages, internal links mapped, overlap detection on. Generates the whole cluster in parallel, verifies it as a set.
+                </p>
+              </div>
             </div>
           </div>
         </section>
       );
     }
 
-    /* ─────────────────────────────────────────────
-       Pipeline
-    ───────────────────────────────────────────── */
-    const PIPELINE_STEPS = [
-      { num: '01', name: 'Brand', body: 'Load company voice, style rules, and editorial guidelines.', chips: ['brand-engine'] },
-      { num: '02', name: 'Write', body: 'Long-form draft from your brand-tuned prompt.', chips: ['gpt-5.5'] },
-      { num: '03', name: 'Humanize', body: 'Rewrite AI patterns. Remove banned phrases.', chips: ['gpt-5.5'] },
-      { num: '04', name: 'Image', body: 'Hero composited in your brand\'s visual style.', chips: ['gpt-image-1'] },
-      { num: '05', name: 'Verify', body: 'Cross-model fact-check. Citations anchored.', chips: ['gemini-3.1-pro', 'grok-4'] },
-      { num: '06', name: 'Edit', body: 'Rich editor with YouTube, tables, and inline images.', chips: ['tiptap'] },
-      { num: '07', name: 'Publish', body: 'Push to WordPress, Webflow, or export HTML.', chips: ['api'] },
+    /* ─── Pipeline ─── */
+    const STAGES = [
+      { name: 'Brand',    chip: 'brand-engine' },
+      { name: 'Write',    chip: 'voice-matched' },
+      { name: 'Humanize', chip: 'anti-AI' },
+      { name: 'Image',    chip: 'gpt-image-1' },
+      { name: 'Verify',   chip: '3-model' },
+      { name: 'Edit',     chip: 'tiptap' },
+      { name: 'Publish',  chip: 'wordpress' },
     ];
 
     function Pipeline() {
       return (
-        <section className="pipeline section-border" id="pipeline">
+        <section className="section" id="pipeline">
           <div className="container">
-            <div className="section-header">
-              <div className="eyebrow">Pipeline</div>
-              <h2 className="section-headline">
+            <div className="section-head">
+              <h2 className="section-head__title">
                 Seven stages. <em>One click.</em>
               </h2>
+              <p className="section-head__sub">
+                A prompt enters at Brand. Three minutes later, a fact-checked, brand-voiced article with a hero image leaves at Publish. Every stage is inspectable, swappable, and overridable per brand.
+              </p>
             </div>
-            <div className="pipeline-row">
-              {PIPELINE_STEPS.map(step => (
-                <div className="pipeline-step" key={step.num}>
-                  <div className="pipeline-step-number">{step.num}</div>
-                  <div className="pipeline-step-name">{step.name}</div>
-                  <div className="pipeline-step-body">{step.body}</div>
+            <div className="pipeline-flow">
+              {STAGES.map((s, idx) => (
+                <div className="pipeline-node" key={s.name}>
+                  <div className="pipeline-node__dot">{romanize(idx + 1)}</div>
                   <div>
-                    {step.chips.map(chip => (
-                      <span className="pipeline-chip" key={chip}>{chip}</span>
-                    ))}
+                    <div className="pipeline-node__name">{s.name}</div>
+                    <div className="pipeline-node__chip">{s.chip}</div>
                   </div>
                 </div>
               ))}
@@ -1092,12 +1145,14 @@
       );
     }
 
-    /* ─────────────────────────────────────────────
-       Before / After Slider
-    ───────────────────────────────────────────── */
+    function romanize(n) {
+      return ['i','ii','iii','iv','v','vi','vii'][n - 1] || String(n);
+    }
+
+    /* ─── Before / After ─── */
     function BeforeAfter() {
       const [pos, setPos] = useState(50);
-      const [containerWidth, setContainerWidth] = useState(0);
+      const [w, setW] = useState(0);
       const containerRef = useRef(null);
       const dragging = useRef(false);
 
@@ -1113,12 +1168,10 @@
         const el = containerRef.current;
         if (!el) return;
         const ro = new ResizeObserver(entries => {
-          for (const entry of entries) {
-            setContainerWidth(entry.contentRect.width);
-          }
+          for (const entry of entries) setW(entry.contentRect.width);
         });
         ro.observe(el);
-        setContainerWidth(el.offsetWidth);
+        setW(el.offsetWidth);
         return () => ro.disconnect();
       }, []);
 
@@ -1126,7 +1179,6 @@
         const onMouseMove = (e) => handleMove(e.clientX);
         const onTouchMove = (e) => handleMove(e.touches[0].clientX);
         const onUp = () => { dragging.current = false; };
-
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('touchmove', onTouchMove);
         document.addEventListener('mouseup', onUp);
@@ -1140,132 +1192,136 @@
       }, [handleMove]);
 
       const beforeTags = ['"dive in"', '"landscape"', '"crucial"', 'no data', 'no citations'];
-      const afterTags = ['22% cost drop', '47-day permits', 'WA-specific', 'cited', '2023 anchor', 'FAQ schema'];
+      const afterTags  = ['22% cost drop', '47-day permits', 'WA-specific', 'cited', '2023 anchor', 'FAQ schema'];
 
       return (
-        <section className="beforeafter section-border" id="beforeafter">
+        <section className="section section--stone" id="beforeafter">
           <div className="container">
-            <div className="section-header">
-              <div className="eyebrow">Before &amp; After</div>
-              <h2 className="section-headline">
-                Raw GPT vs. <em>Organic output.</em>
+            <div className="section-head">
+              <h2 className="section-head__title">
+                Raw GPT, then <em>Organic.</em>
               </h2>
+              <p className="section-head__sub">
+                The same prompt, run through a vanilla writing model versus the Organic pipeline. Drag the divider.
+              </p>
             </div>
-            <div
-              className="slider-container"
-              ref={containerRef}
-              onMouseDown={() => { dragging.current = true; }}
-              onTouchStart={() => { dragging.current = true; }}
-            >
-              {/* After (base layer) */}
-              <div className="slider-side slider-after">
-                <div className="slider-label slider-label--after">
+            <div className="ba" ref={containerRef}>
+              <div className="ba-side ba-after">
+                <div className="ba-label ba-label--after">
                   <span className="live-dot" />
-                  After · Organic
+                  After, Organic
                 </div>
-                <p className="slider-text slider-text--after">
-                  Residential solar installations in Washington state dropped 22% in cost since 2023, but permitting delays now average 47 days — triple the national median. King County homeowners face the longest waits. Here is what the data shows and how to navigate the process.
+                <p className="ba-text ba-text--after">
+                  Residential solar installations in Washington dropped 22% in cost since 2023, but permitting now averages 47 days. King County homeowners face the longest waits. Here is what the data shows and how to clear it.
                 </p>
-                <div className="slider-tags">
-                  {afterTags.map(t => <span className="slider-tag slider-tag--moss" key={t}>{t}</span>)}
+                <div className="ba-tags">
+                  {afterTags.map(t => <span className="ba-tag ba-tag--verified" key={t}>{t}</span>)}
                 </div>
               </div>
 
-              {/* Before (overlay, clipped) */}
-              <div className="slider-before-wrap" style={{ width: `${pos}%` }}>
-                <div className="slider-before" style={{ width: containerWidth || '100%' }}>
-                  <div className="slider-label slider-label--before">Before · Raw GPT</div>
-                  <p className="slider-text slider-text--before">
+              <div className="ba-before-wrap" style={{ width: `${pos}%` }}>
+                <div className="ba-before" style={{ width: w || '100%' }}>
+                  <div className="ba-label">Before, raw GPT</div>
+                  <p className="ba-text ba-text--before">
                     Solar energy is an important pathway for homeowners looking to reduce their electricity bills. In an ever-evolving landscape, it is crucial to dive in and understand the nuances of going solar. Many experts agree that harnessing the power of the sun is a game-changer for sustainable living.
                   </p>
-                  <div className="slider-tags">
-                    {beforeTags.map(t => <span className="slider-tag slider-tag--clay" key={t}>{t}</span>)}
+                  <div className="ba-tags">
+                    {beforeTags.map(t => <span className="ba-tag ba-tag--muted" key={t}>{t}</span>)}
                   </div>
                 </div>
               </div>
 
-              {/* Handle */}
-              <div className="slider-handle" style={{ left: `${pos}%` }}>
-                <div className="slider-knob">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M5 3L2 8L5 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M11 3L14 8L11 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <div className="ba-handle" style={{ left: `${pos}%` }}>
+                <div className="ba-knob">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M5 3L2 8L5 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M11 3L14 8L11 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </div>
               </div>
+              <div
+                className="ba-knob-area"
+                style={{ left: `calc(${pos}% - 40px)` }}
+                onMouseDown={() => { dragging.current = true; }}
+                onTouchStart={() => { dragging.current = true; }}
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Compare before and after"
+                aria-valuenow={Math.round(pos)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowLeft') setPos(p => Math.max(0, p - 5));
+                  if (e.key === 'ArrowRight') setPos(p => Math.min(100, p + 5));
+                }}
+              />
             </div>
           </div>
         </section>
       );
     }
 
-    /* ─────────────────────────────────────────────
-       Pricing
-    ───────────────────────────────────────────── */
+    /* ─── Pricing ─── */
     const TIERS = [
       {
         name: 'Starter',
         price: '$99',
-        period: '/mo',
-        perArticle: '$3.96/article',
+        period: '/month',
+        per: '$3.96 per article',
         featured: false,
         badge: null,
-        features: ['25 articles/month', '$3.50 per extra article', 'Solo use', 'Content clusters + overlap detection', 'Brand import from URL'],
-        cta: 'Start free',
+        features: ['25 articles / month', '$3.50 per extra article', 'Solo use', 'Content clusters, overlap detection', 'Brand import from URL'],
       },
       {
         name: 'Standard',
         price: '$299',
-        period: '/mo',
-        perArticle: '$3.74/article',
+        period: '/month',
+        per: '$3.74 per article',
         featured: true,
-        badge: 'POPULAR',
-        features: ['80 articles/month', '$3.00 per extra article', '3 team seats (+$25/extra)', 'Visual style extraction + model bake-off', 'API, MCP server, and webhooks'],
-        cta: 'Start free',
+        badge: 'most teams',
+        features: ['80 articles / month', '$3.00 per extra article', '3 team seats, $25 each beyond', 'Visual style extraction, model bake-off', 'API, MCP server, webhooks'],
       },
       {
         name: 'Scale',
         price: '$999',
-        period: '/mo',
-        perArticle: '$3.33/article',
+        period: '/month',
+        per: '$3.33 per article',
         featured: false,
         badge: null,
-        features: ['300 articles/month', '$2.50 per extra article', '10 team seats (+$20/extra)', 'Unlimited brands + custom prompt templates', 'Priority support + dedicated onboarding'],
-        cta: 'Start free',
+        features: ['300 articles / month', '$2.50 per extra article', '10 team seats, $20 each beyond', 'Unlimited brands, custom prompt templates', 'Priority support, dedicated onboarding'],
       },
     ];
 
-    function Pricing({ onOpenWaitlist }) {
+    function Pricing({ onStart }) {
       return (
-        <section className="pricing section-border" id="pricing">
+        <section className="section" id="pricing">
           <div className="container">
-            <div className="section-header">
-              <div className="eyebrow">Pricing</div>
-              <h2 className="section-headline">
-                Simple plans. <em>No per-word billing.</em>
+            <div className="section-head">
+              <h2 className="section-head__title">
+                Three plans. <em>No per-word billing.</em>
               </h2>
+              <p className="section-head__sub">
+                Pricing is by the article, with a flat overage rate. No tokens to count, no surprises at the end of the month.
+              </p>
             </div>
             <div className="pricing-grid">
-              {TIERS.map(tier => (
-                <div className={`pricing-tier ${tier.featured ? 'pricing-tier--featured' : ''}`} key={tier.name}>
-                  <div className="pricing-eyebrow">
-                    {tier.name}
-                    {tier.badge && <span className="pricing-eyebrow-badge">{tier.badge}</span>}
+              {TIERS.map(t => (
+                <div className={`tier ${t.featured ? 'tier--featured' : ''}`} key={t.name}>
+                  <div className="tier__name">
+                    {t.name}
+                    {t.badge && <span className="tier__badge">{t.badge}</span>}
                   </div>
-                  <div className="pricing-price">{tier.price}</div>
-                  <div className="pricing-period">{tier.period}</div>
-                  <div className="pricing-per-article">{tier.perArticle}</div>
-                  <ul className="pricing-features">
-                    {tier.features.map(f => (
-                      <li className="pricing-feature" key={f}>{f}</li>
-                    ))}
+                  <div className="tier__price">{t.price}</div>
+                  <div className="tier__period">{t.period}</div>
+                  <div className="tier__per">{t.per}</div>
+                  <ul className="tier__features">
+                    {t.features.map(f => <li className="tier__feature" key={f}>{f}</li>)}
                   </ul>
-                  <div className="pricing-cta">
-                    {tier.featured ? (
-                      <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={onOpenWaitlist}>{tier.cta} →</button>
-                    ) : (
-                      <button className="btn-secondary" style={{ width: '100%', justifyContent: 'center' }} onClick={onOpenWaitlist}>{tier.cta} →</button>
-                    )}
+                  <div className="tier__cta">
+                    <button className={`btn ${t.featured ? 'btn--paper' : 'btn--ink'}`} onClick={onStart}>
+                      Start free <span className="btn-arrow">↗</span>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1275,41 +1331,37 @@
       );
     }
 
-    /* ─────────────────────────────────────────────
-       Final CTA
-    ───────────────────────────────────────────── */
-    function FinalCTA({ onOpenWaitlist }) {
+    /* ─── Final CTA ─── */
+    function FinalCTA({ onStart }) {
       return (
-        <section className="final-cta section-border">
+        <section className="final-cta">
           <div className="container">
             <h2 className="final-cta-headline">
-              Less AI.<br />
-              <em>More Organic.</em>
+              Less AI.<br /> <em>More Organic.</em>
             </h2>
             <p className="final-cta-lede">
               Import your brand. Generate your first cluster. Publish in minutes.
             </p>
-            <button className="btn-primary" onClick={onOpenWaitlist}>Get started free →</button>
+            <button className="btn btn--paper" onClick={onStart}>
+              Start free <span className="btn-arrow">↗</span>
+            </button>
           </div>
         </section>
       );
     }
 
-    /* ─────────────────────────────────────────────
-       Footer
-    ───────────────────────────────────────────── */
+    /* ─── Footer ─── */
     function Footer() {
       return (
         <footer className="footer">
           <div className="container">
             <div className="footer-inner">
-              <div className="footer-left">© All Organic, INC, a PSL Company</div>
+              <div className="footer-left">© Organic, Inc. A PSL company.</div>
               <div className="footer-right">
                 <a href="docs.html" className="footer-link">Docs</a>
                 <a href="changelog.html" className="footer-link">Changelog</a>
-                <a href="#" className="footer-link">MCP Server</a>
-                <a href="#" className="footer-link">Twitter</a>
-                <a href="#" className="footer-link">Privacy</a>
+                <a href="docs.html#mcp" className="footer-link">MCP server</a>
+                <a href="/privacy" className="footer-link">Privacy</a>
               </div>
             </div>
           </div>
@@ -1317,13 +1369,8 @@
       );
     }
 
-    /* ─────────────────────────────────────────────
-       App
-    ───────────────────────────────────────────── */
-    /* ─────────────────────────────────────────────
-       Waitlist Modal
-    ───────────────────────────────────────────── */
-    function WaitlistModal({ open, onClose }) {
+    /* ─── Modal ─── */
+    function StartModal({ open, onClose }) {
       const [email, setEmail] = useState('');
       const [submitting, setSubmitting] = useState(false);
       const [submitted, setSubmitted] = useState(false);
@@ -1331,16 +1378,13 @@
 
       useEffect(() => {
         if (!open) {
-          // Reset state when closed
-          setTimeout(() => {
-            setEmail('');
-            setSubmitted(false);
-            setError(null);
+          const t = setTimeout(() => {
+            setEmail(''); setSubmitted(false); setError(null);
           }, 300);
+          return () => clearTimeout(t);
         }
       }, [open]);
 
-      // Close on Escape
       useEffect(() => {
         if (!open) return;
         const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -1352,7 +1396,6 @@
         e.preventDefault();
         if (!email.trim() || submitting) return;
 
-        // Secret passphrase: typing "GO" redirects straight to the app
         if (email.trim().toUpperCase() === 'GO') {
           localStorage.setItem('organic_gate_unlocked', 'true');
           const appUrl = window.location.protocol === 'file:' ? 'http://localhost:3001/studio' : '/studio';
@@ -1360,15 +1403,13 @@
           return;
         }
 
-        // Basic email validation for normal submissions
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-          setError('Please enter a valid email address.');
+          setError('That email does not look right. Try a different one.');
           return;
         }
 
         setSubmitting(true);
         setError(null);
-
         try {
           const r = await fetch('/api/waitlist', {
             method: 'POST',
@@ -1376,9 +1417,8 @@
             body: JSON.stringify({ email: email.trim() }),
           });
           const data = await r.json();
-          if (!r.ok) throw new Error(data?.error || 'Submission failed');
+          if (!r.ok) throw new Error(data?.error || 'Something went wrong. Try again in a moment.');
           setSubmitted(true);
-          // Unlock the app gate and redirect after a brief pause
           localStorage.setItem('organic_gate_unlocked', 'true');
           setTimeout(() => { window.location.href = '/studio'; }, 1500);
         } catch (err) {
@@ -1392,45 +1432,45 @@
 
       return (
         <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-          <div className="modal-card" style={{ position: 'relative' }}>
+          <div className="modal-card">
             <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
 
             {!submitted ? (
               <>
-                <div className="modal-eyebrow">Private Beta</div>
+                <div className="modal-kicker">Start free</div>
                 <h2 className="modal-title">
-                  Join the <em>waitlist.</em>
+                  Spin up <em>your studio.</em>
                 </h2>
                 <p className="modal-subtitle">
-                  Organic is in private beta. Enter your email to get early access.
+                  Enter your email. We will set up your studio and open it in a moment. Cancel anytime in the first 7 days.
                 </p>
                 <form onSubmit={onSubmit}>
                   <input
-                    type="text"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    spellCheck={false}
+                    required
                     className="modal-input"
                     placeholder="you@company.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     autoFocus
                   />
-                  <button
-                    type="submit"
-                    className="modal-submit"
-                    disabled={submitting || !email.trim()}
-                  >
-                    {submitting ? 'Submitting…' : 'Get early access →'}
+                  <button type="submit" className="modal-submit" disabled={submitting || !email.trim()}>
+                    {submitting ? 'Setting up…' : <>Open my studio <span className="btn-arrow">↗</span></>}
                   </button>
                 </form>
                 {error && <p className="modal-error">{error}</p>}
               </>
             ) : (
               <>
-                <div className="modal-success-icon">✓</div>
+                <div className="modal-success-mark">✓</div>
                 <h2 className="modal-title">
-                  You're <em>in.</em>
+                  Your studio is <em>opening.</em>
                 </h2>
                 <p className="modal-subtitle" style={{ marginBottom: 0 }}>
-                  We'll reach out when it's your turn.
+                  Sit tight for a second. We're routing you in.
                 </p>
               </>
             )}
@@ -1439,25 +1479,71 @@
       );
     }
 
-    /* ─────────────────────────────────────────────
-       App
-    ───────────────────────────────────────────── */
+    /* ─── TEMP: Accent picker (dev affordance — remove once accent is chosen) ─── */
+    const ACCENT_OPTIONS = [
+      { id: 'olive',   label: 'Olive' },
+      { id: 'juniper', label: 'Juniper' },
+      { id: 'clay',    label: 'Clay' },
+      { id: 'ochre',   label: 'Ochre' },
+      { id: 'slate',   label: 'Slate' },
+      { id: 'none',    label: 'None' },
+    ];
+
+    function AccentPicker() {
+      const [accent, setAccent] = useState(() => {
+        if (typeof window === 'undefined') return 'olive';
+        const fromAttr = document.documentElement.getAttribute('data-accent');
+        if (fromAttr && ACCENT_OPTIONS.some(a => a.id === fromAttr)) return fromAttr;
+        return 'olive';
+      });
+
+      useEffect(() => {
+        document.documentElement.setAttribute('data-accent', accent);
+        try { localStorage.setItem('organic_accent', accent); } catch (e) {}
+      }, [accent]);
+
+      const current = ACCENT_OPTIONS.find(a => a.id === accent) || ACCENT_OPTIONS[0];
+
+      return (
+        <aside className="accent-picker" role="region" aria-label="Accent color preview">
+          <span className="accent-picker__label">accent</span>
+          <div className="accent-picker__swatches" role="radiogroup" aria-label="Choose accent">
+            {ACCENT_OPTIONS.map(a => (
+              <button
+                key={a.id}
+                className={`accent-picker__swatch accent-picker__swatch--${a.id}`}
+                data-active={accent === a.id}
+                onClick={() => setAccent(a.id)}
+                aria-label={a.label}
+                title={a.label}
+                role="radio"
+                aria-checked={accent === a.id}
+              />
+            ))}
+          </div>
+          <span className="accent-picker__name">{current.label}</span>
+        </aside>
+      );
+    }
+
+    /* ─── App ─── */
     function App() {
-      const [waitlistOpen, setWaitlistOpen] = useState(false);
-      const openWaitlist = useCallback(() => setWaitlistOpen(true), []);
-      const closeWaitlist = useCallback(() => setWaitlistOpen(false), []);
+      const [modalOpen, setModalOpen] = useState(false);
+      const open  = useCallback(() => setModalOpen(true), []);
+      const close = useCallback(() => setModalOpen(false), []);
 
       return (
         <>
-          <Nav onOpenWaitlist={openWaitlist} />
-          <Hero onOpenWaitlist={openWaitlist} />
+          <Nav onStart={open} />
+          <Hero onStart={open} />
           <WhyOrganic />
           <Pipeline />
           <BeforeAfter />
-          <Pricing onOpenWaitlist={openWaitlist} />
-          <FinalCTA onOpenWaitlist={openWaitlist} />
+          <Pricing onStart={open} />
+          <FinalCTA onStart={open} />
           <Footer />
-          <WaitlistModal open={waitlistOpen} onClose={closeWaitlist} />
+          <StartModal open={modalOpen} onClose={close} />
+          <AccentPicker />
         </>
       );
     }
