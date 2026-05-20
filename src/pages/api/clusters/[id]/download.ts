@@ -63,7 +63,7 @@ function buildStandaloneHtml(article: {
             max-width: 780px;
             margin: 0 auto;
             padding: 40px 24px;
-            color: #1a1a1a;
+            color: #2c2c2c;
             line-height: 1.7;
             background: #fff;
         }
@@ -439,7 +439,7 @@ function buildClusterOverviewHtml(
             max-width: 900px;
             margin: 0 auto;
             padding: 40px 24px;
-            color: #1a1a1a;
+            color: #2c2c2c;
             line-height: 1.6;
             background: #fff;
         }

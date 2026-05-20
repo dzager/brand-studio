@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useTaskStore, type Task, type TaskStatus } from "@/lib/taskStore";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/router";
 import { matchFactsForCompany, shuffleArray, type FunFact } from "@/lib/funFacts";
 
 /* ── Helpers ───────────────────────────────────────────── */
@@ -35,6 +36,7 @@ const TYPE_LABELS: Record<string, string> = {
   research: "Research",
   "research-brief": "Brief",
   "research-article": "Research → Article",
+  "freshness-audit": "Freshness Audit",
 };
 
 /* ── localStorage persistence ─────────────────────────── */
@@ -142,6 +144,7 @@ function TaskLine({
   onRemove: (id: string) => void;
   onCancel: (id: string) => void;
 }) {
+  const router = useRouter();
   const isActive = task.status === "running" || task.status === "queued";
   const elapsed = useElapsedTime(task.startedAt, isActive);
   const time = formatElapsed(task.completedAt ? task.completedAt - task.startedAt : elapsed);
@@ -174,6 +177,9 @@ function TaskLine({
 
   // Check if this is a completed image task with a result
   const isCompletedImage = task.status === "completed" && task.meta?.imageTask && task.result?.image_base64;
+
+  // Check if this is a completed task with a deep link
+  const hasDeepLink = task.status === "completed" && task.meta?.link && !isCompletedImage;
 
   function scrollToFeaturedImage() {
     const el = document.getElementById("featured-image");
@@ -289,6 +295,44 @@ function TaskLine({
             }}
           >
             view ↗
+          </button>
+        </div>
+      )}
+
+      {/* Deep link row for completed tasks with a link target */}
+      {hasDeepLink && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            marginTop: 3,
+            marginBottom: 3,
+            marginLeft: 52,
+            padding: "4px 8px",
+            borderRadius: 6,
+            background: "rgba(122,173,90,0.06)",
+            border: "1px solid rgba(122,173,90,0.12)",
+          }}
+        >
+          <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 11 }}>Done</span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push(task.meta!.link);
+            }}
+            style={{
+              color: "#7aad5a",
+              fontSize: 11,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "0 4px",
+              textDecoration: "underline",
+              textUnderlineOffset: 2,
+            }}
+          >
+            {task.meta?.linkLabel || "view"} ↗
           </button>
         </div>
       )}
@@ -565,7 +609,7 @@ export default function TaskPanel() {
       {/* Terminal shell */}
       <div
         style={{
-          background: "#1a1a1a",
+          background: "#2c2c2c",
           border: "1px solid rgba(255,255,255,0.08)",
           borderRadius: 8,
           overflow: "hidden",
@@ -589,10 +633,88 @@ export default function TaskPanel() {
             cursor: "grab",
           }}
         >
-          {/* Traffic-light dots */}
-          <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#c47a5a", flexShrink: 0 }} />
-          <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#c9a84c", flexShrink: 0 }} />
-          <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#5a7a4a", flexShrink: 0 }} />
+          {/* Traffic-light dots — macOS window controls */}
+          <span
+            data-no-drag
+            className="group/dots"
+            style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}
+          >
+            {/* Close — clear all tasks */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                clearCompleted();
+                // Also cancel any active tasks
+                activeTasks.forEach((t) => cancelTask(t.id));
+              }}
+              className="group/close"
+              style={{
+                width: 12, height: 12, borderRadius: "50%", background: "#c47a5a",
+                border: "none", padding: 0, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 8, fontWeight: 700, color: "transparent", lineHeight: 1,
+                transition: "background 0.15s",
+              }}
+              title="Close"
+            >
+              <span className="opacity-0 group-hover/dots:opacity-100 transition-opacity" style={{ color: "rgba(0,0,0,0.7)", fontSize: 9, fontWeight: 800, marginTop: -1 }}>×</span>
+            </button>
+            {/* Minimize — collapse panel */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded(false);
+              }}
+              className="group/min"
+              style={{
+                width: 12, height: 12, borderRadius: "50%", background: "#c9a84c",
+                border: "none", padding: 0, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 8, fontWeight: 700, color: "transparent", lineHeight: 1,
+                transition: "background 0.15s",
+              }}
+              title="Minimize"
+            >
+              <span className="opacity-0 group-hover/dots:opacity-100 transition-opacity" style={{ color: "rgba(0,0,0,0.7)", fontSize: 12, fontWeight: 800, marginTop: -2 }}>−</span>
+            </button>
+            {/* Maximize — expand to full width */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded(true);
+                // Toggle full-width
+                const vw = window.innerWidth;
+                const isFullWidth = geo && geo.width >= vw - 100;
+                if (isFullWidth) {
+                  // Reset to default centered position
+                  setGeo(null);
+                  setHasCustomPos(false);
+                  localStorage.removeItem(STORAGE_KEY);
+                } else {
+                  // Go full width, pinned to bottom
+                  const fullGeo: PanelGeometry = {
+                    x: 16,
+                    y: window.innerHeight - 420,
+                    width: vw - 32,
+                  };
+                  setGeo(fullGeo);
+                  setHasCustomPos(true);
+                  saveGeometry(fullGeo);
+                }
+              }}
+              className="group/max"
+              style={{
+                width: 12, height: 12, borderRadius: "50%", background: "#5a7a4a",
+                border: "none", padding: 0, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 8, fontWeight: 700, color: "transparent", lineHeight: 1,
+                transition: "background 0.15s",
+              }}
+              title="Maximize"
+            >
+              <span className="opacity-0 group-hover/dots:opacity-100 transition-opacity" style={{ color: "rgba(0,0,0,0.7)", fontSize: 10, fontWeight: 800, marginTop: -1 }}>+</span>
+            </button>
+          </span>
 
           {/* Pulse for active tasks */}
           {hasActiveTasks && (

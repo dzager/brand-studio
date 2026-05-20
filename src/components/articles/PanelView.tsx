@@ -3,7 +3,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import ArticleEditor, { type ArticleEditorHandle } from "@/components/articles/ArticleEditor";
-import AIMemeModal from "@/components/ui/ai-meme-modal";
+
 import { useTaskRunner } from "@/hooks/useTaskRunner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
     DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
@@ -191,10 +192,7 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     const [ytSearching, setYtSearching] = useState(false);
     const [ytErr, setYtErr] = useState<string | null>(null);
 
-    // Meme modal — entertains users during heavy AI operations
-    const [memeDismissed, setMemeDismissed] = useState(false);
-    const panelAiWorking = regenerating || compositeGenerating;
-    useEffect(() => { if (panelAiWorking) setMemeDismissed(false); }, [panelAiWorking]);
+
 
     const [fullArticle, setFullArticle] = useState<Article | null>(null);
     const [loadingFull, setLoadingFull] = useState(false);
@@ -310,7 +308,7 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
 
         // Wrap in a minimal styled container for Word compatibility
         const richHtml = [
-            `<div style="font-family:'Segoe UI',Arial,Helvetica,sans-serif;max-width:720px;margin:0 auto;color:#1a1a1a;line-height:1.6">`,
+            `<div style="font-family:'Segoe UI',Arial,Helvetica,sans-serif;max-width:720px;margin:0 auto;color:#2c2c2c;line-height:1.6">`,
             `<h1 style="font-size:28px;font-weight:700;margin-bottom:8px;line-height:1.25">${article.title}</h1>`,
             article.excerpt ? `<p style="font-size:16px;color:#555;font-style:italic;margin-bottom:20px">${article.excerpt}</p>` : "",
             featuredImg,
@@ -1516,6 +1514,10 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                         </Badge>
                     )}
                     {article.model_used && <Badge variant="outline">{article.model_used}</Badge>}
+                    {displayArticle.html && (() => {
+                        const wc = displayArticle.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean).length;
+                        return <Badge variant="outline">{wc.toLocaleString()} words</Badge>;
+                    })()}
                     <span className="text-xs text-muted-foreground self-center">
                         {new Date(article.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                     </span>
@@ -1581,17 +1583,24 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                             : `Shortened! ${shortenInfo ? `${shortenInfo.original} → ${shortenInfo.shortened}` : ""}`
                     ) : "Shorten"}
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => { setShowInsertModal(true); setInsertMode("inline"); }} className="gap-1.5">
-                    <ImageIcon className="h-3.5 w-3.5" /> Image
-                </Button>
+                {/* Image button hidden per request — image insertion still available in Edit mode */}
 
                 <Separator orientation="vertical" className="h-6 mx-1" />
 
                 {/* ── Quality ── */}
-                <Button variant="outline" size="sm" onClick={checkSimilarity} disabled={checkingSimilarity || !article.company_id}
-                    className={cn("gap-1.5", similarResults !== null && similarResults.length === 0 && "text-success border-success", similarResults !== null && similarResults.length > 0 && "text-amber-500 border-amber-500")}>
-                    {checkingSimilarity ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Checking…</> : similarResults !== null ? <><Search className="h-3.5 w-3.5" /> {similarResults.length === 0 ? "No Overlap" : `${similarResults.length} Similar`}</> : <><Search className="h-3.5 w-3.5" /> Similarity</>}
-                </Button>
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="outline" size="sm" onClick={checkSimilarity} disabled={checkingSimilarity || !article.company_id}
+                                className={cn("gap-1.5", similarResults !== null && similarResults.length === 0 && "text-success border-success", similarResults !== null && similarResults.length > 0 && "text-amber-500 border-amber-500")}>
+                                {checkingSimilarity ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Checking…</> : similarResults !== null ? <><Search className="h-3.5 w-3.5" /> {similarResults.length === 0 ? "No Overlap" : `${similarResults.length} Similar`}</> : <><Search className="h-3.5 w-3.5" /> Similarity</>}
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                            Checks for content overlap with other articles in this brand to prevent keyword cannibalization
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
                 <Button variant="outline" size="sm" onClick={handleConsulCheck} disabled={consulChecking || !displayArticle.html}
                     className="gap-1.5 border-primary/30">
                     {consulChecking ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Consulting…</> : consulResult ? <><Scale className="h-3.5 w-3.5" /> Re-check</> : <><Scale className="h-3.5 w-3.5" /> Fact-Check Consul</>}
@@ -1841,8 +1850,7 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
             {insertImageModal}
         </div>
 
-        {/* AI Meme Entertainment Modal — shows during regeneration */}
-        <AIMemeModal open={panelAiWorking && !memeDismissed} onClose={() => setMemeDismissed(true)} companyName={article.company_id ? companies[article.company_id] : undefined} />
+
         </>
     );
 }

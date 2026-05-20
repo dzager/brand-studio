@@ -6,7 +6,7 @@ import { useModelDefaults } from "@/hooks/useModelDefaults";
 import { IMAGE_STYLE_CATEGORIES, type ImageStyleCategory } from "@/brand/engine";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import ContentWizard from "@/components/layout/ContentWizard";
-import AIMemeModal from "@/components/ui/ai-meme-modal";
+
 
 interface CreateArticleModalProps {
   open: boolean;
@@ -70,10 +70,11 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // Meme modal
-  const [memeDismissed, setMemeDismissed] = useState(false);
+  // Snippet collections
+  const [snippetCollections, setSnippetCollections] = useState<{ id: string; name: string; snippet_count: number }[]>([]);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string>("");
+
   const aiIsWorking = loading || clusterGenerating;
-  useEffect(() => { if (aiIsWorking) setMemeDismissed(false); }, [aiIsWorking]);
 
   const [activeStyles, setActiveStyles] = useState<ImageStyleCategory[]>(IMAGE_STYLE_CATEGORIES);
   const [recommending, setRecommending] = useState(false);
@@ -82,6 +83,7 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
 
   const [companyPrompts, setCompanyPrompts] = useState<{ id: string; name: string; body: string }[]>([]);
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
+  const [activeVoiceId, setActiveVoiceId] = useState<string | null>(null);
 
   const [previewing, setPreviewing] = useState(false);
   const [previewData, setPreviewData] = useState<any>(null);
@@ -167,6 +169,10 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
         );
       }
     }).catch(() => { setActiveStyles(IMAGE_STYLE_CATEGORIES); setImageStyle("default"); });
+    // Fetch snippet collections for this company
+    fetch(`/api/snippet-collections?company_id=${companyId}`).then(r => r.json()).then(data => {
+      if (Array.isArray(data)) setSnippetCollections(data);
+    }).catch(() => { setSnippetCollections([]); });
   }, [companyId]);
 
   // Load company prompts
@@ -180,14 +186,23 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
 
   async function onCreate() {
     setLoading(true); setErr(null);
+    // Build the creation prompt — prepend voice prompt if one is active
+    let finalPrompt = prompt;
+    if (activeVoiceId) {
+      const voiceBody = companyPrompts.find((p) => p.id === activeVoiceId)?.body;
+      if (voiceBody) {
+        finalPrompt = `${voiceBody}\n\n---\n\n${prompt}`;
+      }
+    }
     const payload: Record<string, unknown> = {
-      creation_prompt: prompt,
+      creation_prompt: finalPrompt,
       image_style: imageStyle,
       model,
       word_count: wordCount,
       company_id: companyId || undefined,
       image_model: defaults.imageGeneration,
       utility_model: defaults.utility,
+      snippet_collection_id: selectedCollectionId || undefined,
     };
     if (isCompositeStyle && csProductUrl) {
       payload.composite_product_image_url = csProductUrl;
@@ -258,6 +273,7 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
     setWordCount("1500-2500");
     setErr(null);
     setActiveTemplateId(null);
+    setActiveVoiceId(null);
     setCsProductQuery("");
     setCsProductResults([]);
     setCsProductUrl(null);
@@ -266,6 +282,8 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
     setCsBgImageUrl("");
     setRecommendation(null);
     setPreviewData(null);
+    setSnippetCollections([]);
+    setSelectedCollectionId("");
   }
 
   return (
@@ -287,6 +305,8 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
               companyPrompts={companyPrompts}
               activeTemplateId={activeTemplateId}
               setActiveTemplateId={setActiveTemplateId}
+              activeVoiceId={activeVoiceId}
+              setActiveVoiceId={setActiveVoiceId}
               clusterTopic={clusterTopic}
               setClusterTopic={setClusterTopic}
               getClusterPlaceholder={getClusterPlaceholder}
@@ -330,17 +350,14 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
               onPreviewPrompt={onPreviewPrompt}
               previewing={previewing}
               onBakeoffModelSelected={(mid) => { if (availableModels.some(m => m.id === mid)) setModel(mid); }}
+              snippetCollections={snippetCollections}
+              selectedCollectionId={selectedCollectionId}
+              setSelectedCollectionId={setSelectedCollectionId}
             />
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* AI Meme Entertainment Modal — shows during generation */}
-      <AIMemeModal
-        open={aiIsWorking && !memeDismissed}
-        onClose={() => setMemeDismissed(true)}
-        companyName={companies.find(c => c.id === companyId)?.name}
-      />
     </>
   );
 }

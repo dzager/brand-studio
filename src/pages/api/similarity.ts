@@ -47,7 +47,7 @@ export default async function handler(
                 .single();
 
             if (articleErr || !article) {
-                return res.status(404).json({ error: "Article not found" });
+                return res.status(404).json({ error: "This article hasn't been saved yet — try again after it finishes generating." });
             }
 
             if (article.embedding) {

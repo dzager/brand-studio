@@ -25,7 +25,8 @@ export type TaskType =
   | "style-extract"
   | "research"
   | "research-brief"
-  | "research-article";
+  | "research-article"
+  | "freshness-audit";
 
 export interface Task {
   id: string;

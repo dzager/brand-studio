@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   Building2, Network, FileText, Check, ChevronRight, ChevronLeft,
   Sparkles, RefreshCw, Settings, ChevronDown, Search, Layers,
-  Eye, AlertCircle,
+  Eye, AlertCircle, Bookmark, Mic,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { ImageStyleCategory } from "@/brand/engine";
 import ModelBakeoff from "@/components/ui/ModelBakeoff";
+
+// ── Helpers ────────────────────────────────────────────────────────────
+
+/** Voice-type prompts contain this marker in their body */
+function isVoicePrompt(body: string): boolean {
+  return body.includes("# VOICE PROFILE") || body.includes("VOICE PROFILE — PRIORITY DIRECTIVE");
+}
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -33,6 +40,8 @@ interface WizardProps {
   companyPrompts: { id: string; name: string; body: string }[];
   activeTemplateId: string | null;
   setActiveTemplateId: (id: string | null) => void;
+  activeVoiceId: string | null;
+  setActiveVoiceId: (id: string | null) => void;
   // Cluster
   clusterTopic: string;
   setClusterTopic: (t: string) => void;
@@ -75,6 +84,10 @@ interface WizardProps {
   previewing: boolean;
   // Bake-off
   onBakeoffModelSelected: (mid: string) => void;
+  // Snippet collections
+  snippetCollections?: { id: string; name: string; snippet_count: number }[];
+  selectedCollectionId?: string;
+  setSelectedCollectionId?: (id: string) => void;
 }
 
 const ALL_STEPS = [
@@ -91,6 +104,7 @@ export default function ContentWizard(props: WizardProps) {
     companies, companiesLoaded, companyId, setCompanyId, isScopedMember,
     mode, setMode,
     prompt, setPrompt, suggestedPrompt, companyPrompts, activeTemplateId, setActiveTemplateId,
+    activeVoiceId, setActiveVoiceId,
     clusterTopic, setClusterTopic, getClusterPlaceholder,
     imageStyle, setImageStyle, activeStyles, model, setModel,
     availableModels, wordCount, setWordCount,
@@ -101,6 +115,7 @@ export default function ContentWizard(props: WizardProps) {
     recommending, recommendation, onRecommendStyle,
     loading, clusterGenerating, onCreate, onCreateCluster,
     onPreviewPrompt, previewing, onBakeoffModelSelected,
+    snippetCollections, selectedCollectionId, setSelectedCollectionId,
   } = props;
 
   // When only 1 company, skip the Brand step entirely
@@ -349,18 +364,43 @@ export default function ContentWizard(props: WizardProps) {
                 <div className="mb-4">
                   <Label className="text-xs text-muted-foreground mb-2 block">Templates</Label>
                   <div className="flex gap-2 flex-wrap">
-                    {companyPrompts.map((t) => (
-                      <Button
-                        key={t.id}
-                        variant={activeTemplateId === t.id ? "default" : "outline"}
-                        size="sm"
-                        className="rounded-full gap-1 text-xs"
-                        onClick={() => { setPrompt(t.body); setActiveTemplateId(t.id); }}
-                      >
-                        📝 {t.name}
-                      </Button>
-                    ))}
+                    {companyPrompts.map((t) => {
+                      const isVoice = isVoicePrompt(t.body);
+                      const isActiveVoice = isVoice && activeVoiceId === t.id;
+                      const isActiveTemplate = !isVoice && activeTemplateId === t.id;
+
+                      return (
+                        <Button
+                          key={t.id}
+                          variant={isActiveVoice || isActiveTemplate ? "default" : "outline"}
+                          size="sm"
+                          className={cn(
+                            "rounded-full gap-1 text-xs transition-all",
+                            isActiveVoice && "ring-2 ring-primary/30 shadow-sm",
+                          )}
+                          onClick={() => {
+                            if (isVoice) {
+                              // Toggle voice prompt — don't touch the textarea
+                              setActiveVoiceId(isActiveVoice ? null : t.id);
+                            } else {
+                              // Regular template — populate the textarea as before
+                              setPrompt(t.body);
+                              setActiveTemplateId(t.id);
+                            }
+                          }}
+                        >
+                          {isVoice ? <Mic className="h-3 w-3" /> : <>📝</>} {t.name}
+                          {isActiveVoice && <Check className="h-3 w-3 ml-0.5" />}
+                        </Button>
+                      );
+                    })}
                   </div>
+                  {activeVoiceId && (
+                    <p className="text-[11px] text-primary mt-1.5 flex items-center gap-1">
+                      <Mic className="h-3 w-3" />
+                      Voice profile will be applied when you create the article.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -396,6 +436,34 @@ export default function ContentWizard(props: WizardProps) {
                     <span className="text-[10px] text-primary/60 font-medium whitespace-nowrap mt-0.5 shrink-0">Click to use</span>
                   </div>
                 </button>
+              )}
+
+              {/* Attach Research — snippet collection picker */}
+              {snippetCollections && snippetCollections.length > 0 && setSelectedCollectionId && (
+                <div className="mt-4 p-3 rounded-lg border border-border/60 bg-muted/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Bookmark className="h-3.5 w-3.5 text-primary" />
+                    <Label className="text-xs font-medium">Attach research</Label>
+                    <span className="text-[10px] text-muted-foreground">optional</span>
+                  </div>
+                  <select
+                    value={selectedCollectionId || ""}
+                    onChange={(e) => setSelectedCollectionId(e.target.value)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">No research attached</option>
+                    {snippetCollections.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.snippet_count} snippet{c.snippet_count !== 1 ? "s" : ""})
+                      </option>
+                    ))}
+                  </select>
+                  {selectedCollectionId && (
+                    <p className="text-[10px] text-muted-foreground mt-1.5">
+                      Research snippets will be injected as context for the AI writer.
+                    </p>
+                  )}
+                </div>
               )}
             </>)}
 
@@ -590,6 +658,33 @@ export default function ContentWizard(props: WizardProps) {
                     <span className="text-sm">{LENGTH_LABELS[wordCount] ?? wordCount}</span>
                   </div>
                 </>
+              )}
+
+              {activeVoiceId && (
+                <div className="wizard-summary-row">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Voice</span>
+                  <div className="flex items-center gap-1.5">
+                    <Mic className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-sm">
+                      {companyPrompts.find(p => p.id === activeVoiceId)?.name ?? "Voice Profile"}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {selectedCollectionId && snippetCollections && (
+                <div className="wizard-summary-row">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Research</span>
+                  <div className="flex items-center gap-1.5">
+                    <Bookmark className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-sm">
+                      {snippetCollections.find(c => c.id === selectedCollectionId)?.name ?? "Collection"}
+                      <span className="text-muted-foreground ml-1">
+                        ({snippetCollections.find(c => c.id === selectedCollectionId)?.snippet_count ?? 0} snippets)
+                      </span>
+                    </span>
+                  </div>
+                </div>
               )}
             </div>
 

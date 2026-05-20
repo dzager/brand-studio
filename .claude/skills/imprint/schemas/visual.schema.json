@@ -1,0 +1,98 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/psl-labs/imprint/schemas/visual.schema.json",
+  "title": "Visual style",
+  "description": "Photography style + image style categories + design tokens. See reference/visual.md.",
+  "type": "object",
+  "required": ["photography_style"],
+  "properties": {
+    "photography_style": {
+      "type": "object",
+      "required": ["global_feel", "lighting", "mood", "composition", "avoid"],
+      "properties": {
+        "realism_base": {
+          "type": "string",
+          "description": "Universal realism instructions. Brands may extend, never weaken."
+        },
+        "global_feel": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 2,
+          "maxItems": 7
+        },
+        "narrative": { "type": "string" },
+        "storytelling_cues": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "lighting": { "type": "string" },
+        "mood": { "type": "string" },
+        "composition": { "type": "string" },
+        "subjects": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "avoid": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "image_style_categories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "label": { "type": "string" },
+          "narrative": { "type": "string" },
+          "storytelling_cues": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "image_prompt_style": { "type": "string" },
+          "thumbnail_url": { "type": "string" },
+          "type": { "type": "string", "enum": ["prompt", "composite"], "default": "prompt" },
+          "composite_bg_prompt": { "type": "string" },
+          "composite_product_query": { "type": "string" },
+          "composite_bg_image_url": { "type": "string" }
+        }
+      }
+    },
+    "design_tokens": {
+      "type": "object",
+      "properties": {
+        "colors": {
+          "type": "object",
+          "properties": {
+            "primary": { "type": "array", "items": { "$ref": "#/$defs/colorToken" } },
+            "extended": { "type": "array", "items": { "$ref": "#/$defs/colorToken" } },
+            "secondary": { "type": "array", "items": { "$ref": "#/$defs/colorToken" } }
+          }
+        },
+        "usage_rules": {
+          "type": "object",
+          "properties": {
+            "cta": { "type": "string" },
+            "backgrounds": { "type": "array", "items": { "type": "string" } },
+            "navigation": { "type": "array", "items": { "type": "string" } },
+            "accent": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "colorToken": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "hex": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "oklch": { "type": "string" },
+        "role": { "type": "string" }
+      }
+    }
+  }
+}

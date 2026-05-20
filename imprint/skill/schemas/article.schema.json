@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/psl-labs/imprint/schemas/article.schema.json",
+  "title": "Article output",
+  "description": "What /imprint article produces.",
+  "type": "object",
+  "required": ["title", "slug", "meta_title", "meta_description", "html", "key_takeaways", "faq", "primary_keyword"],
+  "properties": {
+    "title": { "type": "string" },
+    "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$" },
+    "meta_title": { "type": "string", "minLength": 30, "maxLength": 70 },
+    "meta_description": { "type": "string", "minLength": 120, "maxLength": 180 },
+    "excerpt": { "type": "string" },
+    "html": { "type": "string" },
+    "key_takeaways": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 3,
+      "maxItems": 7
+    },
+    "faq": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["q", "a"],
+        "properties": {
+          "q": { "type": "string" },
+          "a": { "type": "string" }
+        }
+      },
+      "minItems": 3
+    },
+    "content_type": {
+      "type": "string",
+      "enum": ["guide", "how_to", "comparison", "news_explainer", "case_study", "listicle"]
+    },
+    "primary_keyword": { "type": "string" },
+    "secondary_keywords": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "image_prompt": { "type": "string" },
+    "image_style": { "type": "string" },
+    "seo": {
+      "type": "object",
+      "properties": {
+        "json_ld": { "type": "object" },
+        "structured_data": { "type": "object" }
+      }
+    }
+  }
+}

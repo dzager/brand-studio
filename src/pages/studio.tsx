@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import AIMemeModal from "@/components/ui/ai-meme-modal";
+
 import { useTaskRunner } from "@/hooks/useTaskRunner";
 import { useRouter } from "next/router";
 import Link from "next/link";
@@ -144,11 +144,7 @@ export default function Home() {
     const [result, setResult] = useState<any>(null);
     const [err, setErr] = useState<string | null>(null);
 
-    // Meme modal state — auto-shows during AI generation, dismissible by user
-    const [memeDismissed, setMemeDismissed] = useState(false);
-    const aiIsWorking = loading || clusterGenerating;
-    // Reset dismissal when a new generation starts
-    useEffect(() => { if (aiIsWorking) setMemeDismissed(false); }, [aiIsWorking]);
+
 
     const [factChecking, setFactChecking] = useState(false);
     const [factCheck, setFactCheck] = useState<FactCheckResult | null>(null);
@@ -189,6 +185,7 @@ export default function Home() {
 
     const [companyPrompts, setCompanyPrompts] = useState<{ id: string; name: string; body: string }[]>([]);
     const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
+    const [activeVoiceId, setActiveVoiceId] = useState<string | null>(null);
 
     const [previewing, setPreviewing] = useState(false);
     const [previewData, setPreviewData] = useState<{ system: string; user: string; image_system: string; image_user: string; model: string; estimated_tokens?: number } | null>(null);
@@ -306,8 +303,16 @@ export default function Home() {
         setLoading(true); setErr(null); setResult(null); setFactCheck(null); setFactCheckErr(null);
         setConsulResult(null); setConsulErr(null); setExpandedClaims(new Set()); setAppliedRewrites(new Set());
         setGallery([]); setSelectedImgId(null); setCustomImagePrompt(""); setRefreshErr(null); setHumanized(false); setHumanizeErr(null);
+        // Build the creation prompt — prepend voice prompt if one is active
+        let finalPrompt = prompt;
+        if (activeVoiceId) {
+            const voiceBody = companyPrompts.find((p) => p.id === activeVoiceId)?.body;
+            if (voiceBody) {
+                finalPrompt = `${voiceBody}\n\n---\n\n${prompt}`;
+            }
+        }
         const payload: Record<string, unknown> = {
-            creation_prompt: prompt,
+            creation_prompt: finalPrompt,
             image_style: imageStyle,
             model,
             word_count: wordCount,
@@ -571,6 +576,8 @@ export default function Home() {
                     companyPrompts={companyPrompts}
                     activeTemplateId={activeTemplateId}
                     setActiveTemplateId={setActiveTemplateId}
+                    activeVoiceId={activeVoiceId}
+                    setActiveVoiceId={setActiveVoiceId}
                     clusterTopic={clusterTopic}
                     setClusterTopic={setClusterTopic}
                     getClusterPlaceholder={getClusterPlaceholder}
@@ -940,8 +947,7 @@ export default function Home() {
                 {previewErr && <p className="text-sm text-destructive mt-2">Preview failed: {previewErr}</p>}
             </div>
 
-            {/* AI Meme Entertainment Modal — shows during generation */}
-            <AIMemeModal open={aiIsWorking && !memeDismissed} onClose={() => setMemeDismissed(true)} companyName={companies.find(c => c.id === companyId)?.name} />
+
         </AppLayout>
     );
 }

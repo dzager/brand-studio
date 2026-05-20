@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import Head from "next/head";
@@ -71,10 +71,11 @@ export default function RegisterPage() {
     const [inviteEmails, setInviteEmails] = useState<string[]>([""]);
 
     // Redirect if already authenticated
-    if (user) {
-        router.replace("/articles");
-        return null;
-    }
+    useEffect(() => {
+        if (user) {
+            router.replace("/articles");
+        }
+    }, [user, router]);
 
     // ── URL Import ─────────────────────────────────────────────────
     async function handleImportUrl() {

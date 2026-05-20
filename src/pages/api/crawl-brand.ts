@@ -54,11 +54,11 @@ const CrawledBrandSchema = {
         },
         color_primary: {
             type: "string",
-            description: "The primary brand color as a hex code (e.g. '#1a1a1a'). Derived from theme-color meta, prominent CSS colors, or logo colors.",
+            description: "The primary brand color as a hex code (e.g. '#2c2c2c'). Derived from theme-color meta, prominent CSS colors, or logo colors.",
         },
         color_secondary: {
             type: "string",
-            description: "The secondary/accent brand color as a hex code (e.g. '#e5a00d'). Derived from CSS accent colors, CTA button colors, or link colors.",
+            description: "The secondary/accent brand color as a hex code (e.g. '#fdfe52'). Derived from CSS accent colors, CTA button colors, or link colors.",
         },
         avoid_phrases: {
             type: "string",

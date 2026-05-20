@@ -1,6 +1,6 @@
 -- Migration: Add brand_colors JSONB column to companies table
 -- This allows storing an unlimited palette of named brand colors
--- Format: [{ "name": "Primary", "hex": "#1a1a1a" }, { "name": "Accent", "hex": "#e5a00d" }, ...]
+-- Format: [{ "name": "Primary", "hex": "#2c2c2c" }, { "name": "Accent", "hex": "#fdfe52" }, ...]
 
 ALTER TABLE companies
 ADD COLUMN IF NOT EXISTS brand_colors JSONB DEFAULT '[]'::jsonb;

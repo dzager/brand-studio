@@ -24,6 +24,7 @@ import {
   UserPlus,
   Palette,
   HelpCircle,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -45,13 +46,15 @@ import SettingsDialog from "@/components/layout/SettingsDialog";
 import { useAuth } from "@/hooks/useAuth";
 
 const ProductTour = dynamic(() => import("@/components/layout/ProductTour"), { ssr: false });
+const OnboardingModal = dynamic(() => import("@/components/layout/OnboardingModal"), { ssr: false });
 
 const NAV_ITEMS = [
   { href: "/articles", label: "Articles", icon: FileText, description: "Content architecture", minRole: "member" },
   { href: "/studio", label: "Studio", icon: Home, description: "Create content", minRole: "member", hidden: true, alwaysHidden: true },
   { href: "/company", label: "Company", icon: Palette, description: "Brand profile", minRole: "member", hidden: true },
   { href: "/companies", label: "Companies", icon: Building2, description: "Manage brands", minRole: "member" },
-  { href: "/research", label: "Research", icon: Search, description: "Topic deep dives", minRole: "member" },
+  { href: "/research", label: "Research", icon: Search, description: "Topic deep dives", minRole: "member", badge: "Beta" },
+  { href: "/freshness", label: "Freshness", icon: ShieldCheck, description: "Fact verification", minRole: "member", badge: "Beta" },
   { href: "/admin", label: "Admin", icon: Shield, description: "Platform dashboard", minRole: "admin" },
 ];
 
@@ -230,7 +233,7 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
                     </Link>
                   </TooltipTrigger>
                   <TooltipContent side="right">
-                    <p>{item.label}</p>
+                    <p>{item.label}{(item as any).badge && <span className="ml-1.5 text-[9px] font-semibold uppercase tracking-wider text-primary/70">{(item as any).badge}</span>}</p>
                   </TooltipContent>
                 </Tooltip>
               );
@@ -250,6 +253,9 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 <span>{item.label}</span>
+                {(item as any).badge && (
+                  <span className="ml-auto text-[9px] font-semibold uppercase tracking-wider rounded-full bg-primary/10 text-primary px-1.5 py-0.5">{(item as any).badge}</span>
+                )}
               </Link>
             );
           })}
@@ -426,6 +432,9 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
                     <Icon className="h-4 w-4 text-muted-foreground" />
                     <h1 className="text-lg font-semibold tracking-tight">
                       {item.label}
+                      {(item as any).badge && (
+                        <span className="ml-2 text-[9px] font-semibold uppercase tracking-wider rounded-full bg-primary/10 text-primary px-1.5 py-0.5 align-middle">{(item as any).badge}</span>
+                      )}
                     </h1>
                     <Separator orientation="vertical" className="h-4 mx-1" />
                     <span className="text-sm text-muted-foreground hidden sm:inline">
@@ -503,6 +512,9 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
 
       {/* Product Tour */}
       <ProductTour />
+
+      {/* First-time Onboarding */}
+      <OnboardingModal />
     </div>
   );
 }

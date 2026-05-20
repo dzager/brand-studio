@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/psl-labs/imprint/schemas/voice.schema.json",
+  "title": "Voice profile",
+  "description": "Structured voice profile. See reference/voice.md for authoring guidance.",
+  "type": "object",
+  "required": ["summary", "tone_descriptors", "pov_and_person"],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "One sentence that describes the voice."
+    },
+    "tone_descriptors": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 3,
+      "maxItems": 7
+    },
+    "sentence_rhythm": { "type": "string" },
+    "paragraph_style": { "type": "string" },
+    "vocabulary_level": {
+      "type": "string",
+      "enum": ["plain", "professional", "technical", "academic"]
+    },
+    "rhetorical_devices": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "structural_patterns": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "pov_and_person": { "type": "string" },
+    "sample_phrases": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 0,
+      "maxItems": 25
+    },
+    "avoid": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "banned_phrases": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "structural_do": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "structural_dont": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "specificity_rules": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "length_rules": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

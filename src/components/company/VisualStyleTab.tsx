@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useTaskRunner } from "@/hooks/useTaskRunner";
 import type { ImageStyleCategory } from "@/brand/engine";
 import type { TabProps } from "./types";
@@ -15,6 +15,42 @@ import {
     Palette, Layers, ChevronDown, ChevronRight, AlertCircle,
     Plus, X, Camera, ImagePlus, Loader2, Sparkles, CheckCircle2,
 } from "lucide-react";
+
+/* ── Hover-to-enlarge thumbnail preview ── */
+function ThumbnailPreview({ src, alt, className }: { src: string; alt: string; className?: string }) {
+    const [show, setShow] = useState(false);
+    const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+    const ref = useRef<HTMLDivElement>(null);
+
+    const handleEnter = useCallback(() => {
+        if (!ref.current) return;
+        const rect = ref.current.getBoundingClientRect();
+        // Position popup to the right of the thumbnail; if too close to right edge, show to the left
+        const spaceRight = window.innerWidth - rect.right;
+        const popupW = 256;
+        const left = spaceRight > popupW + 16 ? rect.right + 8 : rect.left - popupW - 8;
+        // Vertically center on the thumbnail
+        const top = Math.max(8, rect.top + rect.height / 2 - 128);
+        setPos({ top, left });
+        setShow(true);
+    }, []);
+
+    return (
+        <div ref={ref} className={`relative ${className ?? ""}`} onMouseEnter={handleEnter} onMouseLeave={() => setShow(false)}>
+            <img src={src} alt={alt} className="w-full h-full rounded-md object-cover border border-border shadow-sm" />
+            {show && (
+                <div
+                    className="fixed z-[100] pointer-events-none"
+                    style={{ top: pos.top, left: pos.left }}
+                >
+                    <div className="w-64 h-64 rounded-xl overflow-hidden border border-border shadow-xl bg-card ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-150">
+                        <img src={src} alt={alt} className="w-full h-full object-cover" />
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
 
 type ImageStyleAnalysis = {
     style_name: string;
@@ -83,6 +119,7 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
                         label: `Thumbnail: ${data.style.style_name || "extracted style"}`,
                         endpoint: "/api/generate-style-thumbnail",
                         body: { image_prompt_style: data.style.image_prompt_style, style_name: data.style.style_name },
+                        meta: { link: `/company?id=${company.id}&tab=visual`, linkLabel: "View in Visual" },
                         onSuccess: (d2) => { if (d2.thumbnail_base64) setExtractThumbnail(`data:image/jpeg;base64,${d2.thumbnail_base64}`); },
                     }).finally(() => setGeneratingThumbnail(false));
                 }
@@ -118,7 +155,7 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
                                         <div className="flex items-center justify-between px-4 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors" onClick={() => setExpandedStyles(prev => { const n = new Set(prev); if (n.has(idx)) n.delete(idx); else n.add(idx); return n; })}>
                                             <span className="text-sm font-medium flex items-center gap-2">
                                                 {cat.thumbnail_url ? (
-                                                    <img src={cat.thumbnail_url} alt={cat.label} className="w-8 h-8 rounded-md object-cover border border-border shadow-sm shrink-0" />
+                                                    <ThumbnailPreview src={cat.thumbnail_url} alt={cat.label} className="w-8 h-8 shrink-0" />
                                                 ) : (
                                                     isExp ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />
                                                 )}
@@ -133,7 +170,7 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
                                                 {/* Thumbnail preview + generate */}
                                                 <div className="pt-2 flex items-end gap-3">
                                                     {cat.thumbnail_url ? (
-                                                        <img src={cat.thumbnail_url} alt={`${cat.label} preview`} className="w-16 h-16 rounded-lg object-cover border border-border shadow-sm" />
+                                                        <ThumbnailPreview src={cat.thumbnail_url} alt={`${cat.label} preview`} className="w-16 h-16" />
                                                     ) : (
                                                         <div className="w-16 h-16 rounded-lg border border-dashed border-border bg-muted/30 flex items-center justify-center"><Camera className="h-4 w-4 text-muted-foreground" /></div>
                                                     )}
@@ -146,7 +183,8 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
                                                                 label: `Thumbnail: ${cat.label}`,
                                                                 endpoint: "/api/generate-style-thumbnail",
                                                                 body: { image_prompt_style: cat.image_prompt_style, style_name: cat.label },
-                                                                onSuccess: (d) => { if (d.thumbnail_base64) { const nc = [...form.image_style_categories]; nc[idx] = { ...nc[idx], thumbnail_url: `data:image/jpeg;base64,${d.thumbnail_base64}` }; setForm(prev => ({ ...prev, image_style_categories: nc })); } },
+                                                                meta: { link: `/company?id=${company.id}&tab=visual`, linkLabel: "View in Visual" },
+                                                                onSuccess: (d) => { if (d.thumbnail_base64) { setForm(prev => { const nc = [...prev.image_style_categories]; nc[idx] = { ...nc[idx], thumbnail_url: `data:image/jpeg;base64,${d.thumbnail_base64}` }; return { ...prev, image_style_categories: nc }; }); } },
                                                             }).finally(() => setGeneratingThumbIdx(null));
                                                         }}>
                                                             {generatingThumbIdx === idx ? <><Loader2 className="h-3 w-3 animate-spin" /> Generating…</> : <><Sparkles className="h-3 w-3" /> {cat.thumbnail_url ? "Regenerate" : "Generate"} Thumbnail</>}
@@ -265,6 +303,7 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
                         label: `Thumbnail: ${extractStyleName || extractResult.style_name}`,
                         endpoint: "/api/generate-style-thumbnail",
                         body: { image_prompt_style: extractResult.image_prompt_style, style_name: extractStyleName || extractResult.style_name },
+                        meta: { link: `/company?id=${company.id}&tab=visual`, linkLabel: "View in Visual" },
                         onSuccess: (d2) => { if (d2.thumbnail_base64) setExtractThumbnail(`data:image/jpeg;base64,${d2.thumbnail_base64}`); },
                     }).finally(() => setGeneratingThumbnail(false));
                 }}

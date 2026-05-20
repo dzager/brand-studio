@@ -1,5 +1,5 @@
 // funFacts.ts — Shared fun fact data and company-matching logic
-// Used by TaskPanel (inline ticker) and AIMemeModal (fullscreen overlay)
+// Used by TaskPanel (inline ticker)
 
 export type FunFact = {
     headline: string;

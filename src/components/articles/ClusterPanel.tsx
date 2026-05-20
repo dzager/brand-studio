@@ -2,7 +2,7 @@
 // Renders in the panel slot when a cluster is selected (instead of PanelView for articles)
 
 import { useState, useEffect, useCallback } from "react";
-import AIMemeModal from "@/components/ui/ai-meme-modal";
+
 import { useTaskRunner } from "@/hooks/useTaskRunner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -112,10 +112,7 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
     const [confirmDeleteArticle, setConfirmDeleteArticle] = useState<string | null>(null);
     const [deletingArticle, setDeletingArticle] = useState<string | null>(null);
 
-    // Meme modal — entertains users during generation
-    const [memeDismissed, setMemeDismissed] = useState(false);
-    const clusterAiWorking = !!generatingPage || batchGenerating;
-    useEffect(() => { if (clusterAiWorking) setMemeDismissed(false); }, [clusterAiWorking]);
+
 
     const [editingStrategy, setEditingStrategy] = useState(false);
     const [editStrategyJson, setEditStrategyJson] = useState("");
@@ -1009,8 +1006,7 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
             )}
         </div>
 
-        {/* AI Meme Entertainment Modal — shows during generation */}
-        <AIMemeModal open={clusterAiWorking && !memeDismissed} onClose={() => setMemeDismissed(true)} companyName={cluster ? companies[cluster.company_id] : undefined} />
+
         </>
     );
 }

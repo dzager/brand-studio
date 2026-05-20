@@ -193,8 +193,8 @@ export const BRAND_ENGINE: BrandEngine = {
     design_tokens: {
         colors: {
             primary: {
-                obsidian: "#1a1a1a",
-                marigold: "#e5a00d",
+                obsidian: "#2c2c2c",
+                marigold: "#fdfe52",
                 sky: "#b8d4e8",
                 white: "#FFFFFF",
             },

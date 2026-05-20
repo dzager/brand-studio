@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/psl-labs/imprint/schemas/brand.schema.json",
+  "title": "Brand profile",
+  "description": "Schema for BRAND.md frontmatter. Required fields establish identity; optional fields tune the rubric and pipeline.",
+  "type": "object",
+  "required": ["name", "archetype", "tone_axes", "audiences", "editorial_guidelines"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "tagline": { "type": "string" },
+    "mission": { "type": "string" },
+    "archetype": {
+      "type": "string",
+      "enum": ["guide", "hero", "sage", "caregiver", "creator", "explorer", "magician", "outlaw"]
+    },
+    "tone_axes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 3,
+      "maxItems": 7,
+      "description": "3-7 tone descriptors. Specific (skeptical, plainspoken) beats generic (professional)."
+    },
+    "audiences": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["needs", "positioning"],
+        "properties": {
+          "needs": { "type": "array", "items": { "type": "string" } },
+          "positioning": { "type": "string" }
+        }
+      },
+      "description": "Named audiences. Each has needs (an array) and positioning (a sentence)."
+    },
+    "editorial_guidelines": {
+      "type": "string",
+      "description": "Free-text guidelines that override base rules for voice, tone, depth, and format."
+    },
+    "seo_guidelines": {
+      "type": "string",
+      "description": "Free-text SEO rules specific to this brand."
+    },
+    "avoid_phrases": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Brand-specific banned phrases beyond the universal list."
+    },
+    "reference_articles": {
+      "type": "array",
+      "items": { "type": "string", "format": "uri" },
+      "maxItems": 10,
+      "description": "URLs of gold-standard articles for few-shot reference."
+    },
+    "auto_humanize": {
+      "type": "boolean",
+      "default": false,
+      "description": "Run the humanizer after every generation."
+    },
+    "include_toc": {
+      "type": "boolean",
+      "default": false,
+      "description": "Generate a clickable Table of Contents on long-form articles."
+    },
+    "eval_weights": {
+      "type": "object",
+      "properties": {
+        "voice": { "type": "number", "minimum": 0, "maximum": 100 },
+        "seo": { "type": "number", "minimum": 0, "maximum": 100 },
+        "aeo": { "type": "number", "minimum": 0, "maximum": 100 },
+        "geo": { "type": "number", "minimum": 0, "maximum": 100 },
+        "factuality": { "type": "number", "minimum": 0, "maximum": 100 },
+        "humanization": { "type": "number", "minimum": 0, "maximum": 100 }
+      },
+      "description": "Override the default rubric weights. Should sum to 100."
+    },
+    "publish_threshold": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 80,
+      "description": "Minimum composite audit score required to publish."
+    }
+  }
+}

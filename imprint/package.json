@@ -1,0 +1,44 @@
+{
+  "name": "imprint",
+  "version": "0.1.0",
+  "description": "The brand-content methodology that makes your AI harness better at on-brand content. Voice, SEO, AEO, GEO, humanization, fact-checking, visual style — distilled into slash commands.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "Pioneer Square Labs",
+  "homepage": "https://github.com/psl-labs/imprint",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/psl-labs/imprint.git"
+  },
+  "bugs": {
+    "url": "https://github.com/psl-labs/imprint/issues"
+  },
+  "keywords": [
+    "ai",
+    "claude-code",
+    "skill",
+    "content",
+    "brand",
+    "seo",
+    "aeo",
+    "geo",
+    "humanizer",
+    "voice"
+  ],
+  "bin": {
+    "imprint": "./cli/imprint.mjs"
+  },
+  "files": [
+    "skill/",
+    "cli/",
+    "examples/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node tests/run.mjs"
+  }
+}

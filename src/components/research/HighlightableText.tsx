@@ -10,7 +10,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Highlighter, X, MessageSquare, Trash2 } from "lucide-react";
+import { Highlighter, X, MessageSquare, Trash2, Bookmark } from "lucide-react";
+import CollectionPicker from "./CollectionPicker";
 import { cn } from "@/lib/utils";
 
 export interface Highlight {
@@ -25,6 +26,11 @@ interface HighlightableTextProps {
     highlights: Highlight[];
     onHighlightsChange: (highlights: Highlight[]) => void;
     className?: string;
+    /** For CollectionPicker — save highlights to a snippet collection */
+    companyId?: string;
+    projectId?: string;
+    sourceUrl?: string;
+    sourceTitle?: string;
 }
 
 const HIGHLIGHT_COLORS = [
@@ -44,6 +50,10 @@ export default function HighlightableText({
     highlights,
     onHighlightsChange,
     className,
+    companyId,
+    projectId,
+    sourceUrl,
+    sourceTitle,
 }: HighlightableTextProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [toolbar, setToolbar] = useState<{ x: number; y: number; text: string } | null>(null);
@@ -231,6 +241,19 @@ export default function HighlightableText({
                         <Highlighter className="h-3 w-3" />
                         Highlight
                     </Button>
+                    {companyId && (
+                        <CollectionPicker
+                            companyId={companyId}
+                            snippet={{
+                                text: toolbar.text,
+                                source_url: sourceUrl,
+                                source_title: sourceTitle,
+                                research_project_id: projectId,
+                                color: selectedColor,
+                            }}
+                            compact={false}
+                        />
+                    )}
                 </div>
             )}
 
@@ -274,6 +297,20 @@ export default function HighlightableText({
                         <Button size="sm" className="h-7 px-2 text-xs" onClick={() => saveNote(editingNote)}>
                             Save
                         </Button>
+                        {companyId && (
+                            <CollectionPicker
+                                companyId={companyId}
+                                snippet={{
+                                    text: highlights[editingNote].text,
+                                    note: highlights[editingNote].note,
+                                    source_url: sourceUrl,
+                                    source_title: sourceTitle,
+                                    research_project_id: projectId,
+                                    color: highlights[editingNote].color,
+                                }}
+                                compact={false}
+                            />
+                        )}
                     </div>
                 </div>
             )}

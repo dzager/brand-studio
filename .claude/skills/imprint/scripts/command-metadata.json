@@ -1,0 +1,26 @@
+{
+  "commands": {
+    "teach":     { "description": "Interview-style setup. Writes BRAND.md (and optional VOICE.md, VISUAL.md).", "argumentHint": "" },
+    "voice":     { "description": "Analyze brand voice from a URL or pasted samples; write VOICE.md.", "argumentHint": "<url | text>" },
+    "style":     { "description": "Analyze visual style from a URL or image directory; write VISUAL.md.", "argumentHint": "<url | dir>" },
+    "article":   { "description": "Generate a long-form, brand-voiced, fact-checked article (SEO + AEO + GEO).", "argumentHint": "<topic>" },
+    "short":     { "description": "Generate a short-form post (LinkedIn, X, threads).", "argumentHint": "<topic>" },
+    "cluster":   { "description": "Generate a pillar + supporting articles with an internal link map.", "argumentHint": "<topic>" },
+    "image":     { "description": "Compose a brand-styled image prompt (model-agnostic; emit or call a provider).", "argumentHint": "<prompt>" },
+    "video":     { "description": "Script + storyboard + per-scene image prompts + motion spec. Optional provider call.", "argumentHint": "<topic>" },
+    "humanize":  { "description": "Strip AI patterns, banned phrases, generic openings. Re-rhythm.", "argumentHint": "<file>" },
+    "factcheck": { "description": "Three-model council. Claim-by-claim verdict with citations.", "argumentHint": "<file>" },
+    "shorten":   { "description": "Extract a short-form post from a long article.", "argumentHint": "<file>" },
+    "polish":    { "description": "Final brand pass: voice match, banned-phrase sweep, schema check.", "argumentHint": "<file>" },
+    "audit":     { "description": "Quantitative score 0-100 across SEO, AEO, GEO, voice match, factuality.", "argumentHint": "<file>" },
+    "critique":  { "description": "Qualitative critique with prioritized issues and persona red flags.", "argumentHint": "<file>" },
+    "bakeoff":   { "description": "Same topic across N models. Side-by-side diff.", "argumentHint": "<topic>" },
+    "seo":       { "description": "Extract/inject SEO metadata, FAQ schema, and structured data.", "argumentHint": "<file>" },
+    "aeo":       { "description": "Restructure for answer engines (inverted pyramid, Q&A blocks, citations).", "argumentHint": "<file>" },
+    "geo":       { "description": "Generative engine optimization pass (sources, freshness, unique insight).", "argumentHint": "<file>" },
+    "publish":   { "description": "Emit final HTML + JSON-LD + image-prompt bundle for any CMS.", "argumentHint": "<file>" },
+    "evals":     { "description": "Run eval rubric against existing content.", "argumentHint": "" },
+    "pin":       { "description": "Alias /imprint <command> as a top-level /<command>.", "argumentHint": "<command>" },
+    "unpin":     { "description": "Remove a pinned alias.", "argumentHint": "<command>" }
+  }
+}

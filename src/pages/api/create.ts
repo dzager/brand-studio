@@ -148,7 +148,9 @@ export default async function handler(
         }
 
         const {
-            creation_prompt, image_style, model: requestedModel, word_count, company_id,
+            creation_prompt: rawCreationPrompt, image_style, model: requestedModel, word_count, company_id,
+            // Snippet collection for research context injection
+            snippet_collection_id,
             // Composite-specific fields (when style type is "composite")
             composite_product_image_url,
             composite_bg_image_url,
@@ -156,8 +158,8 @@ export default async function handler(
         } = req.body ?? {};
 
         if (
-            typeof creation_prompt !== "string" ||
-            creation_prompt.trim().length < 5
+            typeof rawCreationPrompt !== "string" ||
+            rawCreationPrompt.trim().length < 5
         ) {
             return res.status(400).json({ error: "creation_prompt required" });
         }
@@ -235,7 +237,7 @@ export default async function handler(
 Respond with ONLY valid JSON in this exact format:
 {"id": "<style id>", "reason": "<1 sentence explanation>"}`;
 
-                const recUser = `Article topic: "${creation_prompt.trim()}"
+                const recUser = `Article topic: "${rawCreationPrompt.trim()}"
 
 Available image styles:
 
@@ -283,8 +285,38 @@ Which style best fits this article? Respond with JSON only.`;
             }
         }
 
+        // ── Inject snippet collection context (if provided) ────────
+        let creation_prompt = rawCreationPrompt.trim();
+
+        if (typeof snippet_collection_id === "string" && snippet_collection_id) {
+            try {
+                const { data: collection } = await getSupabase()
+                    .from("snippet_collections")
+                    .select("name, snippets")
+                    .eq("id", snippet_collection_id)
+                    .single();
+
+                if (collection && Array.isArray(collection.snippets) && collection.snippets.length > 0) {
+                    let researchContext = `\n\n## Research Context\n`;
+                    researchContext += `This article should incorporate findings from the research collection "${collection.name}".\n\n`;
+                    researchContext += `### Research Snippets\n`;
+                    for (const snippet of collection.snippets) {
+                        researchContext += `- ${snippet.text}`;
+                        if (snippet.note) researchContext += ` (Note: ${snippet.note})`;
+                        if (snippet.source_title) researchContext += ` [Source: ${snippet.source_title}]`;
+                        researchContext += `\n`;
+                    }
+                    researchContext += `\nUse these research snippets as factual grounding. Cite specific data points and weave them naturally into the article.\n`;
+                    creation_prompt = `${creation_prompt}\n${researchContext}`;
+                    console.log(`[create] Injected ${collection.snippets.length} snippets from collection "${collection.name}"`);
+                }
+            } catch (collErr) {
+                console.warn("[create] Failed to fetch snippet collection (non-blocking):", collErr);
+            }
+        }
+
         const user = compileUserPrompt({
-            creation_prompt: creation_prompt.trim(),
+            creation_prompt,
             brand,
             word_count: typeof word_count === "string" && word_count ? word_count : undefined,
         });

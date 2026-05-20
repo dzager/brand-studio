@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import type { GetServerSideProps } from "next";
 import { useRouter } from "next/router";
 import type { ImageStyleCategory, VoiceProfile } from "@/brand/engine";
+// VoiceProfile type still needed for form state; Voice tab UI moved into PromptsEngineTab
 import AppLayout from "@/components/layout/AppLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
@@ -10,14 +11,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
     AlertCircle, Save, X, CheckCircle2,
-    Eye, Mic, Palette, FileText,
+    Eye, Palette, FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 import type { CompanyData, CompanyForm } from "@/components/company/types";
 import { getInitialBrandColors } from "@/components/company/types";
 import { BrandIdentityTab } from "@/components/company/BrandIdentityTab";
-import { VoiceToneTab } from "@/components/company/VoiceToneTab";
+
 import { VisualStyleTab } from "@/components/company/VisualStyleTab";
 import { PromptsEngineTab } from "@/components/company/PromptsEngineTab";
 
@@ -27,6 +28,7 @@ export const getServerSideProps: GetServerSideProps = async () => {
 
 /* ── Company Card (used for both single and multi mode) ──────────── */
 function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c: CompanyData) => void }) {
+    const router = useRouter();
     const [editing, setEditing] = useState(true);
     const [saving, setSaving] = useState(false);
     const [saveErr, setSaveErr] = useState<string | null>(null);
@@ -118,18 +120,12 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
             </div>
 
             {/* Tabbed interface */}
-            <Tabs defaultValue="brand" className="w-full">
+            <Tabs defaultValue={(router.query.tab as string) || "brand"} className="w-full">
                 <TabsList className="w-full justify-start">
                     <TabsTrigger value="brand" className="gap-1.5">
                         <Eye className="h-3.5 w-3.5" /> Brand
                     </TabsTrigger>
-                    <TabsTrigger value="voice" className="gap-1.5">
-                        <Mic className="h-3.5 w-3.5" />
-                        Voice
-                        {form.voice_profile
-                            ? <Badge variant="outline" className="text-[10px] ml-0.5 h-4 border-primary/50 text-primary">Active</Badge>
-                            : null}
-                    </TabsTrigger>
+
                     <TabsTrigger value="visual" className="gap-1.5">
                         <Palette className="h-3.5 w-3.5" />
                         Visual
@@ -137,20 +133,21 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
                     </TabsTrigger>
                     <TabsTrigger value="prompts" className="gap-1.5">
                         <FileText className="h-3.5 w-3.5" /> Prompts
+                        {form.voice_profile
+                            ? <Badge variant="outline" className="text-[10px] ml-0.5 h-4 border-primary/50 text-primary">Voice</Badge>
+                            : null}
                     </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="brand" className="mt-4">
                     <BrandIdentityTab {...tabProps} />
                 </TabsContent>
-                <TabsContent value="voice" className="mt-4">
-                    <VoiceToneTab {...tabProps} />
-                </TabsContent>
+
                 <TabsContent value="visual" className="mt-4">
                     <VisualStyleTab {...tabProps} />
                 </TabsContent>
                 <TabsContent value="prompts" className="mt-4">
-                    <PromptsEngineTab company={company} />
+                    <PromptsEngineTab company={company} form={form} setForm={setForm} />
                 </TabsContent>
             </Tabs>
         </div>

@@ -65,16 +65,28 @@ export function compileImageUserPrompt({
     parts.push("Write one image generation prompt for the hero image of this article.");
     parts.push("");
 
-    // ── General photography defaults (only the useful bits) ─────────────
+    // ── Brand photography style (the company's Photography / Image Style field) ──
     const photo = brand.photography_style;
-    parts.push("General photography guidance:");
+
+    if (photo.realism_base) {
+        parts.push("BRAND PHOTOGRAPHY STYLE — incorporate this into the image:");
+        parts.push(photo.realism_base);
+        parts.push("");
+    }
+
+    if (photo.narrative) {
+        parts.push(`Visual narrative: ${photo.narrative}`);
+        parts.push("");
+    }
+
+    // ── General photography defaults ─────────────────────────────────────
+    parts.push("Additional photography guidance:");
     parts.push(`- Feel: ${photo.global_feel.join(", ")}`);
     parts.push(`- Lighting: ${photo.lighting}`);
     parts.push(`- Mood: ${photo.mood}`);
     parts.push(`- Composition: ${photo.composition}`);
-    parts.push(`- Subjects: ${photo.subjects.join(", ")}`);
-    parts.push(`- Avoid: ${photo.avoid.join(", ")}`);
-    parts.push(`- Realism: ${photo.realism_base}`);
+    if (photo.subjects.length) parts.push(`- Subjects: ${photo.subjects.join(", ")}`);
+    if (photo.avoid.length) parts.push(`- Avoid: ${photo.avoid.join(", ")}`);
 
     // Color palette (brief)
     const colors = brand.design_tokens.colors.primary;

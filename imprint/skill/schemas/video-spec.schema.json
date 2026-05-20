@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/psl-labs/imprint/schemas/video-spec.schema.json",
+  "title": "Video spec",
+  "description": "Full video specification: script + storyboard + per-scene image + motion. See reference/video.md.",
+  "type": "object",
+  "required": ["video_spec_version", "topic", "scenes"],
+  "properties": {
+    "video_spec_version": { "type": "string", "enum": ["1.0"] },
+    "brand": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "voice_profile": { "type": "object" },
+        "visual_style": { "type": "object" }
+      }
+    },
+    "topic": { "type": "string" },
+    "content_type": {
+      "type": "string",
+      "enum": ["explainer", "testimonial", "product_demo", "brand_film", "tutorial"]
+    },
+    "duration_target_seconds": { "type": "integer", "minimum": 5, "maximum": 600 },
+    "scenes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["number", "duration", "vo", "storyboard", "image_prompt", "motion"],
+        "properties": {
+          "number": { "type": "integer", "minimum": 1 },
+          "duration": { "type": "integer", "minimum": 1, "maximum": 60 },
+          "vo": { "type": "string" },
+          "caption": { "type": "string" },
+          "storyboard": { "type": "string" },
+          "image_prompt": { "type": "string" },
+          "image_url": { "type": "string" },
+          "motion": {
+            "type": "object",
+            "required": ["type", "intensity", "duration_seconds"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["static", "dolly_in", "dolly_out", "pan_left", "pan_right", "tilt_up", "tilt_down", "parallax", "zoom_in", "zoom_out"]
+              },
+              "intensity": { "type": "string", "enum": ["subtle", "moderate", "strong"] },
+              "duration_seconds": { "type": "number", "minimum": 1 },
+              "camera_notes": { "type": "string" },
+              "audio_notes": { "type": "string" }
+            }
+          },
+          "clip_url": { "type": "string" }
+        }
+      }
+    },
+    "audio": {
+      "type": "object",
+      "properties": {
+        "vo_recording": { "type": "string" },
+        "music": { "type": "string" },
+        "ambient": { "type": "string" },
+        "sfx": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "delivery": {
+      "type": "object",
+      "properties": {
+        "aspect_ratio": { "type": "string", "enum": ["16:9", "9:16", "1:1", "4:5"] },
+        "resolution": { "type": "string" },
+        "frame_rate": { "type": "integer" },
+        "formats": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

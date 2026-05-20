@@ -16,6 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useTaskRunner } from "@/hooks/useTaskRunner";
 import HighlightableText, { type Highlight } from "./HighlightableText";
+import CollectionPicker from "./CollectionPicker";
 import ResearchBrief, { type BriefData } from "./ResearchBrief";
 
 interface Source {
@@ -254,7 +255,7 @@ export default function ResearchDetail({ projectId, onDelete, onFollowUpCreated 
 
             {/* Tab Content */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
-                {activeTab === "overview" && analysis && <OverviewTab analysis={analysis} onCreateArticle={onCreateArticle} creatingArticle={creatingArticle} />}
+                {activeTab === "overview" && analysis && <OverviewTab analysis={analysis} onCreateArticle={onCreateArticle} creatingArticle={creatingArticle} companyId={project.company_id} projectId={project.id} />}
                 {activeTab === "overview" && !analysis && (
                     <p className="text-sm text-muted-foreground text-center py-12">No analysis available yet.</p>
                 )}
@@ -271,6 +272,8 @@ export default function ResearchDetail({ projectId, onDelete, onFollowUpCreated 
                             });
                         }}
                         onSaveHighlights={saveHighlights}
+                        companyId={project.company_id}
+                        projectId={project.id}
                     />
                 )}
 
@@ -319,7 +322,7 @@ export default function ResearchDetail({ projectId, onDelete, onFollowUpCreated 
 
 // ── Overview Tab ─────────────────────────────────────────────────────────
 
-function OverviewTab({ analysis, onCreateArticle, creatingArticle }: { analysis: Analysis; onCreateArticle: (angle: string) => void; creatingArticle: boolean }) {
+function OverviewTab({ analysis, onCreateArticle, creatingArticle, companyId, projectId }: { analysis: Analysis; onCreateArticle: (angle: string) => void; creatingArticle: boolean; companyId: string; projectId: string }) {
     return (
         <div className="space-y-5">
             {/* Key Findings */}
@@ -333,16 +336,23 @@ function OverviewTab({ analysis, onCreateArticle, creatingArticle }: { analysis:
                             <div key={i} className="flex items-start gap-2 text-sm group rounded-md px-2 py-1.5 -mx-2 hover:bg-muted/40 transition-colors">
                                 <span className="text-primary font-medium shrink-0 mt-0.5">{i + 1}.</span>
                                 <span className="text-foreground/85 flex-1">{f}</span>
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-6 text-[10px] gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-primary hover:text-primary"
-                                    onClick={() => onCreateArticle(f)}
-                                    disabled={creatingArticle}
-                                >
-                                    <FileText className="h-3 w-3" />
-                                    Create Article
-                                </Button>
+                                <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+                                    <CollectionPicker
+                                        companyId={companyId}
+                                        snippet={{ text: f, research_project_id: projectId }}
+                                        compact
+                                    />
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-6 text-[10px] gap-1 text-primary hover:text-primary"
+                                        onClick={() => onCreateArticle(f)}
+                                        disabled={creatingArticle}
+                                    >
+                                        <FileText className="h-3 w-3" />
+                                        Create Article
+                                    </Button>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -364,16 +374,23 @@ function OverviewTab({ analysis, onCreateArticle, creatingArticle }: { analysis:
                                         <p className="text-sm font-medium">{s.stat}</p>
                                         <p className="text-xs text-muted-foreground mt-0.5">{s.context}</p>
                                     </div>
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-6 text-[10px] gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-primary hover:text-primary mt-0.5"
-                                        onClick={() => onCreateArticle(`${s.stat} — ${s.context}`)}
-                                        disabled={creatingArticle}
-                                    >
-                                        <FileText className="h-3 w-3" />
-                                        Create Article
-                                    </Button>
+                                    <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 mt-0.5">
+                                        <CollectionPicker
+                                            companyId={companyId}
+                                            snippet={{ text: `${s.stat} — ${s.context}`, note: `Source: ${s.source}`, source_url: s.source, research_project_id: projectId }}
+                                            compact
+                                        />
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-6 text-[10px] gap-1 text-primary hover:text-primary"
+                                            onClick={() => onCreateArticle(`${s.stat} — ${s.context}`)}
+                                            disabled={creatingArticle}
+                                        >
+                                            <FileText className="h-3 w-3" />
+                                            Create Article
+                                        </Button>
+                                    </div>
                                 </CardContent>
                             </Card>
                         ))}
@@ -411,16 +428,23 @@ function OverviewTab({ analysis, onCreateArticle, creatingArticle }: { analysis:
                             <li key={i} className="text-sm text-foreground/80 flex items-start gap-1.5 group rounded-md px-2 py-1.5 -mx-2 hover:bg-muted/40 transition-colors">
                                 <span className="text-amber-400 shrink-0 mt-0.5">⚡</span>
                                 <span className="flex-1">{a}</span>
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-6 text-[10px] gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-primary hover:text-primary"
-                                    onClick={() => onCreateArticle(a)}
-                                    disabled={creatingArticle}
-                                >
-                                    <FileText className="h-3 w-3" />
-                                    Create Article
-                                </Button>
+                                <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+                                    <CollectionPicker
+                                        companyId={companyId}
+                                        snippet={{ text: a, research_project_id: projectId }}
+                                        compact
+                                    />
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-6 text-[10px] gap-1 text-primary hover:text-primary"
+                                        onClick={() => onCreateArticle(a)}
+                                        disabled={creatingArticle}
+                                    >
+                                        <FileText className="h-3 w-3" />
+                                        Create Article
+                                    </Button>
+                                </div>
                             </li>
                         ))}
                     </ul>
@@ -439,16 +463,23 @@ function OverviewTab({ analysis, onCreateArticle, creatingArticle }: { analysis:
                             <li key={i} className="text-sm text-foreground/80 flex items-start gap-1.5 group rounded-md px-2 py-1.5 -mx-2 hover:bg-muted/40 transition-colors">
                                 <span className="text-green-400 shrink-0 mt-0.5">🔍</span>
                                 <span className="flex-1">{g}</span>
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-6 text-[10px] gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-primary hover:text-primary"
-                                    onClick={() => onCreateArticle(g)}
-                                    disabled={creatingArticle}
-                                >
-                                    <FileText className="h-3 w-3" />
-                                    Create Article
-                                </Button>
+                                <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+                                    <CollectionPicker
+                                        companyId={companyId}
+                                        snippet={{ text: g, research_project_id: projectId }}
+                                        compact
+                                    />
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-6 text-[10px] gap-1 text-primary hover:text-primary"
+                                        onClick={() => onCreateArticle(g)}
+                                        disabled={creatingArticle}
+                                    >
+                                        <FileText className="h-3 w-3" />
+                                        Create Article
+                                    </Button>
+                                </div>
                             </li>
                         ))}
                     </ul>
@@ -467,16 +498,23 @@ function OverviewTab({ analysis, onCreateArticle, creatingArticle }: { analysis:
                             <div key={i} className="text-sm text-foreground/80 flex items-start gap-1.5 group rounded-md px-2 py-1.5 -mx-2 hover:bg-muted/40 transition-colors">
                                 <span className="text-primary/60 shrink-0 mt-0.5">→</span>
                                 <span className="flex-1">{a}</span>
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-6 text-[10px] gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-primary hover:text-primary"
-                                    onClick={() => onCreateArticle(a)}
-                                    disabled={creatingArticle}
-                                >
-                                    <FileText className="h-3 w-3" />
-                                    Create Article
-                                </Button>
+                                <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+                                    <CollectionPicker
+                                        companyId={companyId}
+                                        snippet={{ text: a, research_project_id: projectId }}
+                                        compact
+                                    />
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-6 text-[10px] gap-1 text-primary hover:text-primary"
+                                        onClick={() => onCreateArticle(a)}
+                                        disabled={creatingArticle}
+                                    >
+                                        <FileText className="h-3 w-3" />
+                                        Create Article
+                                    </Button>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -489,12 +527,14 @@ function OverviewTab({ analysis, onCreateArticle, creatingArticle }: { analysis:
 // ── Sources Tab ──────────────────────────────────────────────────────────
 
 function SourcesTab({
-    sources, expandedSources, onToggleSource, onSaveHighlights,
+    sources, expandedSources, onToggleSource, onSaveHighlights, companyId, projectId,
 }: {
     sources: Source[];
     expandedSources: Set<string>;
     onToggleSource: (id: string) => void;
     onSaveHighlights: (sourceId: string, highlights: Highlight[]) => void;
+    companyId: string;
+    projectId: string;
 }) {
     return (
         <div className="space-y-2">
@@ -537,6 +577,10 @@ function SourcesTab({
                                         content={source.content_text}
                                         highlights={source.highlights || []}
                                         onHighlightsChange={(hl) => onSaveHighlights(source.id, hl)}
+                                        companyId={companyId}
+                                        projectId={projectId}
+                                        sourceUrl={source.url}
+                                        sourceTitle={source.title}
                                     />
                                 ) : (
                                     <p className="text-xs text-muted-foreground italic">Content could not be extracted from this source.</p>
