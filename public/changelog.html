@@ -372,6 +372,161 @@
       </div>
 
       <!-- ───────────────────────────────────── -->
+      <!-- May 22, 2026 -->
+      <!-- ───────────────────────────────────── -->
+      <div class="changelog-entry">
+        <div class="changelog-date">May 22, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+          <span class="changelog-tag changelog-tag--design">Design</span>
+        </div>
+        <h2 class="changelog-title">Sidebar <em>navigation</em></h2>
+        <div class="changelog-body">
+          <p>
+            Company settings have been reorganized from an in-page tabbed interface to the main sidebar. Brand, Visual, and Prompts settings are now accessible from a collapsible sub-navigation in the sidebar, with the active section highlighted and routed via URL parameters.
+          </p>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">May 22, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+          <span class="changelog-tag changelog-tag--infrastructure">Infrastructure</span>
+        </div>
+        <h2 class="changelog-title">Fact-Check <em>Consul</em> with Claude</h2>
+        <div class="changelog-body">
+          <p>
+            The multi-model Fact-Check Consul now runs three independent AI models in parallel for higher-confidence claim verification.
+          </p>
+          <ul>
+            <li><strong>Claude integration</strong> — Anthropic's Claude joins Gemini and Grok as a third fact-checking model, with tripartite reconciliation logic for claim adjudication.</li>
+            <li><strong>Three-model status UI</strong> — The PanelView now displays individual status indicators for all three models during fact-check runs.</li>
+            <li><strong>Batch rewrite queue</strong> — Select multiple flagged claims and apply corrections in a single AI pass via <code>/api/apply-rewrite-batch</code>, preventing race conditions from sequential rewrites.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">May 22, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+        </div>
+        <h2 class="changelog-title">Article <em>comparison</em></h2>
+        <div class="changelog-body">
+          <p>
+            Compare any Organic article against a competitor URL with AI-powered competitive analysis. The new "Compare" button in the article panel scrapes the target page and runs a multi-category scoring analysis covering depth, structure, SEO, readability, and expertise.
+          </p>
+          <ul>
+            <li><strong>Category scoring</strong> — Side-by-side scores across content depth, keyword coverage, structural quality, and user engagement metrics.</li>
+            <li><strong>Actionable suggestions</strong> — Concrete improvement recommendations based on what the competitor does well.</li>
+            <li><strong>Background tracking</strong> — Comparison tasks are tracked in the global activity panel like all other operations.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">May 22, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+        </div>
+        <h2 class="changelog-title">Batch image style <em>extraction</em></h2>
+        <div class="changelog-body">
+          <p>
+            Upload multiple reference images at once and let AI extract visual styles from all of them in parallel. A new batch upload dialog supports multi-file selection with concurrent processing, progress tracking, and automatic style mapping to your brand profile.
+          </p>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">May 22, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--improvement">Improvement</span>
+        </div>
+        <h2 class="changelog-title">Voice analysis <em>depth</em></h2>
+        <div class="changelog-body">
+          <p>
+            The voice profile analyzer now captures structural and rhythmic patterns from reference articles — headline cadence, paragraph rhythm, section length, and transition style — producing more faithful brand voice replication in generated content.
+          </p>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">May 22, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--improvement">Improvement</span>
+          <span class="changelog-tag changelog-tag--infrastructure">Infrastructure</span>
+        </div>
+        <h2 class="changelog-title">Task panel <em>refinements</em></h2>
+        <div class="changelog-body">
+          <p>
+            Several improvements to the background task system.
+          </p>
+          <ul>
+            <li><strong>Non-destructive close</strong> — Closing the activity panel now only hides the UI without terminating active background processes.</li>
+            <li><strong>Shorten tracking</strong> — The "Shorten" feature now registers as a tracked task with live status in the activity panel.</li>
+            <li><strong>Modal close-on-submit</strong> — The article creation modal closes immediately when a task is submitted, while the background process continues running.</li>
+            <li><strong>Default word count</strong> — Standardized article length default to 1,800–2,400 words across all creation interfaces and API endpoints.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ───────────────────────────────────── -->
+      <!-- May 20, 2026 -->
+      <!-- ───────────────────────────────────── -->
+      <div class="changelog-entry">
+        <div class="changelog-date">May 20, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+          <span class="changelog-tag changelog-tag--infrastructure">Infrastructure</span>
+        </div>
+        <h2 class="changelog-title">Email <em>campaigns</em></h2>
+        <div class="changelog-body">
+          <p>
+            A comprehensive, admin-managed email campaign system built on Supabase and Resend. Create, preview, and send brand-consistent HTML email campaigns to managed subscriber lists with batch delivery and unsubscribe support.
+          </p>
+          <ul>
+            <li><strong>Campaign editor</strong> — Tiptap-powered rich text editor with automatic brand template wrapping and inline preview.</li>
+            <li><strong>Subscriber management</strong> — Bulk CSV import, individual adds, and subscriber status tracking.</li>
+            <li><strong>AI product updates</strong> — Generate "Product Updates" email content automatically from your company's recent articles.</li>
+            <li><strong>Admin-only access</strong> — Campaigns, Subscribers, and Users tabs are scoped to global platform administrators.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">May 20, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+        </div>
+        <h2 class="changelog-title">Voice prompt <em>attachment</em></h2>
+        <div class="changelog-body">
+          <p>
+            Toggle a company voice profile on or off when creating articles. When enabled, the brand's compiled voice directives are automatically injected into the generation prompt without cluttering the visible prompt field. A "Voice Attached" indicator confirms when the profile is active.
+          </p>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">May 20, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--design">Design</span>
+          <span class="changelog-tag changelog-tag--improvement">Improvement</span>
+        </div>
+        <h2 class="changelog-title">UI <em>polish</em></h2>
+        <div class="changelog-body">
+          <p>
+            A round of visual refinements across the platform.
+          </p>
+          <ul>
+            <li><strong>Border cleanup</strong> — Removed redundant border and ring styles from cards, list items, and panels for a cleaner, flatter aesthetic.</li>
+            <li><strong>Updated hero copy</strong> — Landing page headline updated to "Content engineers, train the robots. Skip the humdrum." with positioning subhead.</li>
+            <li><strong>Onboarding improvements</strong> — Fixed registration hook errors, removed grayscale image filters, and refined the first-time user tour flow.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ───────────────────────────────────── -->
       <!-- May 6, 2026 -->
       <!-- ───────────────────────────────────── -->
       <div class="changelog-entry">
