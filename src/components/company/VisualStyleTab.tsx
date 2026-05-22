@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
     Palette, Layers, ChevronDown, ChevronRight, AlertCircle,
     Plus, X, Camera, ImagePlus, Loader2, Sparkles, CheckCircle2,
+    Upload, Trash2,
 } from "lucide-react";
 
 /* ── Hover-to-enlarge thumbnail preview ── */
@@ -81,6 +82,177 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
     const [generatingThumbnail, setGeneratingThumbnail] = useState(false);
     const [generatingThumbIdx, setGeneratingThumbIdx] = useState<number | null>(null);
     const imageInputRef = useRef<HTMLInputElement>(null);
+
+    /* ── Batch upload state ── */
+    const [showBatchUpload, setShowBatchUpload] = useState(false);
+    type BatchImageItem = {
+        file: File;
+        previewUrl: string;
+        base64: string;
+        thumbnailDataUri: string | null; // resized client-side
+        status: "queued" | "analyzing" | "done" | "error";
+        styleName: string;
+        result: ImageStyleAnalysis | null;
+        error: string | null;
+    };
+    const [batchItems, setBatchItems] = useState<BatchImageItem[]>([]);
+    const [batchAnalyzing, setBatchAnalyzing] = useState(false);
+    const [batchErr, setBatchErr] = useState<string | null>(null);
+    const batchInputRef = useRef<HTMLInputElement>(null);
+
+    function openBatchUpload() {
+        setShowBatchUpload(true);
+        setBatchItems([]);
+        setBatchAnalyzing(false);
+        setBatchErr(null);
+    }
+    function closeBatchUpload() {
+        setShowBatchUpload(false);
+        setBatchItems([]);
+        setBatchAnalyzing(false);
+        setBatchErr(null);
+    }
+
+    /** Resize an image data URI to ~128px thumbnail using canvas */
+    function resizeToThumbnail(dataUri: string): Promise<string> {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                canvas.width = 128;
+                canvas.height = 128;
+                const ctx = canvas.getContext("2d")!;
+                // Cover-crop to square
+                const size = Math.min(img.width, img.height);
+                const sx = (img.width - size) / 2;
+                const sy = (img.height - size) / 2;
+                ctx.drawImage(img, sx, sy, size, size, 0, 0, 128, 128);
+                resolve(canvas.toDataURL("image/jpeg", 0.8));
+            };
+            img.onerror = () => resolve(dataUri);
+            img.src = dataUri;
+        });
+    }
+
+    async function handleBatchFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+        const maxFiles = 10;
+        const selected = Array.from(files).slice(0, maxFiles);
+        const invalid = selected.filter(f => !f.type.startsWith("image/") || f.size > 10 * 1024 * 1024);
+        if (invalid.length > 0) {
+            setBatchErr(`${invalid.length} file(s) skipped — must be images under 10MB.`);
+        }
+        const valid = selected.filter(f => f.type.startsWith("image/") && f.size <= 10 * 1024 * 1024);
+        if (valid.length === 0) return;
+
+        // Read all files as base64 + create thumbnails
+        const newItems: BatchImageItem[] = await Promise.all(
+            valid.map(async (file) => {
+                const dataUri = await new Promise<string>((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => resolve(ev.target?.result as string);
+                    reader.readAsDataURL(file);
+                });
+                const thumb = await resizeToThumbnail(dataUri);
+                return {
+                    file,
+                    previewUrl: dataUri,
+                    base64: dataUri,
+                    thumbnailDataUri: thumb,
+                    status: "queued" as const,
+                    styleName: "",
+                    result: null,
+                    error: null,
+                };
+            })
+        );
+        setBatchItems(prev => [...prev, ...newItems].slice(0, maxFiles));
+        // Reset the input so re-selecting the same files works
+        if (batchInputRef.current) batchInputRef.current.value = "";
+    }
+
+    function removeBatchItem(idx: number) {
+        setBatchItems(prev => prev.filter((_, i) => i !== idx));
+    }
+
+    async function analyzeBatchItems() {
+        if (batchItems.length === 0) return;
+        setBatchAnalyzing(true);
+        setBatchErr(null);
+
+        // Process sequentially with concurrency=2 using manual fetch
+        const queue = batchItems.map((_, i) => i).filter(i => batchItems[i].status === "queued");
+        const concurrency = 2;
+        const running = new Set<Promise<void>>();
+
+        const processOne = async (idx: number) => {
+            setBatchItems(prev => prev.map((item, i) => i === idx ? { ...item, status: "analyzing" as const } : item));
+            try {
+                const res = await fetch("/api/analyze-image-style", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ image_base64: batchItems[idx].base64 }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data?.error || "Analysis failed");
+                setBatchItems(prev => prev.map((item, i) =>
+                    i === idx ? {
+                        ...item,
+                        status: "done" as const,
+                        result: data.style,
+                        styleName: item.styleName || data.style.style_name || "",
+                    } : item
+                ));
+            } catch (err: any) {
+                setBatchItems(prev => prev.map((item, i) =>
+                    i === idx ? { ...item, status: "error" as const, error: err.message || "Unknown error" } : item
+                ));
+            }
+        };
+
+        while (queue.length > 0 || running.size > 0) {
+            while (running.size < concurrency && queue.length > 0) {
+                const idx = queue.shift()!;
+                const p = processOne(idx).finally(() => running.delete(p));
+                running.add(p);
+            }
+            if (running.size > 0) await Promise.race(running);
+        }
+
+        setBatchAnalyzing(false);
+    }
+
+    function saveBatchStyles() {
+        const newStyles: import("@/brand/engine").ImageStyleCategory[] = batchItems
+            .filter(item => item.status === "done" && item.result)
+            .map(item => {
+                const name = item.styleName.trim() || item.result!.style_name;
+                const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+                return {
+                    id,
+                    label: name,
+                    narrative: item.result!.narrative,
+                    storytelling_cues: item.result!.storytelling_cues,
+                    image_prompt_style: item.result!.image_prompt_style,
+                    thumbnail_url: item.thumbnailDataUri ?? undefined,
+                };
+            });
+        if (newStyles.length === 0) return;
+        setForm(prev => ({
+            ...prev,
+            useCustomStyles: true,
+            image_style_categories: [...prev.image_style_categories, ...newStyles],
+        }));
+        // Auto-expand the newly added styles
+        setExpandedStyles(prev => {
+            const next = new Set(prev);
+            const startIdx = form.image_style_categories.length;
+            newStyles.forEach((_, i) => next.add(startIdx + i));
+            return next;
+        });
+        closeBatchUpload();
+    }
 
     function openImageExtract() {
         setShowImageExtract(true); setExtractPreviewUrl(null); setExtractBase64(null);
@@ -226,9 +398,10 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
                                 );
                             })}
                             {form.useCustomStyles && (
-                                <div className="flex gap-2">
+                                <div className="flex gap-2 flex-wrap">
                                     <Button variant="outline" className="border-dashed gap-1" onClick={() => setForm(prev => ({ ...prev, image_style_categories: [...prev.image_style_categories, { id: "", label: "", narrative: "", storytelling_cues: [], image_prompt_style: "" }] }))}><Plus className="h-3.5 w-3.5" /> Add Style</Button>
                                     <Button variant="outline" className="gap-1.5 border-primary/30 text-primary hover:bg-primary/5" onClick={openImageExtract}><Camera className="h-3.5 w-3.5" /> Extract from Image</Button>
+                                    <Button variant="outline" className="gap-1.5 border-primary/30 text-primary hover:bg-primary/5" onClick={openBatchUpload}><Upload className="h-3.5 w-3.5" /> Batch Upload</Button>
                                 </div>
                             )}
                         </>
@@ -311,6 +484,21 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
                 onExtract={handleImageExtract}
                 onAdd={addExtractedStyle}
                 onReplaceImage={() => { setExtractPreviewUrl(null); setExtractBase64(null); setExtractResult(null); setExtractErr(null); if (imageInputRef.current) imageInputRef.current.value = ""; }}
+            />
+
+            {/* Batch Image Upload Modal */}
+            <BatchImageUploadDialog
+                show={showBatchUpload}
+                onClose={closeBatchUpload}
+                batchInputRef={batchInputRef}
+                items={batchItems}
+                analyzing={batchAnalyzing}
+                error={batchErr}
+                onFileSelect={handleBatchFileSelect}
+                onRemoveItem={removeBatchItem}
+                onUpdateName={(idx, name) => setBatchItems(prev => prev.map((item, i) => i === idx ? { ...item, styleName: name } : item))}
+                onAnalyze={analyzeBatchItems}
+                onSave={saveBatchStyles}
             />
         </div>
     );
@@ -398,6 +586,198 @@ function ImageExtractDialog({ show, onClose, imageInputRef, extractPreviewUrl, e
                         {extractResult.storytelling_cues?.length > 0 && <div className="space-y-1"><Label className="text-xs">Storytelling Cues</Label><div className="flex flex-wrap gap-1.5">{extractResult.storytelling_cues.map((c, i) => <Badge key={i} variant="outline" className="text-xs font-normal">{c}</Badge>)}</div></div>}
                         <div className="space-y-1"><Label className="text-xs">Narrative</Label><p className="text-xs text-muted-foreground leading-relaxed">{extractResult.narrative}</p></div>
                         <div className="flex justify-end gap-2 pt-2"><Button variant="outline" onClick={onClose}>Cancel</Button><Button onClick={onAdd} className="gap-1.5"><Plus className="h-4 w-4" /> Add Style</Button></div>
+                    </div>
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+/* ── Batch Image Upload Dialog ── */
+type BatchImageItem = {
+    file: File;
+    previewUrl: string;
+    base64: string;
+    thumbnailDataUri: string | null;
+    status: "queued" | "analyzing" | "done" | "error";
+    styleName: string;
+    result: ImageStyleAnalysis | null;
+    error: string | null;
+};
+
+function BatchImageUploadDialog({ show, onClose, batchInputRef, items, analyzing, error, onFileSelect, onRemoveItem, onUpdateName, onAnalyze, onSave }: {
+    show: boolean;
+    onClose: () => void;
+    batchInputRef: React.RefObject<HTMLInputElement | null>;
+    items: BatchImageItem[];
+    analyzing: boolean;
+    error: string | null;
+    onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onRemoveItem: (idx: number) => void;
+    onUpdateName: (idx: number, name: string) => void;
+    onAnalyze: () => void;
+    onSave: () => void;
+}) {
+    const doneCount = items.filter(i => i.status === "done").length;
+    const errorCount = items.filter(i => i.status === "error").length;
+    const analyzingCount = items.filter(i => i.status === "analyzing").length;
+    const queuedCount = items.filter(i => i.status === "queued").length;
+    const allDone = items.length > 0 && queuedCount === 0 && analyzingCount === 0;
+    const hasQueued = queuedCount > 0;
+
+    return (
+        <Dialog open={show} onOpenChange={(open) => { if (!open) onClose(); }}>
+            <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <Upload className="h-5 w-5 text-primary" />
+                        Batch Image Upload
+                        {items.length > 0 && (
+                            <Badge variant="secondary" className="text-[10px] ml-1">{items.length} image{items.length !== 1 ? "s" : ""}</Badge>
+                        )}
+                    </DialogTitle>
+                </DialogHeader>
+                <p className="text-sm text-muted-foreground mt-1">
+                    Upload multiple reference images at once. Each image will be analyzed by our AI art director to extract a reusable style prompt.
+                </p>
+
+                {/* Upload zone */}
+                <div className="mt-4">
+                    <input
+                        ref={batchInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/jpg"
+                        multiple
+                        className="hidden"
+                        onChange={onFileSelect}
+                    />
+                    <button
+                        type="button"
+                        onClick={() => batchInputRef.current?.click()}
+                        disabled={analyzing}
+                        className="w-full rounded-xl border-2 border-dashed border-border hover:border-primary/50 bg-muted/20 hover:bg-muted/40 transition-all p-6 flex flex-col items-center gap-2 cursor-pointer group disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                            <ImagePlus className="h-6 w-6 text-primary" />
+                        </div>
+                        <div className="text-center">
+                            <p className="text-sm font-medium">{items.length > 0 ? "Add more images" : "Click to select images"}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">JPEG, PNG, or WebP — up to 10 images, 10MB each</p>
+                        </div>
+                    </button>
+                </div>
+
+                {error && (
+                    <Alert variant="destructive" className="mt-3">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                )}
+
+                {/* Image grid */}
+                {items.length > 0 && (
+                    <div className="mt-4 space-y-4">
+                        {/* Progress bar */}
+                        {(analyzing || allDone) && (
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between text-xs">
+                                    <span className="text-muted-foreground">
+                                        {analyzing
+                                            ? `Analyzing… ${doneCount + errorCount} of ${items.length}`
+                                            : `${doneCount} analyzed${errorCount > 0 ? `, ${errorCount} failed` : ""}`}
+                                    </span>
+                                    {analyzing && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
+                                    {allDone && doneCount > 0 && <CheckCircle2 className="h-3.5 w-3.5 text-success" />}
+                                </div>
+                                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                                    <div
+                                        className="h-full rounded-full bg-primary transition-all duration-500"
+                                        style={{ width: `${items.length > 0 ? Math.round(((doneCount + errorCount) / items.length) * 100) : 0}%` }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Grid of image cards */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                            {items.map((item, idx) => (
+                                <div key={idx} className="relative group rounded-xl border border-border bg-card overflow-hidden">
+                                    {/* Image preview */}
+                                    <div className="aspect-square relative bg-muted/30">
+                                        <img src={item.previewUrl} alt={item.styleName || `Image ${idx + 1}`} className="w-full h-full object-cover" />
+                                        {/* Status overlay */}
+                                        {item.status === "analyzing" && (
+                                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <Loader2 className="h-6 w-6 animate-spin text-white" />
+                                                    <span className="text-[10px] text-white/80">Analyzing…</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {item.status === "done" && (
+                                            <div className="absolute top-1.5 right-1.5">
+                                                <div className="w-6 h-6 rounded-full bg-success flex items-center justify-center shadow-sm">
+                                                    <CheckCircle2 className="h-4 w-4 text-white" />
+                                                </div>
+                                            </div>
+                                        )}
+                                        {item.status === "error" && (
+                                            <div className="absolute inset-0 bg-destructive/20 flex items-center justify-center">
+                                                <div className="flex flex-col items-center gap-1 px-2 text-center">
+                                                    <AlertCircle className="h-5 w-5 text-destructive" />
+                                                    <span className="text-[10px] text-destructive leading-tight">{item.error || "Failed"}</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {/* Remove button */}
+                                        {!analyzing && (
+                                            <button
+                                                type="button"
+                                                onClick={() => onRemoveItem(idx)}
+                                                className="absolute top-1.5 left-1.5 w-6 h-6 rounded-full bg-black/60 hover:bg-destructive flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                <X className="h-3.5 w-3.5 text-white" />
+                                            </button>
+                                        )}
+                                    </div>
+                                    {/* Style name */}
+                                    <div className="p-2">
+                                        {item.status === "done" ? (
+                                            <input
+                                                type="text"
+                                                value={item.styleName}
+                                                onChange={(e) => onUpdateName(idx, e.target.value)}
+                                                placeholder="Style name"
+                                                className="w-full text-xs bg-transparent border-0 border-b border-border/50 focus:border-primary focus:outline-none pb-0.5 placeholder:text-muted-foreground"
+                                            />
+                                        ) : (
+                                            <span className="text-[11px] text-muted-foreground truncate block">
+                                                {item.status === "analyzing" ? "Analyzing…" : item.status === "error" ? "Failed" : item.file.name}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex justify-end gap-2 pt-2">
+                            <Button variant="outline" onClick={onClose}>Cancel</Button>
+                            {hasQueued && (
+                                <Button onClick={onAnalyze} disabled={analyzing} className="gap-1.5">
+                                    {analyzing ? (
+                                        <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing…</>
+                                    ) : (
+                                        <><Sparkles className="h-4 w-4" /> Analyze {queuedCount} Image{queuedCount !== 1 ? "s" : ""}</>
+                                    )}
+                                </Button>
+                            )}
+                            {allDone && doneCount > 0 && (
+                                <Button onClick={onSave} className="gap-1.5">
+                                    <Plus className="h-4 w-4" /> Save {doneCount} Style{doneCount !== 1 ? "s" : ""}
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 )}
             </DialogContent>

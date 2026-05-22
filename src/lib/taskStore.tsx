@@ -26,7 +26,8 @@ export type TaskType =
   | "research"
   | "research-brief"
   | "research-article"
-  | "freshness-audit";
+  | "freshness-audit"
+  | "compare";
 
 export interface Task {
   id: string;

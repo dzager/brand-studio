@@ -136,7 +136,7 @@ export default function Home() {
     const [imageStyle, setImageStyle] = useState("default");
     const [model, setModel] = useState("");
     const [availableModels, setAvailableModels] = useState<{ id: string; label: string; provider: string }[]>([]);
-    const [wordCount, setWordCount] = useState("1500-2500");
+    const [wordCount, setWordCount] = useState("1800-2400");
     const [companyId, setCompanyId] = useState<string>("");
     const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
     const [companiesLoaded, setCompaniesLoaded] = useState(false);
@@ -326,38 +326,42 @@ export default function Home() {
             if (csBgImageUrl.trim()) payload.composite_bg_image_url = csBgImageUrl.trim();
             if (csBgPrompt.trim()) payload.composite_bg_prompt = csBgPrompt.trim();
         }
-        await runTask({
+        // Navigate immediately — activity panel tracks progress
+        setLoading(false);
+        router.push(`/articles`);
+
+        runTask({
             type: "article",
             label: prompt.trim().slice(0, 60) || "New article",
             endpoint: "/api/create",
             body: payload,
             meta: { companyId },
             onSuccess: (data: any) => {
-                setResult(data);
                 window.dispatchEvent(new Event("article-created"));
-                if (data?.image_base64) {
-                    const img: GalleryImage = { id: ++_imgId, base64: data.image_base64, prompt: data.image_prompt ?? "", label: "Original" };
-                    setGallery([img]); setSelectedImgId(img.id);
-                }
-                setLoading(false);
-                // Navigate to the articles page
-                setTimeout(() => router.push(`/articles`), 600);
             },
-            onError: (errMsg) => { setErr(errMsg); setLoading(false); },
+            onError: () => { /* handled by task panel */ },
         });
     }
 
     async function onCreateCluster() {
         if (!companyId || !clusterTopic.trim()) return;
-        setClusterGenerating(true); setClusterErr(null); setClusterResult(null);
-        await runTask({
+        const topic = clusterTopic.trim();
+        // Navigate immediately — activity panel tracks progress
+        setClusterGenerating(false);
+        router.push(`/articles`);
+
+        runTask({
             type: "cluster-strategy",
-            label: `Strategy: ${clusterTopic.trim().slice(0, 50)}`,
+            label: `Strategy: ${topic.slice(0, 50)}`,
             endpoint: "/api/clusters",
-            body: { company_id: companyId, topic: clusterTopic.trim(), model },
+            body: { company_id: companyId, topic, model },
             meta: { companyId },
-            onSuccess: (data: any) => { setClusterResult(data); setClusterGenerating(false); },
-            onError: (errMsg) => { setClusterErr(errMsg); setClusterGenerating(false); },
+            onSuccess: (data: any) => {
+                if (data?.id) {
+                    window.dispatchEvent(new CustomEvent("cluster-created", { detail: { id: data.id } }));
+                }
+            },
+            onError: () => { /* handled by task panel */ },
         });
     }
 

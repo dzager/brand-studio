@@ -20,9 +20,11 @@ import {
   Shield,
   LogOut,
   ChevronDown,
+  ChevronRight,
   User,
   UserPlus,
   Palette,
+  Eye,
   HelpCircle,
   ShieldCheck,
 } from "lucide-react";
@@ -41,6 +43,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import SettingsDialog from "@/components/layout/SettingsDialog";
 import { useAuth } from "@/hooks/useAuth";
@@ -56,6 +59,12 @@ const NAV_ITEMS = [
   { href: "/research", label: "Research", icon: Search, description: "Topic deep dives", minRole: "member", badge: "Beta" },
   { href: "/freshness", label: "Freshness", icon: ShieldCheck, description: "Fact verification", minRole: "member", badge: "Beta" },
   { href: "/admin", label: "Admin", icon: Shield, description: "Platform dashboard", minRole: "admin" },
+];
+
+const COMPANY_SUB_NAV = [
+  { tab: "brand", label: "Brand", icon: Eye },
+  { tab: "visual", label: "Visual", icon: Palette },
+  { tab: "prompts", label: "Prompts", icon: FileText },
 ];
 
 function ThemeToggle() {
@@ -209,6 +218,7 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
         {/* Nav Items */}
         <nav className="flex-1 px-2 py-3 space-y-1" data-tour="sidebar-nav">
           {visibleNavItems.map((item) => {
+            const isCompanyNav = item.href === "/company" || item.href === "/companies";
             const isActive =
               item.href === "/"
                 ? router.pathname === "/"
@@ -236,6 +246,56 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
                     <p>{item.label}{(item as any).badge && <span className="ml-1.5 text-[9px] font-semibold uppercase tracking-wider text-primary/70">{(item as any).badge}</span>}</p>
                   </TooltipContent>
                 </Tooltip>
+              );
+            }
+
+            // Company nav with sub-items
+            if (isCompanyNav && item.href === "/company") {
+              const activeTab = (router.query.tab as string) || "brand";
+              return (
+                <Collapsible key={item.href} defaultOpen={isActive}>
+                  <CollapsibleTrigger asChild>
+                    <button
+                      data-tour={`nav-${item.href.replace('/', '')}`}
+                      className={cn(
+                        "flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm transition-colors",
+                        isActive
+                          ? "bg-sidebar-accent text-sidebar-primary font-medium"
+                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                      )}
+                      onClick={() => {
+                        if (!isActive) router.push("/company");
+                      }}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span className="flex-1 text-left">{item.label}</span>
+                      <ChevronRight className="h-3 w-3 shrink-0 transition-transform duration-200 [[data-state=open]>&]:rotate-90" />
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="ml-4 mt-0.5 space-y-0.5 border-l border-sidebar-border pl-2">
+                      {COMPANY_SUB_NAV.map((sub) => {
+                        const SubIcon = sub.icon;
+                        const isSubActive = isActive && activeTab === sub.tab;
+                        return (
+                          <Link
+                            key={sub.tab}
+                            href={`/company?tab=${sub.tab}`}
+                            className={cn(
+                              "flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] transition-colors",
+                              isSubActive
+                                ? "bg-sidebar-accent/70 text-sidebar-primary font-medium"
+                                : "text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                            )}
+                          >
+                            <SubIcon className="h-3.5 w-3.5 shrink-0" />
+                            <span>{sub.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
               );
             }
 

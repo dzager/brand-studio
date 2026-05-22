@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import {
     DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
     DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
@@ -27,9 +28,10 @@ import {
     Crown, BookOpen, Scroll, Layers, ArrowLeft,
     ChevronDown, FileText, ClipboardCopy, Scissors, Crop,
     Scale, ExternalLink, ShieldCheck, Wand2, ChevronRight,
-    X, Maximize2, Video, Play,
+    X, Maximize2, Video, Play, ArrowLeftRight, ListChecks,
 } from "lucide-react";
 import type { ConsulResult, ConsulClaimReview } from "@/lib/consulPrompts";
+import type { CompareResult } from "@/pages/api/compare-article";
 import { cn } from "@/lib/utils";
 
 type SearchImage = {
@@ -117,6 +119,9 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     const [expandedClaims, setExpandedClaims] = useState<Set<number>>(new Set());
     const [applyingRewrite, setApplyingRewrite] = useState<number | null>(null);
     const [appliedRewrites, setAppliedRewrites] = useState<Set<number>>(new Set());
+    const [rewriteQueue, setRewriteQueue] = useState<Set<number>>(new Set());
+    const [applyingBatch, setApplyingBatch] = useState(false);
+    const [consulCollapsed, setConsulCollapsed] = useState(true);
 
     const [refreshingImage, setRefreshingImage] = useState(false);
     const [imagePromptInput, setImagePromptInput] = useState("");
@@ -191,6 +196,14 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     const [ytResults, setYtResults] = useState<SearchVideo[]>([]);
     const [ytSearching, setYtSearching] = useState(false);
     const [ytErr, setYtErr] = useState<string | null>(null);
+
+    // Compare article state
+    const [showCompareModal, setShowCompareModal] = useState(false);
+    const [compareUrl, setCompareUrl] = useState("");
+    const [comparing, setComparing] = useState(false);
+    const [compareResult, setCompareResult] = useState<CompareResult | null>(null);
+    const [compareErr, setCompareErr] = useState<string | null>(null);
+    const [compareCollapsed, setCompareCollapsed] = useState(true);
 
 
 
@@ -378,53 +391,56 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
         });
     }
 
-    async function handleShorten() {
+    async function handleShorten(targetWords: number) {
         if (!displayArticle.html) return;
         setShortening(true); setShortenErr(null); setShortened(false); setShortenInfo(null);
-        try {
-            const r = await fetch("/api/shorten", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    html: displayArticle.html,
-                    title: article.title,
-                    excerpt: article.excerpt || undefined,
-                    company_id: article.company_id ?? undefined,
-                }),
-            });
-            const data = await r.json();
-            if (!r.ok) throw new Error(data.error || "Shortening failed");
+        await runTask({
+            type: "shorten",
+            label: `${article.title.slice(0, 40)} → ~${targetWords.toLocaleString()} words`,
+            endpoint: "/api/shorten",
+            body: {
+                html: displayArticle.html,
+                title: article.title,
+                excerpt: article.excerpt || undefined,
+                company_id: article.company_id ?? undefined,
+                target_words: targetWords,
+            },
+            meta: { articleId: article.id, companyId: article.company_id },
+            onSuccess: async (data: any) => {
+                try {
+                    // If already under limit, show info but don't save
+                    if (data.word_count === data.original_word_count) {
+                        setShortenInfo({ original: data.original_word_count, shortened: data.word_count });
+                        setShortened(true);
+                        setTimeout(() => setShortened(false), 4000);
+                        return;
+                    }
 
-            // If already under limit, show info but don't save
-            if (data.word_count === data.original_word_count) {
-                setShortenInfo({ original: data.original_word_count, shortened: data.word_count });
-                setShortened(true);
-                setTimeout(() => setShortened(false), 4000);
-                return;
-            }
-
-            // Save shortened content
-            const saveResp = await fetch(`/api/articles/${article.id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    html: data.html,
-                    ...(data.excerpt ? { excerpt: data.excerpt } : {}),
-                }),
-            });
-            const saveData = await saveResp.json();
-            if (!saveResp.ok) throw new Error(saveData.error || "Failed to save");
-            onUpdate({ ...article, ...saveData });
-            setShortenInfo({ original: data.original_word_count, shortened: data.word_count });
-            setShortened(true);
-            setTimeout(() => { setShortened(false); setShortenInfo(null); }, 5000);
-        } catch (e: any) { setShortenErr(e.message); }
-        finally { setShortening(false); }
+                    // Save shortened content
+                    const saveResp = await fetch(`/api/articles/${article.id}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            html: data.html,
+                            ...(data.excerpt ? { excerpt: data.excerpt } : {}),
+                        }),
+                    });
+                    const saveData = await saveResp.json();
+                    if (!saveResp.ok) throw new Error(saveData.error || "Failed to save");
+                    onUpdate({ ...article, ...saveData });
+                    setShortenInfo({ original: data.original_word_count, shortened: data.word_count });
+                    setShortened(true);
+                    setTimeout(() => { setShortened(false); setShortenInfo(null); }, 5000);
+                } catch (e: any) { setShortenErr(e.message); }
+                finally { setShortening(false); }
+            },
+            onError: (errMsg) => { setShortenErr(errMsg); setShortening(false); },
+        });
     }
 
     async function handleConsulCheck() {
         if (!displayArticle.html) return;
-        setConsulChecking(true); setConsulErr(null); setConsulResult(null); setExpandedClaims(new Set()); setAppliedRewrites(new Set());
+        setConsulChecking(true); setConsulErr(null); setConsulResult(null); setExpandedClaims(new Set()); setAppliedRewrites(new Set()); setRewriteQueue(new Set()); setApplyingBatch(false);
         await runTask({
             type: "consul-check",
             label: `Deep check: ${article.title.slice(0, 40)}`,
@@ -436,6 +452,26 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
         });
     }
 
+    async function handleCompare() {
+        if (!displayArticle.html || !compareUrl.trim()) return;
+        setComparing(true); setCompareErr(null); setCompareResult(null); setShowCompareModal(false);
+        await runTask({
+            type: "compare",
+            label: `Compare: ${article.title.slice(0, 30)} vs URL`,
+            endpoint: "/api/compare-article",
+            body: {
+                html: displayArticle.html,
+                title: article.title,
+                excerpt: article.excerpt || undefined,
+                competitor_url: compareUrl.trim(),
+                company_id: article.company_id ?? undefined,
+            },
+            meta: { articleId: article.id },
+            onSuccess: (data: any) => { setCompareResult(data); setComparing(false); },
+            onError: (errMsg) => { setCompareErr(errMsg); setComparing(false); },
+        });
+    }
+
     function toggleConsulClaim(index: number) {
         setExpandedClaims((prev) => {
             const next = new Set(prev);
@@ -444,6 +480,30 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
         });
     }
 
+    function toggleRewriteQueue(claimIndex: number) {
+        setRewriteQueue((prev) => {
+            const next = new Set(prev);
+            if (next.has(claimIndex)) next.delete(claimIndex); else next.add(claimIndex);
+            return next;
+        });
+    }
+
+    /** Get all claim indices that have suggested rewrites and aren't already applied */
+    function getRewritableClaims(): number[] {
+        if (!consulResult) return [];
+        return consulResult.claims
+            .map((c, i) => ({ c, i }))
+            .filter(({ c, i }) => c.suggested_rewrite && !appliedRewrites.has(i))
+            .map(({ i }) => i);
+    }
+
+    /** Queue all rewritable claims at once */
+    function queueAllRewrites() {
+        const indices = getRewritableClaims();
+        setRewriteQueue(new Set(indices));
+    }
+
+    /** Apply a single rewrite (unchanged behavior for individual clicks) */
     async function handleApplyRewrite(claimIndex: number) {
         if (!displayArticle.html || !consulResult) return;
         const claim = consulResult.claims[claimIndex];
@@ -467,8 +527,46 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
             if (!saveResp.ok) throw new Error(saveData.error || "Save failed");
             onUpdate({ ...article, ...saveData });
             setAppliedRewrites((prev) => new Set(prev).add(claimIndex));
+            setRewriteQueue((prev) => { const next = new Set(prev); next.delete(claimIndex); return next; });
         } catch (e: any) { alert(`Rewrite failed: ${e.message}`); }
         finally { setApplyingRewrite(null); }
+    }
+
+    /** Apply all queued rewrites in a single batch API call */
+    async function handleApplyBatchRewrites() {
+        if (!displayArticle.html || !consulResult || rewriteQueue.size === 0) return;
+        const corrections = Array.from(rewriteQueue)
+            .map((i) => consulResult.claims[i])
+            .filter((c) => c?.suggested_rewrite)
+            .map((c) => ({ claim: c.claim, suggested_rewrite: c.suggested_rewrite! }));
+        if (corrections.length === 0) return;
+        setApplyingBatch(true);
+        try {
+            const r = await fetch("/api/apply-rewrite-batch", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ html: displayArticle.html, corrections }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data?.error || "Batch rewrite failed");
+            // Save the corrected HTML
+            const saveResp = await fetch(`/api/articles/${article.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ html: data.html }),
+            });
+            const saveData = await saveResp.json();
+            if (!saveResp.ok) throw new Error(saveData.error || "Save failed");
+            onUpdate({ ...article, ...saveData });
+            // Mark all queued claims as applied
+            setAppliedRewrites((prev) => {
+                const next = new Set(prev);
+                for (const i of rewriteQueue) next.add(i);
+                return next;
+            });
+            setRewriteQueue(new Set());
+        } catch (e: any) { alert(`Batch rewrite failed: ${e.message}`); }
+        finally { setApplyingBatch(false); }
     }
 
     // PanelView: is the selected style composite?
@@ -1574,15 +1672,52 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                 <Button variant="outline" size="sm" onClick={handleRegenerate} disabled={regenerating} className="gap-1.5">
                     <RefreshCw className={cn("h-3.5 w-3.5", regenerating && "animate-spin")} /> {regenerating ? "Regenerating…" : "Regenerate"}
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleShorten} disabled={shortening || !displayArticle.html}
-                    className={cn("gap-1.5", shortened && "text-success border-success")}>
-                    <Scissors className={cn("h-3.5 w-3.5", shortening && "animate-pulse")} />
-                    {shortening ? "Shortening…" : shortened ? (
-                        shortenInfo && shortenInfo.original === shortenInfo.shortened
-                            ? `Already <2k (${shortenInfo.original} words)`
-                            : `Shortened! ${shortenInfo ? `${shortenInfo.original} → ${shortenInfo.shortened}` : ""}`
-                    ) : "Shorten"}
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" disabled={shortening || !displayArticle.html}
+                            className={cn("gap-1.5", shortened && "text-success border-success")}>
+                            <Scissors className={cn("h-3.5 w-3.5", shortening && "animate-pulse")} />
+                            {shortening ? "Shortening…" : shortened ? (
+                                shortenInfo && shortenInfo.original === shortenInfo.shortened
+                                    ? `Already short (${shortenInfo.original} words)`
+                                    : `Shortened! ${shortenInfo ? `${shortenInfo.original} → ${shortenInfo.shortened}` : ""}`
+                            ) : "Shorten"}
+                            {!shortening && !shortened && <ChevronDown className="h-3 w-3 ml-0.5 opacity-60" />}
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="min-w-[200px]">
+                        <DropdownMenuLabel>Target Length</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleShorten(500)} className="gap-2 cursor-pointer">
+                            <Scissors className="h-4 w-4" />
+                            <div>
+                                <div className="font-medium">~500 words</div>
+                                <div className="text-xs text-muted-foreground">Quick summary</div>
+                            </div>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleShorten(1000)} className="gap-2 cursor-pointer">
+                            <Scissors className="h-4 w-4" />
+                            <div>
+                                <div className="font-medium">~1,000 words</div>
+                                <div className="text-xs text-muted-foreground">Short read</div>
+                            </div>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleShorten(1500)} className="gap-2 cursor-pointer">
+                            <Scissors className="h-4 w-4" />
+                            <div>
+                                <div className="font-medium">~1,500 words</div>
+                                <div className="text-xs text-muted-foreground">Medium length</div>
+                            </div>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleShorten(2000)} className="gap-2 cursor-pointer">
+                            <Scissors className="h-4 w-4" />
+                            <div>
+                                <div className="font-medium">~2,000 words</div>
+                                <div className="text-xs text-muted-foreground">Light trim</div>
+                            </div>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
                 {/* Image button hidden per request — image insertion still available in Edit mode */}
 
                 <Separator orientation="vertical" className="h-6 mx-1" />
@@ -1604,6 +1739,10 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                 <Button variant="outline" size="sm" onClick={handleConsulCheck} disabled={consulChecking || !displayArticle.html}
                     className="gap-1.5 border-primary/30">
                     {consulChecking ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Consulting…</> : consulResult ? <><Scale className="h-3.5 w-3.5" /> Re-check</> : <><Scale className="h-3.5 w-3.5" /> Fact-Check Consul</>}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => { setShowCompareModal(true); setCompareUrl(""); setCompareErr(null); }} disabled={comparing || !displayArticle.html}
+                    className={cn("gap-1.5", compareResult && "border-primary/50")}>
+                    {comparing ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Comparing…</> : compareResult ? <><ArrowLeftRight className="h-3.5 w-3.5" /> Re-compare</> : <><ArrowLeftRight className="h-3.5 w-3.5" /> Compare</>}
                 </Button>
 
                 <Separator orientation="vertical" className="h-6 mx-1" />
@@ -1679,36 +1818,88 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                 };
                 const AGREEMENT_LABELS: Record<string, { label: string; icon: string; color: string }> = {
                     full: { label: "Full Agreement", icon: "✓", color: "#22c55e" },
+                    majority: { label: "Majority Agreement", icon: "⅔", color: "#22c55e" },
                     partial: { label: "Partial Agreement", icon: "~", color: "#f59e0b" },
                     split: { label: "Models Disagree", icon: "✗", color: "#ef4444" },
                     single_source: { label: "Single Source", icon: "1", color: "#a3a3a3" },
                 };
+                const flaggedCount = consulResult.claims.filter(c => c.consensus_verdict !== "accurate").length;
                 return (
+                    <Collapsible open={!consulCollapsed} onOpenChange={(open) => setConsulCollapsed(!open)}>
                     <Card className="border-primary/20">
-                        <CardContent className="p-4 space-y-4">
-                            {/* Header with model status */}
-                            <div className="flex items-center justify-between flex-wrap gap-2">
+                        <CollapsibleTrigger asChild>
+                        <button className="w-full p-4 flex items-center justify-between gap-2 cursor-pointer hover:bg-muted/30 transition-colors rounded-t-lg">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <Scale className="h-4 w-4 text-primary" />
+                                <span className="text-xs font-semibold uppercase tracking-wider text-primary">Fact-Check Consul</span>
+                                <Badge style={{ backgroundColor: VERDICT_COLORS[consulResult.overall_verdict] }} className="text-white ml-1">
+                                    {consulResult.overall_verdict === "pass" ? "✓ Pass" : consulResult.overall_verdict === "needs_review" ? "⚠ Needs Review" : "✗ Fail"}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">{Math.round(consulResult.overall_confidence * 100)}%</span>
+                                {consulCollapsed && flaggedCount > 0 && (
+                                    <span className="text-[11px] text-muted-foreground">· {flaggedCount} flagged</span>
+                                )}
+                                {consulCollapsed && (
+                                    <span className="text-[11px] text-muted-foreground">· {consulResult.claims.length} claims</span>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-3">
                                 <div className="flex items-center gap-2">
-                                    <Scale className="h-4 w-4 text-primary" />
-                                    <span className="text-xs font-semibold uppercase tracking-wider text-primary">Fact-Check Consul</span>
-                                    <Badge style={{ backgroundColor: VERDICT_COLORS[consulResult.overall_verdict] }} className="text-white ml-2">
-                                        {consulResult.overall_verdict === "pass" ? "✓ Pass" : consulResult.overall_verdict === "needs_review" ? "⚠ Needs Review" : "✗ Fail"}
-                                    </Badge>
-                                    <span className="text-xs text-muted-foreground">Confidence: {Math.round(consulResult.overall_confidence * 100)}%</span>
+                                    <span className={cn("h-2 w-2 rounded-full", consulResult.models_used.gemini.status === "success" ? "bg-green-500" : "bg-red-500")} />
+                                    <span className={cn("h-2 w-2 rounded-full", consulResult.models_used.grok.status === "success" ? "bg-green-500" : "bg-red-500")} />
+                                    <span className={cn("h-2 w-2 rounded-full", consulResult.models_used.claude.status === "success" ? "bg-green-500" : "bg-red-500")} />
                                 </div>
-                                <div className="flex items-center gap-3">
-                                    <div className="flex items-center gap-1.5">
-                                        <span className={cn("h-2 w-2 rounded-full", consulResult.models_used.gemini.status === "success" ? "bg-green-500" : "bg-red-500")} />
-                                        <span className="text-[11px] text-muted-foreground">Gemini</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                        <span className={cn("h-2 w-2 rounded-full", consulResult.models_used.grok.status === "success" ? "bg-green-500" : "bg-red-500")} />
-                                        <span className="text-[11px] text-muted-foreground">Grok</span>
-                                    </div>
+                                <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", consulCollapsed && "-rotate-90")} />
+                            </div>
+                        </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                        <CardContent className="p-4 pt-0 space-y-4">
+                            {/* Model status detail */}
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-1.5">
+                                    <span className={cn("h-2 w-2 rounded-full", consulResult.models_used.gemini.status === "success" ? "bg-green-500" : "bg-red-500")} />
+                                    <span className="text-[11px] text-muted-foreground">Gemini</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <span className={cn("h-2 w-2 rounded-full", consulResult.models_used.grok.status === "success" ? "bg-green-500" : "bg-red-500")} />
+                                    <span className="text-[11px] text-muted-foreground">Grok</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <span className={cn("h-2 w-2 rounded-full", consulResult.models_used.claude.status === "success" ? "bg-green-500" : "bg-red-500")} />
+                                    <span className="text-[11px] text-muted-foreground">Claude</span>
                                 </div>
                             </div>
 
                             {consulResult.summary && <p className="text-sm leading-relaxed">{consulResult.summary}</p>}
+
+                            {/* Batch rewrite controls */}
+                            {(() => {
+                                const rewritable = getRewritableClaims();
+                                if (rewritable.length === 0) return null;
+                                return (
+                                    <div className="flex items-center gap-2 p-2.5 rounded-md bg-muted/50 border border-dashed border-border">
+                                        <Wand2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                                        <span className="text-xs text-muted-foreground flex-1">
+                                            {rewriteQueue.size > 0
+                                                ? <><strong>{rewriteQueue.size}</strong> rewrite{rewriteQueue.size !== 1 ? "s" : ""} queued</>
+                                                : <>{rewritable.length} correction{rewritable.length !== 1 ? "s" : ""} available</>}
+                                        </span>
+                                        {rewriteQueue.size === 0 ? (
+                                            <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={queueAllRewrites}>
+                                                <ListChecks className="h-3 w-3" /> Queue All
+                                            </Button>
+                                        ) : (
+                                            <div className="flex items-center gap-1.5">
+                                                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setRewriteQueue(new Set())} disabled={applyingBatch}>Clear</Button>
+                                                <Button variant="default" size="sm" className="h-7 text-xs gap-1.5" onClick={handleApplyBatchRewrites} disabled={applyingBatch}>
+                                                    {applyingBatch ? <><RefreshCw className="h-3 w-3 animate-spin" /> Applying {rewriteQueue.size}…</> : <><Wand2 className="h-3 w-3" /> Apply {rewriteQueue.size} Rewrite{rewriteQueue.size !== 1 ? "s" : ""}</>}
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
 
                             <h4 className="text-sm font-medium">Claims Reviewed ({consulResult.claims.length})</h4>
 
@@ -1732,7 +1923,7 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                                         <p className="text-sm font-medium">&ldquo;{claim.claim}&rdquo;</p>
                                         <p className="text-sm text-muted-foreground mt-1">{claim.explanation}</p>
 
-                                        {(claim.gemini_explanation || claim.grok_explanation) && claim.agreement !== "full" && (
+                                        {(claim.gemini_explanation || claim.grok_explanation || claim.claude_explanation) && claim.agreement !== "full" && (
                                             <div className="mt-2">
                                                 <button onClick={() => toggleConsulClaim(i)} className="flex items-center gap-1 text-xs text-primary hover:underline">
                                                     {isExp ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
@@ -1768,6 +1959,20 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                                                                 <p className="text-xs text-muted-foreground">{claim.grok_explanation}</p>
                                                             </div>
                                                         )}
+                                                        {claim.claude_explanation && (
+                                                            <div className="p-2 rounded border border-border bg-card">
+                                                                <div className="flex items-center gap-1.5 mb-1">
+                                                                    <span className="h-2 w-2 rounded-full bg-amber-600" />
+                                                                    <span className="text-[11px] font-semibold">Claude</span>
+                                                                    {claim.claude_verdict && (
+                                                                        <Badge className="text-[9px] uppercase ml-1" style={{ color: VERDICT_COLORS[claim.claude_verdict], backgroundColor: `${VERDICT_COLORS[claim.claude_verdict]}18` }}>
+                                                                            {claim.claude_verdict}
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+                                                                <p className="text-xs text-muted-foreground">{claim.claude_explanation}</p>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
@@ -1789,18 +1994,180 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                                         {claim.suggested_rewrite && (
                                             <div className="mt-2 p-2 bg-card border border-dashed border-border rounded-md">
                                                 <p className="text-sm">✏️ <strong>Suggested rewrite:</strong> {claim.suggested_rewrite}</p>
-                                                <Button variant="outline" size="sm" className={cn("mt-2 gap-1.5 text-xs h-7", appliedRewrites.has(i) && "border-success text-success")}
-                                                    disabled={applyingRewrite === i || appliedRewrites.has(i)}
-                                                    onClick={() => handleApplyRewrite(i)}>
-                                                    {applyingRewrite === i ? <><RefreshCw className="h-3 w-3 animate-spin" /> Applying…</> : appliedRewrites.has(i) ? <><CheckCircle2 className="h-3 w-3" /> Applied</> : <><Wand2 className="h-3 w-3" /> Apply Rewrite</>}
-                                                </Button>
+                                                <div className="flex items-center gap-2 mt-2">
+                                                    {!appliedRewrites.has(i) && !applyingBatch && (
+                                                        <Button variant={rewriteQueue.has(i) ? "secondary" : "ghost"} size="sm" className={cn("gap-1.5 text-xs h-7", rewriteQueue.has(i) && "border border-primary/30 text-primary")}
+                                                            disabled={applyingRewrite === i || applyingBatch}
+                                                            onClick={() => toggleRewriteQueue(i)}>
+                                                            {rewriteQueue.has(i) ? <><CheckCircle2 className="h-3 w-3" /> Queued</> : <><ListChecks className="h-3 w-3" /> Add to Queue</>}
+                                                        </Button>
+                                                    )}
+                                                    <Button variant="outline" size="sm" className={cn("gap-1.5 text-xs h-7", appliedRewrites.has(i) && "border-success text-success")}
+                                                        disabled={applyingRewrite === i || appliedRewrites.has(i) || applyingBatch}
+                                                        onClick={() => handleApplyRewrite(i)}>
+                                                        {applyingRewrite === i ? <><RefreshCw className="h-3 w-3 animate-spin" /> Applying…</> : applyingBatch && rewriteQueue.has(i) ? <><RefreshCw className="h-3 w-3 animate-spin" /> In Batch…</> : appliedRewrites.has(i) ? <><CheckCircle2 className="h-3 w-3" /> Applied</> : <><Wand2 className="h-3 w-3" /> Apply Now</>}
+                                                    </Button>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
                                 );
                             })}
                         </CardContent>
+                        </CollapsibleContent>
                     </Card>
+                    </Collapsible>
+                );
+            })()}
+
+            {/* Compare Article Results */}
+            {compareErr && (
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>Compare failed: {compareErr}</AlertDescription>
+                </Alert>
+            )}
+            {compareResult && (() => {
+                const WINNER_COLORS: Record<string, { bg: string; text: string; label: string }> = {
+                    organic: { bg: "#22c55e", text: "#fff", label: "✓ Your Article Wins" },
+                    competitor: { bg: "#ef4444", text: "#fff", label: "✗ Competitor Wins" },
+                    tie: { bg: "#f59e0b", text: "#fff", label: "~ Tie" },
+                };
+                const winner = WINNER_COLORS[compareResult.overall_winner] ?? WINNER_COLORS.tie;
+                const totalOrganic = compareResult.categories.reduce((s, c) => s + c.organic_score, 0);
+                const totalCompetitor = compareResult.categories.reduce((s, c) => s + c.competitor_score, 0);
+                return (
+                    <Collapsible open={!compareCollapsed} onOpenChange={(open) => setCompareCollapsed(!open)}>
+                    <Card className="border-primary/20">
+                        <CollapsibleTrigger asChild>
+                        <button className="w-full p-4 flex items-center justify-between gap-2 cursor-pointer hover:bg-muted/30 transition-colors rounded-t-lg">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <ArrowLeftRight className="h-4 w-4 text-primary" />
+                                <span className="text-xs font-semibold uppercase tracking-wider text-primary">Content Comparison</span>
+                                <Badge style={{ backgroundColor: winner.bg, color: winner.text }} className="ml-1">
+                                    {winner.label}
+                                </Badge>
+                                {compareCollapsed && (
+                                    <span className="text-[11px] text-muted-foreground">· {totalOrganic} vs {totalCompetitor}</span>
+                                )}
+                            </div>
+                            <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", compareCollapsed && "-rotate-90")} />
+                        </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                        <CardContent className="p-4 pt-0 space-y-4">
+                            {/* Word count detail */}
+                            <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                                <span>Organic: {compareResult.organic_word_count.toLocaleString()} words</span>
+                                <span>·</span>
+                                <span>Competitor: {compareResult.competitor_word_count.toLocaleString()} words</span>
+                            </div>
+
+                            {/* Competitor link */}
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span className="font-medium">vs.</span>
+                                <span className="truncate flex-1 italic">&ldquo;{compareResult.competitor_title}&rdquo;</span>
+                                <a href={compareUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline shrink-0">
+                                    <ExternalLink className="h-3 w-3" /> View
+                                </a>
+                            </div>
+
+                            <p className="text-sm leading-relaxed">{compareResult.overall_reasoning}</p>
+
+                            {/* Category scores */}
+                            <div>
+                                <h4 className="text-sm font-medium mb-3">Category Scores <span className="text-muted-foreground font-normal">({totalOrganic} vs {totalCompetitor} total)</span></h4>
+                                <div className="space-y-3">
+                                    {compareResult.categories.map((cat, i) => {
+                                        const orgPct = (cat.organic_score / 10) * 100;
+                                        const compPct = (cat.competitor_score / 10) * 100;
+                                        const orgWins = cat.organic_score > cat.competitor_score;
+                                        const tied = cat.organic_score === cat.competitor_score;
+                                        return (
+                                            <div key={i}>
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <span className="text-xs font-medium">{cat.category}</span>
+                                                    <span className="text-[11px] text-muted-foreground">
+                                                        <span className={cn(orgWins && "text-green-500 font-semibold", !orgWins && !tied && "text-muted-foreground")}>{cat.organic_score}</span>
+                                                        <span className="mx-1">vs</span>
+                                                        <span className={cn(!orgWins && !tied && "text-red-500 font-semibold", orgWins && "text-muted-foreground")}>{cat.competitor_score}</span>
+                                                    </span>
+                                                </div>
+                                                <div className="flex gap-1 h-2">
+                                                    <div className="flex-1 bg-muted rounded-full overflow-hidden">
+                                                        <div className="h-full rounded-full transition-all" style={{ width: `${orgPct}%`, backgroundColor: orgWins ? "#22c55e" : tied ? "#f59e0b" : "#a3a3a3" }} />
+                                                    </div>
+                                                    <div className="flex-1 bg-muted rounded-full overflow-hidden">
+                                                        <div className="h-full rounded-full transition-all" style={{ width: `${compPct}%`, backgroundColor: !orgWins && !tied ? "#ef4444" : tied ? "#f59e0b" : "#a3a3a3" }} />
+                                                    </div>
+                                                </div>
+                                                <p className="text-[11px] text-muted-foreground mt-0.5">{cat.explanation}</p>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <div className="flex gap-4 mt-2 text-[10px] text-muted-foreground">
+                                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-green-500 inline-block" /> Organic</span>
+                                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500 inline-block" /> Competitor</span>
+                                </div>
+                            </div>
+
+                            {/* Strengths & Weaknesses */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <h5 className="text-xs font-semibold text-green-600 mb-1.5">Your Strengths</h5>
+                                    <ul className="space-y-1">
+                                        {compareResult.organic_strengths.map((s, i) => (
+                                            <li key={i} className="text-xs text-muted-foreground flex gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" />{s}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h5 className="text-xs font-semibold text-red-500 mb-1.5">Your Weaknesses</h5>
+                                    <ul className="space-y-1">
+                                        {compareResult.organic_weaknesses.map((w, i) => (
+                                            <li key={i} className="text-xs text-muted-foreground flex gap-1.5"><AlertCircle className="h-3 w-3 text-red-400 shrink-0 mt-0.5" />{w}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h5 className="text-xs font-semibold text-blue-500 mb-1.5">Competitor Strengths</h5>
+                                    <ul className="space-y-1">
+                                        {compareResult.competitor_strengths.map((s, i) => (
+                                            <li key={i} className="text-xs text-muted-foreground flex gap-1.5"><CheckCircle2 className="h-3 w-3 text-blue-400 shrink-0 mt-0.5" />{s}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h5 className="text-xs font-semibold text-amber-500 mb-1.5">Competitor Weaknesses</h5>
+                                    <ul className="space-y-1">
+                                        {compareResult.competitor_weaknesses.map((w, i) => (
+                                            <li key={i} className="text-xs text-muted-foreground flex gap-1.5"><AlertCircle className="h-3 w-3 text-amber-400 shrink-0 mt-0.5" />{w}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            </div>
+
+                            {/* Improvement suggestions */}
+                            {compareResult.improvement_suggestions.length > 0 && (
+                                <div className="p-3 rounded-md border border-dashed border-primary/20 bg-primary/5">
+                                    <h5 className="text-xs font-semibold text-primary mb-2 flex items-center gap-1.5">
+                                        <Wand2 className="h-3.5 w-3.5" /> Improvement Suggestions
+                                    </h5>
+                                    <ol className="space-y-1.5">
+                                        {compareResult.improvement_suggestions.map((s, i) => (
+                                            <li key={i} className="text-xs text-foreground flex gap-2">
+                                                <span className="text-primary font-bold shrink-0">{i + 1}.</span>
+                                                {s}
+                                            </li>
+                                        ))}
+                                    </ol>
+                                </div>
+                            )}
+                        </CardContent>
+                        </CollapsibleContent>
+                    </Card>
+                    </Collapsible>
                 );
             })()}
 
@@ -1848,6 +2215,38 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
             )}
 
             {insertImageModal}
+
+            {/* Compare Modal */}
+            <Dialog open={showCompareModal} onOpenChange={setShowCompareModal}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <ArrowLeftRight className="h-5 w-5" />
+                            Compare Against Competitor
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div>
+                            <Label className="text-xs">Competitor URL</Label>
+                            <Input
+                                placeholder="https://competitor.com/their-article"
+                                value={compareUrl}
+                                onChange={(e) => setCompareUrl(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === "Enter" && compareUrl.trim()) handleCompare(); }}
+                                className="mt-1"
+                                autoFocus
+                            />
+                            <p className="text-[11px] text-muted-foreground mt-1.5">
+                                We&apos;ll scrape the content and run a head-to-head analysis across depth, readability, SEO, accuracy, originality, and structure.
+                            </p>
+                        </div>
+                        <Button onClick={handleCompare} disabled={!compareUrl.trim() || comparing} className="w-full gap-1.5">
+                            <ArrowLeftRight className="h-4 w-4" />
+                            {comparing ? "Comparing…" : "Run Comparison"}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
 
 

@@ -1,7 +1,7 @@
 /**
  * Fact-Check Consul — Shared Prompts & Schema
  *
- * Used by both the Gemini and Grok paths to ensure identically-structured
+ * Used by the Gemini, Grok, and Claude paths to ensure identically-structured
  * responses that the reconciliation engine can merge cleanly.
  */
 
@@ -91,12 +91,14 @@ export type ConsulClaimReview = {
     consensus_verdict: "accurate" | "inaccurate" | "misleading" | "unverifiable" | "disputed";
     gemini_verdict?: "accurate" | "inaccurate" | "misleading" | "unverifiable";
     grok_verdict?: "accurate" | "inaccurate" | "misleading" | "unverifiable";
-    agreement: "full" | "partial" | "split" | "single_source";
+    claude_verdict?: "accurate" | "inaccurate" | "misleading" | "unverifiable";
+    agreement: "full" | "majority" | "partial" | "split" | "single_source";
     confidence: number;
     explanation: string;
     gemini_explanation?: string;
     grok_explanation?: string;
-    sources: { url: string; title?: string; from: "gemini" | "grok" }[];
+    claude_explanation?: string;
+    sources: { url: string; title?: string; from: "gemini" | "grok" | "claude" }[];
     suggested_rewrite?: string;
 };
 
@@ -107,6 +109,7 @@ export type ConsulResult = {
     models_used: {
         gemini: { model: string; status: "success" | "error"; error?: string };
         grok: { model: string; status: "success" | "error"; error?: string };
+        claude: { model: string; status: "success" | "error"; error?: string };
     };
     claims: ConsulClaimReview[];
 };

@@ -63,7 +63,7 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
   const [imageStyle, setImageStyle] = useState("default");
   const [model, setModel] = useState("");
   const [availableModels, setAvailableModels] = useState<{ id: string; label: string; provider: string }[]>([]);
-  const [wordCount, setWordCount] = useState("1500-2500");
+  const [wordCount, setWordCount] = useState("1800-2400");
   const [companyId, setCompanyId] = useState<string>("");
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [companiesLoaded, setCompaniesLoaded] = useState(false);
@@ -209,7 +209,12 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
       if (csBgImageUrl.trim()) payload.composite_bg_image_url = csBgImageUrl.trim();
       if (csBgPrompt.trim()) payload.composite_bg_prompt = csBgPrompt.trim();
     }
-    await runTask({
+    // Close the modal immediately — the activity panel will track progress
+    onOpenChange(false);
+    resetState();
+    setLoading(false);
+
+    runTask({
       type: "article",
       label: prompt.trim().slice(0, 60) || "New article",
       endpoint: "/api/create",
@@ -217,35 +222,34 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
       meta: { companyId },
       onSuccess: () => {
         window.dispatchEvent(new Event("article-created"));
-        setLoading(false);
-        onOpenChange(false);
-        resetState();
         onCreated?.();
       },
-      onError: (errMsg) => { setErr(errMsg); setLoading(false); },
+      onError: () => { /* handled by task panel */ },
     });
   }
 
   async function onCreateCluster() {
     if (!companyId || !clusterTopic.trim()) return;
-    setClusterGenerating(true);
-    await runTask({
+
+    // Close the modal immediately — the activity panel will track progress
+    const topic = clusterTopic.trim();
+    onOpenChange(false);
+    resetState();
+    setClusterGenerating(false);
+
+    runTask({
       type: "cluster-strategy",
-      label: `Strategy: ${clusterTopic.trim().slice(0, 50)}`,
+      label: `Strategy: ${topic.slice(0, 50)}`,
       endpoint: "/api/clusters",
-      body: { company_id: companyId, topic: clusterTopic.trim(), model },
+      body: { company_id: companyId, topic, model },
       meta: { companyId },
       onSuccess: (data: any) => {
-        setClusterGenerating(false);
-        onOpenChange(false);
-        resetState();
         onCreated?.();
-        // Navigate to the cluster in the articles page
         if (data?.id) {
           router.push(`/articles?cluster=${data.id}`);
         }
       },
-      onError: (errMsg) => { setErr(errMsg); setClusterGenerating(false); },
+      onError: () => { /* handled by task panel */ },
     });
   }
 
@@ -270,7 +274,7 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
     setSuggestedPrompt("");
     setClusterTopic("");
     setImageStyle("default");
-    setWordCount("1500-2500");
+    setWordCount("1800-2400");
     setErr(null);
     setActiveTemplateId(null);
     setActiveVoiceId(null);
@@ -288,8 +292,8 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
 
   return (
     <>
-      <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen && !aiIsWorking) { onOpenChange(false); } }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 gap-0" showCloseButton={!aiIsWorking}>
+      <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) { onOpenChange(false); } }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 gap-0">
           <div className="p-6 create-modal-wizard">
             <ContentWizard
               companies={companies}

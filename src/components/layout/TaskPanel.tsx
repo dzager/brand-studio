@@ -639,13 +639,13 @@ export default function TaskPanel() {
             className="group/dots"
             style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}
           >
-            {/* Close — clear all tasks */}
+            {/* Close — hide panel (tasks keep running) */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                clearCompleted();
-                // Also cancel any active tasks
-                activeTasks.forEach((t) => cancelTask(t.id));
+                setExpanded(false);
+                setVisible(false);
+                setTimeout(() => setMounted(false), 350);
               }}
               className="group/close"
               style={{
@@ -655,7 +655,7 @@ export default function TaskPanel() {
                 fontSize: 8, fontWeight: 700, color: "transparent", lineHeight: 1,
                 transition: "background 0.15s",
               }}
-              title="Close"
+              title="Close panel"
             >
               <span className="opacity-0 group-hover/dots:opacity-100 transition-opacity" style={{ color: "rgba(0,0,0,0.7)", fontSize: 9, fontWeight: 800, marginTop: -1 }}>×</span>
             </button>

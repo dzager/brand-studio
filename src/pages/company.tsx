@@ -5,13 +5,10 @@ import type { ImageStyleCategory, VoiceProfile } from "@/brand/engine";
 // VoiceProfile type still needed for form state; Voice tab UI moved into PromptsEngineTab
 import AppLayout from "@/components/layout/AppLayout";
 import { useAuth } from "@/hooks/useAuth";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
     AlertCircle, Save, X, CheckCircle2,
-    Eye, Palette, FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -104,6 +101,7 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
     }
 
     const tabProps = { company, form, setForm, setField, editing };
+    const activeTab = (router.query.tab as string) || "brand";
 
     return (
         <div className="space-y-4">
@@ -119,37 +117,12 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
                 {saveErr && <span className="text-xs text-destructive">{saveErr}</span>}
             </div>
 
-            {/* Tabbed interface */}
-            <Tabs defaultValue={(router.query.tab as string) || "brand"} className="w-full">
-                <TabsList className="w-full justify-start">
-                    <TabsTrigger value="brand" className="gap-1.5">
-                        <Eye className="h-3.5 w-3.5" /> Brand
-                    </TabsTrigger>
-
-                    <TabsTrigger value="visual" className="gap-1.5">
-                        <Palette className="h-3.5 w-3.5" />
-                        Visual
-                        <Badge variant="secondary" className="text-[10px] ml-0.5 h-4">{form.image_style_categories.length}</Badge>
-                    </TabsTrigger>
-                    <TabsTrigger value="prompts" className="gap-1.5">
-                        <FileText className="h-3.5 w-3.5" /> Prompts
-                        {form.voice_profile
-                            ? <Badge variant="outline" className="text-[10px] ml-0.5 h-4 border-primary/50 text-primary">Voice</Badge>
-                            : null}
-                    </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="brand" className="mt-4">
-                    <BrandIdentityTab {...tabProps} />
-                </TabsContent>
-
-                <TabsContent value="visual" className="mt-4">
-                    <VisualStyleTab {...tabProps} />
-                </TabsContent>
-                <TabsContent value="prompts" className="mt-4">
-                    <PromptsEngineTab company={company} form={form} setForm={setForm} />
-                </TabsContent>
-            </Tabs>
+            {/* Tab content driven by sidebar navigation */}
+            <div className="mt-4">
+                {activeTab === "brand" && <BrandIdentityTab {...tabProps} />}
+                {activeTab === "visual" && <VisualStyleTab {...tabProps} />}
+                {activeTab === "prompts" && <PromptsEngineTab company={company} form={form} setForm={setForm} />}
+            </div>
         </div>
     );
 }

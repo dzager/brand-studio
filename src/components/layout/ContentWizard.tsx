@@ -170,7 +170,7 @@ export default function ContentWizard(props: WizardProps) {
   const LENGTH_LABELS: Record<string, string> = {
     "300-500": "Short (300–500 words)",
     "800-1200": "Medium (800–1,200 words)",
-    "1500-2500": "Long (1,500–2,500 words)",
+    "1800-2400": "Long (1,800–2,400 words)",
     "2500-4000": "Deep Dive (2,500–4,000 words)",
     "": "No limit",
   };
@@ -541,7 +541,7 @@ export default function ContentWizard(props: WizardProps) {
                       className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                       <option value="300-500">Short (300–500)</option>
                       <option value="800-1200">Medium (800–1,200)</option>
-                      <option value="1500-2500">Long (1,500–2,500)</option>
+                      <option value="1800-2400">Long (1,800–2,400)</option>
                       <option value="2500-4000">Deep Dive (2,500–4,000)</option>
                       <option value="">No limit</option>
                     </select>

@@ -22,6 +22,9 @@ const VoiceProfileSchema = {
         "structural_dont",
         "specificity_rules",
         "length_rules",
+        "headline_style",
+        "article_blueprint",
+        "target_length",
     ],
     properties: {
         summary: {
@@ -114,6 +117,18 @@ const VoiceProfileSchema = {
             maxItems: 8,
             description: "Rules about length and padding. e.g. 'cut sentences that restate the previous one', 'no transitional filler', 'get to substance within 2-3 sentences'.",
         },
+        headline_style: {
+            type: "string",
+            description: "How headlines and subheadings are written — casing, length, format, and tone. e.g. 'Sentence case, 4-8 words, action-oriented or question-based H2s. H3s used for sub-steps within procedural sections. No colons or em dashes in headings.'",
+        },
+        article_blueprint: {
+            type: "string",
+            description: "A section-by-section structural map of how the article is built. e.g. 'Hook opening (1-2 sentences) → Key Takeaways box (3-5 bullets) → 4-6 H2 sections each 200-400 words → Comparison table → FAQ section (4-5 pairs) → Brief closing CTA.' Include the approximate number of H2 and H3 headings observed.",
+        },
+        target_length: {
+            type: "string",
+            description: "Observed article length and density. e.g. 'Approximately 2,200 words across 6 H2 sections, averaging 350 words per section. 18 paragraphs total, heavy use of lists and tables. Content-dense with minimal filler.'",
+        },
     },
 } as const;
 
@@ -158,16 +173,35 @@ export default async function handler(
             return res.status(404).json({ error: "Company not found." });
         }
 
-        // Strip HTML tags for cleaner analysis
-        const plainText = html
+        // Preserve heading structure as markdown markers before stripping other tags.
+        // This lets the AI analyze headline patterns, hierarchy, and cadence.
+        const structuredText = html
+            .replace(/<h1[^>]*>(.*?)<\/h1>/gi, "\n# $1\n")
+            .replace(/<h2[^>]*>(.*?)<\/h2>/gi, "\n## $1\n")
+            .replace(/<h3[^>]*>(.*?)<\/h3>/gi, "\n### $1\n")
+            .replace(/<h4[^>]*>(.*?)<\/h4>/gi, "\n#### $1\n")
+            .replace(/<h5[^>]*>(.*?)<\/h5>/gi, "\n##### $1\n")
+            .replace(/<h6[^>]*>(.*?)<\/h6>/gi, "\n###### $1\n")
+            .replace(/<li[^>]*>/gi, "\n- ")
+            .replace(/<\/li>/gi, "")
+            .replace(/<br\s*\/?>/gi, "\n")
+            .replace(/<\/p>/gi, "\n\n")
             .replace(/<[^>]+>/g, " ")
             .replace(/&[a-z]+;/gi, " ")
-            .replace(/\s+/g, " ")
+            .replace(/\n{3,}/g, "\n\n")
+            .replace(/[ \t]+/g, " ")
             .trim();
 
-        const systemPrompt = `You are an expert editorial voice analyst. Given a blog article, you analyze its writing style in precise, actionable detail. Your analysis will be used to instruct an AI writer to replicate this voice in future articles.
+        const systemPrompt = `You are an expert editorial voice and structure analyst. Given a blog article (with heading markers preserved), you analyze both the writing style AND the structural architecture in precise, actionable detail. Your analysis will be used to instruct an AI writer to replicate this voice AND this article structure in future articles.
 
 Focus on SPECIFIC, CONCRETE observations — not generic descriptions. For example, instead of "uses varied sentence lengths" say "Opens paragraphs with 4-8 word declarative sentences, then follows with 15-25 word compound sentences that add context."
+
+STRUCTURAL ANALYSIS (CRITICAL — analyze with equal weight to voice):
+- Count and describe the heading hierarchy: how many H2s, how many H3s, what pattern do they follow?
+- Analyze headline writing style: casing (title case vs sentence case), average word count, whether they use questions, colons, action verbs, or declarative statements.
+- Map the section flow: what comes first, what comes last, how do sections build on each other?
+- Measure approximate word counts: total article length, average words per section, and density (lists vs prose vs tables).
+- Note the rhythm between sections: do they alternate between short and long? Are some sections list-heavy while others are prose?
 
 Extract real phrases from the text as sample_phrases. Be specific about what the writer avoids.
 
@@ -177,17 +211,28 @@ For structural_do and structural_dont: analyze the structural patterns the write
 
 For specificity_rules: note how the writer handles facts, numbers, and concrete details.
 
-For length_rules: note the writer's approach to conciseness and filler avoidance.`;
+For length_rules: note the writer's approach to conciseness and filler avoidance.
 
-        const userPrompt = `Analyze the following article and produce a structured voice profile:
+For headline_style: describe exactly how headings are formatted — casing, word count range, whether they use questions or statements, and any consistent patterns (e.g. "always starts with a verb", "uses colon format", "H3s are short action phrases").
+
+For article_blueprint: produce a section-by-section structural map showing how the article is built, from opening through closing. Include the number of H2 and H3 headings observed and what each section type does.
+
+For target_length: give concrete measurements — approximate word count, number of sections, average words per section, and note whether the article is content-dense or padded.`;
+
+        const userPrompt = `Analyze the following article and produce a structured voice AND structure profile. Note that heading markers (#, ##, ###) have been preserved from the original HTML so you can analyze the heading hierarchy and patterns.
 
 ---
 
-${plainText}
+${structuredText}
 
 ---
 
-Produce a voice profile that captures how this writer writes — their rhythm, word choices, structural habits, tone, editorial standards, and content rules — so that future AI-generated articles can closely match this voice and quality.`;
+Produce a comprehensive profile that captures:
+1. HOW this writer writes — their rhythm, word choices, structural habits, tone, editorial standards, and content rules
+2. HOW this article is built — its heading hierarchy, section flow, headline writing style, and overall architecture
+3. HOW LONG this article is — word count, section count, content density, and whether it favors depth or brevity
+
+This profile will be used so that future AI-generated articles can closely match both the voice AND the structural blueprint of this source.`;
 
         const voiceProfile = await getStructuredResponse<VoiceProfile>(
             "gpt-5.4",

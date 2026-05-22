@@ -78,6 +78,10 @@ export type VoiceProfile = {
     structural_dont: string[];
     specificity_rules: string[];
     length_rules: string[];
+    // Structural & length analysis (extracted from reference articles)
+    headline_style?: string;
+    article_blueprint?: string;
+    target_length?: string;
 };
 
 export const IMAGE_STYLE_CATEGORIES: ImageStyleCategory[] = [
@@ -457,6 +461,15 @@ export function compileVoiceProfileClause(
     }
     if (vp.avoid.length) {
         parts.push(`Voice patterns to avoid: ${vp.avoid.join("; ")}.`);
+    }
+    if (vp.headline_style) {
+        parts.push(`Headline style: ${vp.headline_style}`);
+    }
+    if (vp.article_blueprint) {
+        parts.push(`Article blueprint: ${vp.article_blueprint}`);
+    }
+    if (vp.target_length) {
+        parts.push(`Target length: ${vp.target_length}`);
     }
     // NOTE: banned_phrases, specificity_rules, length_rules, and
     // structural_do/dont are intentionally omitted here — they are

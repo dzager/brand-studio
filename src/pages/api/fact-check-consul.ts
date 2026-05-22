@@ -2,14 +2,15 @@
  * Fact-Check Consul API
  *
  * Multi-model fact-checking endpoint that queries Gemini (with Google Search
- * grounding) and Grok (via Vercel AI Gateway) in parallel, then reconciles
- * their independent verdicts into a unified consensus report.
+ * grounding), Grok (via xAI), and Claude (via Anthropic) in parallel, then
+ * reconciles their independent verdicts into a unified consensus report.
  */
 
 import type { NextApiRequest, NextApiResponse } from "next";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import { xai } from "@ai-sdk/xai";
+import { anthropic } from "@ai-sdk/anthropic";
 import {
     FACT_CHECK_SYSTEM_PROMPT,
     SINGLE_MODEL_FACT_CHECK_SCHEMA,
@@ -24,6 +25,9 @@ import {
 
 const GEMINI_MODEL = "gemini-2.5-pro";
 const GROK_MODEL = "grok-4";
+const CLAUDE_MODEL = "claude-sonnet-4-20250514";
+
+type ModelName = "gemini" | "grok" | "claude";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -118,6 +122,21 @@ async function checkWithGrok(
     return extractJSON(result.text) as SingleModelFactCheckResult;
 }
 
+/**
+ * Run fact-check via Claude (Anthropic).
+ */
+async function checkWithClaude(
+    userPrompt: string
+): Promise<SingleModelFactCheckResult> {
+    const result = await generateText({
+        model: anthropic(CLAUDE_MODEL),
+        system: FACT_CHECK_SYSTEM_PROMPT + "\n\nIMPORTANT: You MUST respond with valid JSON matching this schema exactly:\n" + JSON.stringify(SINGLE_MODEL_FACT_CHECK_SCHEMA, null, 2) + "\n\nRespond ONLY with the JSON object. No markdown fences, no preamble, no text after the JSON.",
+        prompt: userPrompt,
+    });
+
+    return extractJSON(result.text) as SingleModelFactCheckResult;
+}
+
 // ── Claim Matching & Reconciliation ─────────────────────────────────────
 
 /**
@@ -133,168 +152,189 @@ function claimSimilarity(a: string, b: string): number {
     return (2 * overlap) / (wordsA.size + wordsB.size);
 }
 
+const SEVERITY: Record<string, number> = {
+    accurate: 0,
+    unverifiable: 1,
+    misleading: 2,
+    inaccurate: 3,
+};
+
 /**
- * Determine consensus verdict given two individual verdicts.
+ * Determine consensus verdict from an array of individual verdicts (2 or 3).
  */
 function consensusVerdict(
-    a: SingleModelClaimReview["verdict"],
-    b: SingleModelClaimReview["verdict"]
+    verdicts: SingleModelClaimReview["verdict"][]
 ): ConsulClaimReview["consensus_verdict"] {
-    if (a === b) return a;
-    // One says accurate, the other disagrees
-    const severity: Record<string, number> = {
-        accurate: 0,
-        unverifiable: 1,
-        misleading: 2,
-        inaccurate: 3,
-    };
-    const diff = Math.abs(severity[a] - severity[b]);
-    if (diff <= 1) {
-        // Close enough — pick the more cautious one
-        return severity[a] > severity[b] ? a : b;
+    if (verdicts.length === 0) return "unverifiable";
+    if (verdicts.length === 1) return verdicts[0];
+
+    // Count occurrences
+    const counts: Record<string, number> = {};
+    for (const v of verdicts) counts[v] = (counts[v] ?? 0) + 1;
+
+    // Unanimous
+    if (Object.keys(counts).length === 1) return verdicts[0];
+
+    // Majority (2-of-3 or more)
+    for (const [verdict, count] of Object.entries(counts)) {
+        if (count >= 2) return verdict as SingleModelClaimReview["verdict"];
     }
-    // Big disagreement
+
+    // No majority — pick the most cautious (highest severity)
+    const maxSeverity = Math.max(...verdicts.map(v => SEVERITY[v]));
+    const maxDiff = maxSeverity - Math.min(...verdicts.map(v => SEVERITY[v]));
+    if (maxDiff <= 1) {
+        return verdicts.find(v => SEVERITY[v] === maxSeverity)!;
+    }
     return "disputed";
 }
 
 /**
- * Determine agreement level.
+ * Determine agreement level from an array of verdicts.
  */
 function agreementLevel(
-    a: SingleModelClaimReview["verdict"],
-    b: SingleModelClaimReview["verdict"]
+    verdicts: SingleModelClaimReview["verdict"][]
 ): ConsulClaimReview["agreement"] {
-    if (a === b) return "full";
-    const severity: Record<string, number> = {
-        accurate: 0,
-        unverifiable: 1,
-        misleading: 2,
-        inaccurate: 3,
-    };
-    const diff = Math.abs(severity[a] - severity[b]);
+    if (verdicts.length <= 1) return "single_source";
+
+    const unique = new Set(verdicts);
+    if (unique.size === 1) return "full";
+
+    // Check for majority (2-of-3 agree)
+    const counts: Record<string, number> = {};
+    for (const v of verdicts) counts[v] = (counts[v] ?? 0) + 1;
+    const hasMajority = Object.values(counts).some(c => c >= 2);
+
+    if (hasMajority && verdicts.length >= 3) return "majority";
+
+    // 2-model case or 3-way split
+    const severities = verdicts.map(v => SEVERITY[v]);
+    const diff = Math.max(...severities) - Math.min(...severities);
     return diff <= 1 ? "partial" : "split";
 }
 
+type TaggedClaim = SingleModelClaimReview & { model: ModelName };
+
 /**
- * Merge two sets of claims into a unified consul report.
+ * Merge claims from all available models into a unified consul report.
+ * Uses greedy best-match clustering: for each claim, find the best-matching
+ * claim from other models (similarity >= 0.35) and group them.
  */
 function reconcileClaims(
-    geminiClaims: SingleModelClaimReview[] | null,
-    grokClaims: SingleModelClaimReview[] | null
+    modelResults: { model: ModelName; claims: SingleModelClaimReview[] | null }[]
 ): ConsulClaimReview[] {
-    const results: ConsulClaimReview[] = [];
+    // Flatten all claims with model tags
+    const allTagged: TaggedClaim[] = [];
+    for (const mr of modelResults) {
+        if (!mr.claims) continue;
+        for (const c of mr.claims) {
+            allTagged.push({ ...c, model: mr.model });
+        }
+    }
 
-    if (geminiClaims && grokClaims) {
-        // Match claims between models
-        const usedGrokIndices = new Set<number>();
+    if (allTagged.length === 0) return [];
 
-        for (const gc of geminiClaims) {
-            let bestMatch = -1;
-            let bestScore = 0;
+    // Greedy clustering
+    const used = new Set<number>();
+    const clusters: TaggedClaim[][] = [];
 
-            for (let i = 0; i < grokClaims.length; i++) {
-                if (usedGrokIndices.has(i)) continue;
-                const score = claimSimilarity(gc.claim, grokClaims[i].claim);
-                if (score > bestScore && score >= 0.35) {
-                    bestScore = score;
-                    bestMatch = i;
+    for (let i = 0; i < allTagged.length; i++) {
+        if (used.has(i)) continue;
+        used.add(i);
+        const cluster: TaggedClaim[] = [allTagged[i]];
+        const usedModels = new Set<ModelName>([allTagged[i].model]);
+
+        // Find best match from each other model
+        for (let j = i + 1; j < allTagged.length; j++) {
+            if (used.has(j)) continue;
+            if (usedModels.has(allTagged[j].model)) continue;
+            const score = claimSimilarity(allTagged[i].claim, allTagged[j].claim);
+            if (score >= 0.35) {
+                // Check this is the best available match for this model
+                let isBest = true;
+                for (let k = j + 1; k < allTagged.length; k++) {
+                    if (used.has(k) || allTagged[k].model !== allTagged[j].model) continue;
+                    if (claimSimilarity(allTagged[i].claim, allTagged[k].claim) > score) {
+                        isBest = false;
+                        break;
+                    }
+                }
+                if (isBest) {
+                    used.add(j);
+                    cluster.push(allTagged[j]);
+                    usedModels.add(allTagged[j].model);
                 }
             }
+        }
 
-            if (bestMatch >= 0) {
-                // Matched pair
-                usedGrokIndices.add(bestMatch);
-                const gk = grokClaims[bestMatch];
-                const verdict = consensusVerdict(gc.verdict, gk.verdict);
-                const agreement = agreementLevel(gc.verdict, gk.verdict);
+        clusters.push(cluster);
+    }
 
-                // Merge sources
-                const sources: ConsulClaimReview["sources"] = [
-                    ...(gc.sources ?? []).map((s) => ({ ...s, from: "gemini" as const })),
-                    ...(gk.sources ?? []).map((s) => ({ ...s, from: "grok" as const })),
-                ];
+    // Build ConsulClaimReview for each cluster
+    const results: ConsulClaimReview[] = [];
 
-                // Compute confidence
-                let confidence: number;
-                if (agreement === "full") confidence = 0.95;
-                else if (agreement === "partial") confidence = 0.75;
-                else confidence = 0.5;
+    for (const cluster of clusters) {
+        const verdicts = cluster.map(c => c.verdict);
+        const verdict = consensusVerdict(verdicts);
+        const agreement = agreementLevel(verdicts);
 
-                // Pick best suggested rewrite
-                const suggested_rewrite =
-                    verdict !== "accurate"
-                        ? gc.suggested_edit || gk.suggested_edit
-                        : undefined;
-
-                // Build combined explanation
-                const explanation =
-                    agreement === "full"
-                        ? gc.explanation
-                        : `Gemini and Grok ${agreement === "partial" ? "mostly agree" : "disagree"} on this claim. See individual explanations below.`;
-
-                results.push({
-                    claim: gc.claim,
-                    consensus_verdict: verdict,
-                    gemini_verdict: gc.verdict,
-                    grok_verdict: gk.verdict,
-                    agreement,
-                    confidence,
-                    explanation,
-                    gemini_explanation: gc.explanation,
-                    grok_explanation: gk.explanation,
-                    sources,
-                    suggested_rewrite,
-                });
-            } else {
-                // Gemini-only claim
-                results.push({
-                    claim: gc.claim,
-                    consensus_verdict: gc.verdict,
-                    gemini_verdict: gc.verdict,
-                    agreement: "single_source",
-                    confidence: 0.6,
-                    explanation: gc.explanation,
-                    gemini_explanation: gc.explanation,
-                    sources: (gc.sources ?? []).map((s) => ({ ...s, from: "gemini" as const })),
-                    suggested_rewrite: gc.suggested_edit,
-                });
+        // Merge sources
+        const sources: ConsulClaimReview["sources"] = [];
+        for (const c of cluster) {
+            for (const s of c.sources ?? []) {
+                sources.push({ ...s, from: c.model });
             }
         }
 
-        // Unmatched Grok claims
-        for (let i = 0; i < grokClaims.length; i++) {
-            if (usedGrokIndices.has(i)) continue;
-            const gk = grokClaims[i];
-            results.push({
-                claim: gk.claim,
-                consensus_verdict: gk.verdict,
-                grok_verdict: gk.verdict,
-                agreement: "single_source",
-                confidence: 0.6,
-                explanation: gk.explanation,
-                grok_explanation: gk.explanation,
-                sources: (gk.sources ?? []).map((s) => ({ ...s, from: "grok" as const })),
-                suggested_rewrite: gk.suggested_edit,
-            });
+        // Confidence based on agreement
+        let confidence: number;
+        if (agreement === "full") confidence = 0.97;
+        else if (agreement === "majority") confidence = 0.90;
+        else if (agreement === "partial") confidence = 0.75;
+        else if (agreement === "split") confidence = 0.5;
+        else confidence = 0.6; // single_source
+
+        // Model-specific fields
+        const byModel: Record<ModelName, TaggedClaim | undefined> = {
+            gemini: cluster.find(c => c.model === "gemini"),
+            grok: cluster.find(c => c.model === "grok"),
+            claude: cluster.find(c => c.model === "claude"),
+        };
+
+        // Build explanation
+        const modelNames = cluster.map(c => c.model.charAt(0).toUpperCase() + c.model.slice(1));
+        let explanation: string;
+        if (agreement === "full") {
+            explanation = cluster[0].explanation;
+        } else if (agreement === "majority") {
+            explanation = `${modelNames.join(", ")} reviewed this claim — majority agree. See individual reasoning below.`;
+        } else if (cluster.length === 1) {
+            explanation = cluster[0].explanation;
+        } else {
+            explanation = `${modelNames.join(" and ")} ${agreement === "partial" ? "mostly agree" : "disagree"} on this claim. See individual explanations below.`;
         }
-    } else {
-        // Only one model succeeded
-        const claims = geminiClaims ?? grokClaims ?? [];
-        const source = geminiClaims ? "gemini" : "grok";
-        for (const c of claims) {
-            results.push({
-                claim: c.claim,
-                consensus_verdict: c.verdict,
-                ...(source === "gemini"
-                    ? { gemini_verdict: c.verdict, gemini_explanation: c.explanation }
-                    : { grok_verdict: c.verdict, grok_explanation: c.explanation }),
-                agreement: "single_source",
-                confidence: 0.6,
-                explanation: c.explanation,
-                sources: (c.sources ?? []).map((s) => ({ ...s, from: source as "gemini" | "grok" })),
-                suggested_rewrite: c.suggested_edit,
-            });
-        }
+
+        // Pick best suggested rewrite
+        const suggested_rewrite =
+            verdict !== "accurate"
+                ? cluster.find(c => c.suggested_edit)?.suggested_edit
+                : undefined;
+
+        results.push({
+            claim: cluster[0].claim,
+            consensus_verdict: verdict,
+            gemini_verdict: byModel.gemini?.verdict,
+            grok_verdict: byModel.grok?.verdict,
+            claude_verdict: byModel.claude?.verdict,
+            agreement,
+            confidence,
+            explanation,
+            gemini_explanation: byModel.gemini?.explanation,
+            grok_explanation: byModel.grok?.explanation,
+            claude_explanation: byModel.claude?.explanation,
+            sources,
+            suggested_rewrite,
+        });
     }
 
     return results;
@@ -345,34 +385,57 @@ export default async function handler(
 
         const userPrompt = buildFactCheckUserPrompt(title, excerpt, html);
 
-        // Fire both models in parallel (skip Grok if no XAI_API_KEY)
+        // Fire all models in parallel (skip if API key missing)
         const hasXaiKey = !!process.env.XAI_API_KEY;
-        const [geminiResult, grokResult] = await Promise.allSettled([
+        const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
+
+        const [geminiResult, grokResult, claudeResult] = await Promise.allSettled([
             checkWithGemini(userPrompt),
             hasXaiKey
                 ? checkWithGrok(userPrompt)
                 : Promise.reject(new Error("XAI_API_KEY not configured — skipping Grok")),
+            hasAnthropicKey
+                ? checkWithClaude(userPrompt)
+                : Promise.reject(new Error("ANTHROPIC_API_KEY not configured — skipping Claude")),
         ]);
 
         const geminiOk = geminiResult.status === "fulfilled";
         const grokOk = grokResult.status === "fulfilled";
+        const claudeOk = claudeResult.status === "fulfilled";
 
-        if (!geminiOk && !grokOk) {
+        if (!geminiOk && !grokOk && !claudeOk) {
             const errors = [
                 `Gemini: ${(geminiResult as PromiseRejectedResult).reason?.message ?? "Unknown error"}`,
                 `Grok: ${(grokResult as PromiseRejectedResult).reason?.message ?? "Unknown error"}`,
+                `Claude: ${(claudeResult as PromiseRejectedResult).reason?.message ?? "Unknown error"}`,
             ].join("; ");
-            return res.status(502).json({ error: `Both models failed: ${errors}` });
+            return res.status(502).json({ error: `All models failed: ${errors}` });
         }
 
         const geminiData = geminiOk ? (geminiResult as PromiseFulfilledResult<SingleModelFactCheckResult>).value : null;
         const grokData = grokOk ? (grokResult as PromiseFulfilledResult<SingleModelFactCheckResult>).value : null;
+        const claudeData = claudeOk ? (claudeResult as PromiseFulfilledResult<SingleModelFactCheckResult>).value : null;
 
-        // Reconcile claims
-        const claims = reconcileClaims(
-            geminiData?.claims ?? null,
-            grokData?.claims ?? null
-        );
+        // ── Diagnostic logging ──────────────────────────────────────────
+        const successCount = [geminiOk, grokOk, claudeOk].filter(Boolean).length;
+        console.log(`[fact-check-consul] Models: ${successCount}/3 succeeded | gemini=${geminiOk} grok=${grokOk} claude=${claudeOk}`);
+        if (!geminiOk) console.log("[fact-check-consul] Gemini error:", (geminiResult as PromiseRejectedResult).reason?.message);
+        if (!grokOk) console.log("[fact-check-consul] Grok error:", (grokResult as PromiseRejectedResult).reason?.message);
+        if (!claudeOk) console.log("[fact-check-consul] Claude error:", (claudeResult as PromiseRejectedResult).reason?.message);
+        console.log(`[fact-check-consul] Claims: gemini=${geminiData?.claims?.length ?? 0} grok=${grokData?.claims?.length ?? 0} claude=${claudeData?.claims?.length ?? 0}`);
+
+        // Reconcile claims across all models
+        const claims = reconcileClaims([
+            { model: "gemini", claims: geminiData?.claims ?? null },
+            { model: "grok", claims: grokData?.claims ?? null },
+            { model: "claude", claims: claudeData?.claims ?? null },
+        ]);
+
+        // Log reconciliation results
+        const matchedCount = claims.filter(c => c.agreement !== "single_source").length;
+        const singleCount = claims.filter(c => c.agreement === "single_source").length;
+        console.log(`[fact-check-consul] Reconciled: ${claims.length} total | ${matchedCount} matched | ${singleCount} single_source`);
+        claims.forEach((c, i) => console.log(`  claim[${i}]: agreement=${c.agreement} confidence=${c.confidence} verdict=${c.consensus_verdict}`));
 
         const { verdict, confidence } = computeOverallVerdict(claims);
 
@@ -381,6 +444,9 @@ export default async function handler(
         if (geminiData?.summary) summaryParts.push(geminiData.summary);
         if (grokData?.summary && grokData.summary !== geminiData?.summary) {
             summaryParts.push(grokData.summary);
+        }
+        if (claudeData?.summary && claudeData.summary !== geminiData?.summary && claudeData.summary !== grokData?.summary) {
+            summaryParts.push(claudeData.summary);
         }
 
         const consulResult: ConsulResult = {
@@ -397,6 +463,11 @@ export default async function handler(
                     model: GROK_MODEL,
                     status: grokOk ? "success" : "error",
                     ...(grokOk ? {} : { error: (grokResult as PromiseRejectedResult).reason?.message }),
+                },
+                claude: {
+                    model: CLAUDE_MODEL,
+                    status: claudeOk ? "success" : "error",
+                    ...(claudeOk ? {} : { error: (claudeResult as PromiseRejectedResult).reason?.message }),
                 },
             },
             claims,

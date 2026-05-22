@@ -145,7 +145,7 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
 
     const [addingPageType, setAddingPageType] = useState<string | null>(null);
     const [newPage, setNewPage] = useState<ClusterPage>({
-        title: "", keyword: "", slug: "", description: "", word_count: "1,500", links_to: [],
+        title: "", keyword: "", slug: "", description: "", word_count: "1,800", links_to: [],
     });
     const [savingNewPage, setSavingNewPage] = useState(false);
 
@@ -462,7 +462,7 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
 
     function openAddPageForm(type: string) {
         setAddingPageType(type);
-        setNewPage({ title: "", keyword: "", slug: "", description: "", word_count: type === "pillar" ? "3,000" : type === "supporting" ? "1,500" : "800", links_to: [] });
+        setNewPage({ title: "", keyword: "", slug: "", description: "", word_count: type === "pillar" ? "3,000" : type === "supporting" ? "1,800" : "800", links_to: [] });
     }
 
     function handleNewPageFieldChange(field: keyof ClusterPage, value: string) {

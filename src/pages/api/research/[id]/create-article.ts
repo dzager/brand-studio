@@ -86,7 +86,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         creation_prompt,
         company_id: project.company_id,
         model: model || undefined,
-        word_count: word_count || "1500-2500",
+        word_count: word_count || "1800-2400",
         image_style: image_style || "default",
     };
 

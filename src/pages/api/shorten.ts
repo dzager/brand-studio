@@ -21,15 +21,19 @@ function countWords(html: string): number {
     return text ? text.split(/\s+/).length : 0;
 }
 
-function buildShortenPrompt(html: string, title: string | undefined, brand?: BrandEngine): string {
+function buildShortenPrompt(html: string, title: string | undefined, targetWords: number, brand?: BrandEngine): string {
     const voiceSection = brand
         ? `\n\nBrand Voice Guidelines:\n- Tone: ${(brand as any).tone || "professional"}\n- Style: ${(brand as any).writing_style || "clear and concise"}\nMaintain this voice throughout the shortened version.`
         : "";
 
-    return `You are an expert editorial condensation specialist. Your task is to shorten the following article to UNDER 2,000 words while preserving its value and readability.
+    // Scale the aim range based on the target
+    const aimLow = Math.round(targetWords * 0.7);
+    const aimHigh = Math.round(targetWords * 0.9);
+
+    return `You are an expert editorial condensation specialist. Your task is to shorten the following article to UNDER ${targetWords.toLocaleString()} words while preserving its value and readability.
 
 RULES:
-1. The output MUST be fewer than 2,000 words (aim for 1,400-1,800 words).
+1. The output MUST be fewer than ${targetWords.toLocaleString()} words (aim for ${aimLow.toLocaleString()}-${aimHigh.toLocaleString()} words).
 2. Preserve the core argument, key insights, and most important data points.
 3. Keep the HTML structure intact — use <h2>, <h3>, <p>, <ul>/<ol>, <strong>, <em>, <a> tags as appropriate.
 4. Remove redundant examples, verbose transitions, filler paragraphs, and overly detailed explanations.
@@ -62,7 +66,8 @@ export default async function handler(
             return res.status(405).json({ error: "Method not allowed. Use POST." });
         }
 
-        const { html, title, excerpt, company_id } = req.body ?? {};
+        const { html, title, excerpt, company_id, target_words: rawTarget } = req.body ?? {};
+        const targetWords = typeof rawTarget === "number" && rawTarget > 0 ? rawTarget : 2000;
 
         if (!html || typeof html !== "string") {
             return res.status(400).json({ error: "html content is required" });
@@ -70,8 +75,8 @@ export default async function handler(
 
         const originalWordCount = countWords(html);
 
-        // If already under 2000 words, return as-is
-        if (originalWordCount <= 2000) {
+        // If already under target, return as-is
+        if (originalWordCount <= targetWords) {
             return res.status(200).json({
                 html,
                 title,
@@ -95,7 +100,7 @@ export default async function handler(
             }
         }
 
-        const prompt = buildShortenPrompt(html, title, brand);
+        const prompt = buildShortenPrompt(html, title, targetWords, brand);
         const shortenedHtml = await getTextResponse("gpt-5.4", "", prompt, { temperature: 0.3 });
 
         if (!shortenedHtml || shortenedHtml.length < 100) {

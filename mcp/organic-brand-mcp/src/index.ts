@@ -68,6 +68,9 @@ type VoiceProfile = {
   structural_dont: string[];
   specificity_rules: string[];
   length_rules: string[];
+  headline_style?: string;
+  article_blueprint?: string;
+  target_length?: string;
 };
 
 type ImageStyleCategory = {
@@ -247,6 +250,12 @@ function compileVoiceClause(company: CompanyRow): string {
     parts.push(`Sample phrases: "${vp.sample_phrases.join('"; "')}".`);
   if (vp.avoid.length)
     parts.push(`Avoid: ${vp.avoid.join("; ")}.`);
+  if (vp.headline_style)
+    parts.push(`Headline style: ${vp.headline_style}`);
+  if (vp.article_blueprint)
+    parts.push(`Article blueprint: ${vp.article_blueprint}`);
+  if (vp.target_length)
+    parts.push(`Target length: ${vp.target_length}`);
 
   return parts.join(" ");
 }
@@ -517,6 +526,15 @@ server.tool(
     }
     if (vp.avoid.length) {
       parts.push(`Voice patterns to avoid: ${vp.avoid.join("; ")}.`);
+    }
+    if (vp.headline_style) {
+      parts.push(`Headline style: ${vp.headline_style}`);
+    }
+    if (vp.article_blueprint) {
+      parts.push(`Article blueprint: ${vp.article_blueprint}`);
+    }
+    if (vp.target_length) {
+      parts.push(`Target length: ${vp.target_length}`);
     }
 
     // Banned phrases

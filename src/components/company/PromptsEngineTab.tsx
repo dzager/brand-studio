@@ -40,6 +40,9 @@ function compileVoiceToPrompt(vp: VoiceProfile): string {
     if ((vp.length_rules ?? []).length > 0) lines.push(`## Length Rules`, ...vp.length_rules!.map(s => `- ${s}`), ``);
     if (vp.avoid.length > 0) lines.push(`## Patterns to Avoid`, `NEVER use: ${vp.avoid.join(", ")}`, ``);
     if ((vp.banned_phrases ?? []).length > 0) lines.push(`## Banned Phrases — NEVER use these`, ...vp.banned_phrases!.map(p => `- "${p}"`), ``);
+    if (vp.headline_style) lines.push(`## Headline Style`, vp.headline_style, ``);
+    if (vp.article_blueprint) lines.push(`## Article Blueprint`, vp.article_blueprint, ``);
+    if (vp.target_length) lines.push(`## Target Length`, vp.target_length, ``);
     return lines.join("\n");
 }
 

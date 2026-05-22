@@ -27,7 +27,7 @@ A card-based mode switcher at the top of the page lets users choose their creati
 | **Image Style** | Dropdown of the company's custom image styles (or "Default"). Controls the visual style of the generated featured image. |
 | **✨ Recommend** | AI analyzes the prompt and recommends the best-fit image style from available options, with a reason. |
 | **Model** | Select the LLM model (GPT-5.4, GPT-5.5, etc.). |
-| **Length** | Target word count range (Short 300–500, Medium 800–1,200, Long 1,500–2,500, Deep Dive 2,500–4,000, No limit). |
+| **Length** | Target word count range (Short 300–500, Medium 800–1,200, Long 1,800–2,400, Deep Dive 2,500–4,000, No limit). |
 | **Create Article** | Generates the article, excerpt, SEO metadata, FAQ, key takeaways, JSON-LD, and featured image. |
 
 **Content Cluster Mode — Controls:**
