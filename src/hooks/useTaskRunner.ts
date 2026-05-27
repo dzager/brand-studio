@@ -85,7 +85,15 @@ export function useTaskRunner() {
 
         const res = await fetch(config.endpoint, fetchOpts);
         const text = await res.text();
-        const data = text ? JSON.parse(text) : null;
+        let data: any = null;
+        try {
+          data = text ? JSON.parse(text) : null;
+        } catch {
+          // Response wasn't valid JSON (e.g. Vercel timeout plain-text error)
+          if (!res.ok) {
+            throw new Error(text || `Request failed with status ${res.status}`);
+          }
+        }
 
         if (!res.ok) {
           throw new Error(data?.error || `Request failed with status ${res.status}`);
@@ -166,7 +174,14 @@ export function useTaskRunner() {
 
           const res = await fetch(item.endpoint, fetchOpts);
           const text = await res.text();
-          const data = text ? JSON.parse(text) : null;
+          let data: any = null;
+          try {
+            data = text ? JSON.parse(text) : null;
+          } catch {
+            if (!res.ok) {
+              throw new Error(text || `Failed with status ${res.status}`);
+            }
+          }
 
           if (!res.ok) {
             throw new Error(data?.error || `Failed with status ${res.status}`);

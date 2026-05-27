@@ -372,6 +372,106 @@
       </div>
 
       <!-- ───────────────────────────────────── -->
+      <!-- May 27, 2026 -->
+      <!-- ───────────────────────────────────── -->
+      <div class="changelog-entry">
+        <div class="changelog-date">May 27, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+          <span class="changelog-tag changelog-tag--infrastructure">Infrastructure</span>
+        </div>
+        <h2 class="changelog-title">Content quality <em>evaluator</em></h2>
+        <div class="changelog-body">
+          <p>
+            A comprehensive article quality rating system powered by Gemini 2.5 Pro with Google Search grounding. Rate any article across SEO, GEO/AEO, editorial quality, information gain, and trustworthiness — with real-time competitive benchmarking against live search results.
+          </p>
+          <ul>
+            <li><strong>Multi-dimensional scoring</strong> — Six individual scores (overall, SEO, GEO/AEO, editorial quality, information gain, trustworthiness) on a 1–10 scale with a final competitive verdict.</li>
+            <li><strong>Actionable intelligence</strong> — Top weaknesses, highest-leverage improvements, rewrite recommendations, missing content opportunities, cluster expansion ideas, and AI detection risks.</li>
+            <li><strong>Search-grounded analysis</strong> — Uses Google Search during evaluation to compare your content against what's actually ranking, not just theoretical best practices.</li>
+            <li><strong>One-click improvements</strong> — Each weakness includes an "Improve" button that rewrites the relevant article sections via <code>/api/improve-from-weakness</code>, preserving voice, structure, and unrelated content.</li>
+            <li><strong>Batch improve</strong> — "Improve All" runs through all remaining weaknesses sequentially, applying targeted rewrites for each.</li>
+            <li><strong>Quality rules</strong> — Save any weakness as a permanent quality rule on the company profile. Future articles will automatically follow these rules during generation.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">May 27, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--design">Design</span>
+          <span class="changelog-tag changelog-tag--improvement">Improvement</span>
+        </div>
+        <h2 class="changelog-title">Quality menu <em>consolidation</em></h2>
+        <div class="changelog-body">
+          <p>
+            Similarity check, Fact-Check Consul, Compare, and the new Rate Quality action are now unified under a single "Quality" dropdown button in the article toolbar. The dropdown shows live status and results for each check, reducing toolbar clutter while keeping every analysis tool one click away.
+          </p>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">May 27, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+          <span class="changelog-tag changelog-tag--infrastructure">Infrastructure</span>
+        </div>
+        <h2 class="changelog-title">SEO/GEO/AEO content <em>framework</em></h2>
+        <div class="changelog-body">
+          <p>
+            A major upgrade to the content generation engine, embedding best-practice SEO, GEO (Generative Engine Optimization), and AEO (Answer Engine Optimization) guidance directly into the brand engine and MCP prompt compilation.
+          </p>
+          <ul>
+            <li><strong>GEO &amp; answer engine optimization</strong> — Content is now structured with a 4-layer section pattern (direct answer → nuance → interpretation → implications) so AI systems can extract, quote, and attribute individual sections.</li>
+            <li><strong>E-E-A-T compliance</strong> — Every article is required to demonstrate Experience, Expertise, Authoritativeness, and Trustworthiness with real-world reasoning and operational detail.</li>
+            <li><strong>Semantic depth</strong> — Articles proactively cover adjacent concepts, variations, and exceptions to build topical authority signals.</li>
+            <li><strong>Procedural depth</strong> — Process explanations must include exact steps, costs/fees, documents, agencies, common mistakes, and realistic timelines.</li>
+            <li><strong>Quality self-check</strong> — A mandatory pre-flight checklist verifies original insight, human tone, strategic depth, procedural specificity, AI extractability, and competitive advantage before the model returns content.</li>
+            <li><strong>Media recommendations</strong> — The engine now suggests comparison tables, timelines, and visual elements via HTML comments where they would add value.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">May 27, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--feature">Feature</span>
+          <span class="changelog-tag changelog-tag--improvement">Improvement</span>
+        </div>
+        <h2 class="changelog-title">Concurrent freshness <em>audits</em></h2>
+        <div class="changelog-body">
+          <p>
+            Freshness audits now return immediately and run in the background, allowing you to launch multiple audits concurrently without waiting for each to complete.
+          </p>
+          <ul>
+            <li><strong>Single-page mode</strong> — A new Site/Page toggle lets you audit a single URL without crawling the entire site, ideal for quick checks on individual articles.</li>
+            <li><strong>Non-blocking API</strong> — The <code>/api/freshness-audit</code> endpoint responds instantly with an audit ID. The crawl and analysis pipeline runs fire-and-forget in the background.</li>
+            <li><strong>Metric tooltips</strong> — Health Score, Pages Crawled, Facts Verified, and Issues Found now display descriptive tooltips on hover explaining what each metric means.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="changelog-entry">
+        <div class="changelog-date">May 27, 2026</div>
+        <div class="changelog-tags">
+          <span class="changelog-tag changelog-tag--improvement">Improvement</span>
+          <span class="changelog-tag changelog-tag--infrastructure">Infrastructure</span>
+        </div>
+        <h2 class="changelog-title">Content engine <em>refinements</em></h2>
+        <div class="changelog-body">
+          <p>
+            Several improvements to content generation defaults and guardrails.
+          </p>
+          <ul>
+            <li><strong>Expanded FAQs</strong> — FAQ schema output increased from 3–5 to 3–8 items, and key takeaways from 3–5 to 4–8, for richer structured data.</li>
+            <li><strong>Extended banned phrases</strong> — Added 12 new AI-sounding phrases to the global ban list: "in today's digital world," "comprehensive guide," "ultimate guide," "seamlessly," "leverage," "robust," and more.</li>
+            <li><strong>Content quality philosophy</strong> — New mandatory preamble in the MCP prompt requiring non-commodity content with interpretation, tradeoffs, and practitioner-level insight.</li>
+            <li><strong>Human-first writing directive</strong> — Explicit instructions against keyword stuffing, robotic phrasing, and overexplaining simple concepts.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ───────────────────────────────────── -->
       <!-- May 22, 2026 -->
       <!-- ───────────────────────────────────── -->
       <div class="changelog-entry">

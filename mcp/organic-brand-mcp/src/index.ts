@@ -141,6 +141,10 @@ const BASE_BANNED_PHRASES = [
   "aligned", "stakeholders", "unlock the power",
   "navigate the ever-evolving landscape", "in today's fast-paced world",
   "critical tool", "revolutionizing",
+  "in today's digital world", "it is important to note",
+  "navigate the landscape", "game-changing", "revolutionary",
+  "groundbreaking", "comprehensive guide", "ultimate guide",
+  "everything you need to know", "seamlessly", "leverage", "robust",
 ];
 
 const BASE_PHOTOGRAPHY = {
@@ -869,6 +873,13 @@ server.tool(
       // Identity
       `You are a content writer for ${brand}.${company.tagline ? ` Tagline: "${company.tagline}".` : ""} Your job is to produce content that sounds like it was written by a knowledgeable journalist or practitioner — not a marketer, a content agency, or an AI assistant.`,
 
+      // Content Quality Philosophy
+      `\n\n## Content Quality Philosophy (MANDATORY)`,
+      `- Produce non-commodity content. Do not write generic summaries, rewritten competitor content, or surface-level listicles.`,
+      `- Add interpretation, explain WHY things matter, explain HOW decisions actually get made, surface hidden tradeoffs.`,
+      `- Every section must answer: What actually matters here? What would an experienced operator know? What nuance is usually missing?`,
+      `- Content must feel experienced, specific, credible, nuanced, and human — not assembled from search results.`,
+
       // Editorial credibility
       `\n\n## Editorial Credibility (HIGHEST PRIORITY)`,
       `- ${brand} content must protect credibility above all.`,
@@ -876,6 +887,13 @@ server.tool(
       `- Do NOT use casual dramatic framing — "brace yourself," "buckle up," etc.`,
       `- Avoid any sentence that sounds like it was written by an AI assistant or LinkedIn influencer.`,
       `- Do not address the reader's emotions. Report facts. Explain processes.`,
+
+      // Write for humans first
+      `\n\n## Write for Humans First`,
+      `- Content must feel natural and flow conversationally. Avoid robotic phrasing, repetitive cadence, and filler transitions.`,
+      `- Do not keyword stuff, write for bots, or force long-tail keyword variants unnaturally into sentences.`,
+      `- Do not overexplain simple concepts. Trust the reader's intelligence.`,
+      `- Google systems understand semantic meaning and related concepts. Write naturally and comprehensively.`,
 
       // First sentence quality
       `\n\n## First Sentence Quality (MANDATORY)`,
@@ -941,6 +959,53 @@ server.tool(
       `\n\n## Unique Insight & Original Analysis (MANDATORY)`,
       `- Include decision frameworks, statistical breakdowns, edge cases, and practitioner-level guidance.`,
       `- At least one section must contain analysis not found on the primary government/reference source.`,
+    );
+
+    // GEO & Answer Engine Optimization
+    sections.push(
+      `\n\n## GEO & Answer Engine Optimization (MANDATORY)`,
+      `- Structure content so AI systems can extract answers, quote sections, and attribute expertise.`,
+      `- Every major section should contain: (1) a direct answer, (2) expanded nuance, (3) strategic interpretation, (4) practical implications.`,
+      `- Use direct definitions, clear topical hierarchy, strong headings, and concise answer-first paragraphs.`,
+      `- Assume content may appear in Google AI Overviews, AI Mode, chat-based retrieval systems, voice assistants, and RAG systems.`,
+      `- Make sections independently understandable. Maintain factual clarity and strong semantic structure.`,
+    );
+
+    // Semantic Depth & Topical Coverage
+    sections.push(
+      `\n\n## Semantic Depth & Topical Coverage`,
+      `- Cover adjacent concepts necessary for topical authority. Demonstrate ecosystem-level understanding.`,
+      `- For any core topic, proactively address related subtopics, variations, exceptions, and commonly confused alternatives.`,
+    );
+
+    // E-E-A-T Compliance
+    sections.push(
+      `\n\n## E-E-A-T Compliance (MANDATORY)`,
+      `- Demonstrate Experience, Expertise, Authoritativeness, and Trustworthiness in every article.`,
+      `- Use real-world reasoning, specific examples, and operational detail. Show practitioner-level knowledge.`,
+      `- Acknowledge tradeoffs, regional variation, exceptions, and situational context. Avoid unsupported certainty.`,
+    );
+
+    // Procedural Depth
+    sections.push(
+      `\n\n## Procedural Depth (MANDATORY)`,
+      `- When explaining processes: include exact steps, operational realities, edge cases, timing, costs/fees, documents/forms/agencies, and common mistakes.`,
+      `- Do not vaguely reference processes. Be specific enough that a reader could follow the steps without consulting another source.`,
+    );
+
+    // Media & Visual Recommendations
+    sections.push(
+      `\n\n## Media & Visual Recommendations`,
+      `- Where relevant, suggest comparison tables, timelines, charts, diagrams, or visual breakdowns using HTML comments (e.g., \`<!-- Suggest: comparison table of X vs Y -->\`).`,
+      `- Visuals should support comprehension, add information value, and increase AI extractability.`,
+    );
+
+    // Quality Self-Check
+    sections.push(
+      `\n\n## Quality Self-Check (MANDATORY)`,
+      `- Before finalizing, verify: Does this contain original insight? Does this sound human? Is there strategic depth?`,
+      `- Is procedural detail sufficient? Is the article extractable by AI systems? Would a domain expert respect this?`,
+      `- Does this avoid commodity content? Does it answer the "why" and "how"? Is it more useful than top-ranking competitors?`,
     );
 
     // Company SEO guidelines
@@ -1118,12 +1183,12 @@ server.tool(
               answer: { type: "string" },
             },
           },
-          description: "3-5 FAQ pairs matching the FAQ section in the HTML",
+          description: "3-8 FAQ pairs matching the FAQ section in the HTML",
         },
         key_takeaways: {
           type: "array",
           items: { type: "string" },
-          description: "3-5 concise factual takeaways",
+          description: "4-8 concise factual takeaways",
         },
         how_to_steps: {
           type: "array",

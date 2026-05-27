@@ -191,6 +191,7 @@ export type BrandEngine = {
     editorial_guidelines?: string;
     seo_content_guidelines?: string;
     reference_articles?: string[];
+    quality_rules?: string[];
 };
 
 export const BRAND_ENGINE: BrandEngine = {
@@ -373,6 +374,19 @@ export const BRAND_ENGINE: BrandEngine = {
             "in today's fast-paced world",
             "critical tool",
             "revolutionizing",
+            // Google SEO/GEO/AEO additions
+            "in today's digital world",
+            "it is important to note",
+            "navigate the landscape",
+            "game-changing",
+            "revolutionary",
+            "groundbreaking",
+            "comprehensive guide",
+            "ultimate guide",
+            "everything you need to know",
+            "seamlessly",
+            "leverage",
+            "robust",
         ],
     },
 
@@ -516,6 +530,12 @@ export function compileBlogSystemPrompt(
             overrideSections.push(`\n\n## Company Editorial Guidelines (FOLLOWS THESE CLOSELY)\nThe following editorial guidelines are specific to ${brand}. These guidelines take precedence over base rules for voice, tone, content depth, formatting, and section structure. Produce thorough, detailed, richly sourced articles as described below.\n\n${engine.editorial_guidelines}`);
         }
 
+        // Quality improvement rules (from editorial reviews)
+        if (engine.quality_rules && engine.quality_rules.length > 0) {
+            const rulesBlock = engine.quality_rules.map(r => `- ${r}`).join("\n");
+            overrideSections.push(`\n\n## Quality Improvement Rules (MANDATORY)\nThese rules were derived from editorial quality reviews of previous articles. Follow them closely to avoid recurring weaknesses:\n${rulesBlock}`);
+        }
+
         // Banned phrases
         if (uniqueBanned.length) {
             overrideSections.push(`\n\n## Banned Phrases\nNever use these phrases: ${uniqueBanned.map(p => `"${p}"`).join(", ")}.`);
@@ -536,6 +556,14 @@ export function compileBlogSystemPrompt(
         // Minimal identity (overridden by editorial_guidelines if present)
         `You are a content writer for ${brand}.${engine.engine_meta.tagline ? ` Tagline: "${engine.engine_meta.tagline}".` : ""} Your job is to produce content that sounds like it was written by a knowledgeable journalist or practitioner — not a marketer, a content agency, or an AI assistant.`,
 
+        // Content Quality Philosophy (universal — from Google SEO/GEO/AEO recommendations)
+        `\n\n## Content Quality Philosophy (MANDATORY)\nProduce non-commodity content. Every article must contain original insight, first-hand perspective, strategic depth, and procedural clarity that cannot be assembled from existing search results.`,
+        `- Do NOT write generic summaries, rewritten competitor content, surface-level listicles, obvious advice, or regurgitated definitions.`,
+        `- Add interpretation. Explain WHY things matter. Explain HOW decisions actually get made. Surface hidden tradeoffs. Cover mistakes, edge cases, exceptions, risks, and strategic implications.`,
+        `- Every section must answer: What actually matters here? What would an experienced operator know? What nuance is usually missing? What practical reality isn't obvious?`,
+        `- Content must feel experienced, specific, credible, nuanced, and human — not assembled from search results or competitor articles.`,
+        `- The article should outperform generic SEO summaries and surface-level AI-generated content. It should feel like it came from a top-tier publication, an experienced operator, or a domain expert.`,
+
         // Anti-AI & Credibility (universal)
         `\n\n## Editorial Credibility (HIGHEST PRIORITY)\nThis section overrides any conflicting brand voice instructions.`,
         `- ${brand} content must protect credibility above all. When in doubt between sounding "warm" and sounding "credible," always choose credible.`,
@@ -544,6 +572,13 @@ export function compileBlogSystemPrompt(
         `- Do NOT lean negative or fatalistic. Report challenges factually without editorial coloring. Example: "the costs can be brutal" → "total costs typically range from $1,500 to $3,000." Let the reader draw their own conclusions from the facts.`,
         `- Avoid any sentence that sounds like it was written by an AI assistant, a life coach, or a content agency. If you can imagine a LinkedIn influencer posting it, cut it.`,
         `- Do not address the reader's emotions. Report facts. Explain processes.`,
+
+        // Write for Humans First (universal — from Google SEO/GEO/AEO recommendations)
+        `\n\n## Write for Humans First\nContent must feel natural and flow conversationally. Google systems understand semantic meaning, synonyms, and multi-topic pages — write naturally and comprehensively.`,
+        `- Avoid robotic phrasing, repetitive AI cadence, filler transitions between sections, and overexplaining simple concepts.`,
+        `- Do NOT keyword stuff, write for bots, or force long-tail keyword variants unnaturally into sentences. Search engines understand context.`,
+        `- Trust the reader's intelligence. If a concept is straightforward, state it once clearly and move on.`,
+        `- Write with the authority of an experienced operator, founder, attorney, strategist, journalist, or domain expert — not a generic content marketer.`,
 
         // First Sentence Quality (universal — critical for credibility)
         `\n\n## First Sentence Quality (MANDATORY)\nThe opening sentence is the single most important sentence in the article. It determines whether readers — and AI extraction systems — take the content seriously.`,
@@ -682,6 +717,45 @@ export function compileBlogSystemPrompt(
     sections.push(`- **Avoid keyword cannibalization**: When cluster context lists sibling keywords, do NOT try to rank for those keywords in this article. Mention them only as linking opportunities.`);
     sections.push(`- **Standalone articles**: If no cluster context is provided, still include 1-2 internal links to related content if logical slugs can be inferred from the topic. Use placeholder slugs and descriptive anchor text.`);
 
+    // ── GEO & ANSWER ENGINE OPTIMIZATION (universal — from Google SEO/GEO/AEO recommendations) ──
+
+    sections.push(`\n\n## GEO & Answer Engine Optimization (MANDATORY)\nStructure content so AI systems can extract answers, quote sections, attribute expertise, understand context, and retrieve supporting evidence. Content may appear in Google AI Overviews, AI Mode, chat-based retrieval systems, voice assistants, and RAG systems.`);
+    sections.push(`- **4-layer section pattern**: Every major section should contain: (1) a direct answer in the first 1-2 sentences, (2) expanded nuance and context, (3) strategic interpretation or expert commentary, (4) practical implications for the reader.`);
+    sections.push(`- Use direct definitions, clear topical hierarchy, strong headings, and concise answer-first paragraphs.`);
+    sections.push(`- Make sections independently understandable — each section should make sense if extracted without surrounding context.`);
+    sections.push(`- Ensure headings carry semantic meaning. A heading like "Cost Considerations" is better than "Things to Think About."`);
+    sections.push(`- Use structured explanations, bullet summaries, comparison tables, and step-by-step processes to maximize extractability.`);
+    sections.push(`- Do NOT create "AI optimized" junk, over-chunk content, add fake expertise, create synthetic mentions, or add unnecessary schema tricks. Focus on genuinely useful, well-structured content.`);
+
+    // ── SEMANTIC DEPTH & TOPICAL COVERAGE (universal — from Google SEO/GEO/AEO recommendations) ──
+
+    sections.push(`\n\n## Semantic Depth & Topical Coverage\nCover adjacent concepts necessary for topical authority. Demonstrate ecosystem-level understanding of the subject matter.`);
+    sections.push(`- For any core topic, proactively address related subtopics, variations, exceptions, and commonly confused alternatives that a knowledgeable practitioner would naturally discuss.`);
+    sections.push(`- Do not artificially limit scope to only the exact keyword. If discussing a topic requires understanding related concepts, cover them with appropriate depth.`);
+    sections.push(`- This builds topical authority signals that search engines and AI systems use to determine content expertise.`);
+
+    // ── E-E-A-T COMPLIANCE (universal — from Google SEO/GEO/AEO recommendations) ──
+
+    sections.push(`\n\n## E-E-A-T Compliance (MANDATORY)\nEvery article must demonstrate Experience, Expertise, Authoritativeness, and Trustworthiness — the core quality signals that Google and AI systems use to evaluate content credibility.`);
+    sections.push(`- **Experience**: Include real-world reasoning, operational detail, and practitioner-level knowledge that signals direct experience with the subject matter.`);
+    sections.push(`- **Expertise**: Use specific examples, precise terminology, and nuanced analysis. Reference specific laws, standards, forms, agencies, and processes by name.`);
+    sections.push(`- **Authoritativeness**: Cite authoritative sources, reference official data, and position the content as a definitive resource on the topic.`);
+    sections.push(`- **Trustworthiness**: Acknowledge tradeoffs, state-by-state or regional variation, exceptions, and situational context. Avoid unsupported certainty. Qualify claims when appropriate.`);
+
+    // ── PROCEDURAL DEPTH (universal — from Google SEO/GEO/AEO recommendations) ──
+
+    sections.push(`\n\n## Procedural Depth (MANDATORY)\nWhen explaining any process, procedure, or multi-step workflow, provide sufficient operational detail that a reader could follow the steps without consulting another source.`);
+    sections.push(`- Include exact steps, operational realities, edge cases, realistic timing, costs and fees where applicable, required documents/forms/agencies, and common mistakes.`);
+    sections.push(`- Do NOT vaguely reference processes. Replace vague references with specific detail. Example: "You may need to file amendments" → "In Delaware, amendments are filed through the Secretary of State using a Certificate of Amendment and typically require board approval plus stockholder approval under DGCL §242."`);
+    sections.push(`- For each procedural section, anticipate what could go wrong and address it. Include what to do if a step fails, what common mistakes people make, and what the realistic timeline looks like (not just the official estimate).`);
+
+    // ── MEDIA & VISUAL RECOMMENDATIONS (universal — from Google SEO/GEO/AEO recommendations) ──
+
+    sections.push(`\n\n## Media & Visual Recommendations\nWhere content would benefit from visual support, include HTML comments suggesting specific visual elements.`);
+    sections.push(`- Suggest comparison tables, timelines, charts, diagrams, cost breakdowns, or process flowcharts using HTML comments — e.g., \`<!-- Suggest: comparison table of Option A vs Option B with cost, timeline, and outcome columns -->\`.`);
+    sections.push(`- Visuals should support comprehension, add information value, improve retention, and increase AI extractability.`);
+    sections.push(`- Actively use HTML tables for comparisons, cost breakdowns, feature matrices, and any data that benefits from side-by-side presentation. Do not describe tabular data in paragraph form when a table would be clearer.`);
+
     // ── COMPANY SEO CONTENT GUIDELINES (company-specific) ────────────────
 
     if (engine.seo_content_guidelines) {
@@ -694,6 +768,12 @@ export function compileBlogSystemPrompt(
         sections.push(`\n\n## Company Editorial Guidelines (FOLLOWS THESE CLOSELY)\nThe following editorial guidelines are specific to ${brand}. These guidelines take precedence over base rules for voice, tone, content depth, formatting, and section structure. Produce thorough, detailed, richly sourced articles as described below.\n\n${engine.editorial_guidelines}`);
     }
 
+    // Quality improvement rules (from editorial reviews)
+    if (engine.quality_rules && engine.quality_rules.length > 0) {
+        const rulesBlock = engine.quality_rules.map(r => `- ${r}`).join("\n");
+        sections.push(`\n\n## Quality Improvement Rules (MANDATORY)\nThese rules were derived from editorial quality reviews of previous articles. Follow them closely to avoid recurring weaknesses:\n${rulesBlock}`);
+    }
+
     // Banned phrases (universal)
     if (uniqueBanned.length) {
         sections.push(`\n\n## Banned Phrases\nNever use these phrases: ${uniqueBanned.map(p => `"${p}"`).join(", ")}.`);
@@ -704,6 +784,19 @@ export function compileBlogSystemPrompt(
     if (voiceClause) {
         sections.push(voiceClause);
     }
+
+    // ── QUALITY SELF-CHECK (universal — from Google SEO/GEO/AEO recommendations) ──
+
+    sections.push(`\n\n## Quality Self-Check (MANDATORY)\nBefore finalizing the article, verify each of the following. If any answer is "no," improve the content before returning it.`);
+    sections.push(`- Does this article contain original insight not easily found elsewhere?`);
+    sections.push(`- Does the content sound authentically human — not templated, not AI-assembled?`);
+    sections.push(`- Is there genuine strategic depth — analysis, frameworks, or expert-level interpretation?`);
+    sections.push(`- Is procedural detail specific enough that a reader could act on it?`);
+    sections.push(`- Is the article structured so AI systems can extract, quote, and attribute individual sections?`);
+    sections.push(`- Would a subject-matter expert read this and find it credible and respectful of the topic?`);
+    sections.push(`- Does the article answer both "why" and "how" — not just "what"?`);
+    sections.push(`- Is this more useful than the top-ranking competitors for the target keyword?`);
+    sections.push(`- Does the content feel authored by an expert rather than assembled from existing sources?`);
 
     return sections.join("\n");
 }

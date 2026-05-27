@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Organic — AI Content Platform</title>
-  <meta name="description" content="The AI content platform that sounds like your brand, not like AI. Multi-brand content operations with humanization, three-model fact-checking, and visual style matching." />
+  <title>Organic — Editorial Infrastructure for the AI Search Era</title>
+  <meta name="description" content="Organic turns brand voice into scalable editorial infrastructure — articles, imagery, metadata, and AI-search-ready formatting that reads like your internal team wrote it, not a generic AI model." />
 
   <!-- ABC Arizona super-family (self-hosted): Serif display, Sans body, Mix italic kickers -->
   <style>
@@ -32,8 +32,6 @@
     @font-face { font-family: 'ArizonaMix'; src: url('fonts/ABCArizonaMix-Regular-Trial.otf') format('opentype'); font-weight: 400; font-style: normal; font-display: swap; }
   </style>
 
-
-
   <!-- React 18 UMD -->
   <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
@@ -47,60 +45,51 @@
 
     /* ─── Tokens (muted eco-industrial palette) ─── */
     :root {
-      /* Two surfaces, alternating — bone and taupe */
-      --paper:        #ffffff;                /* pure white */
-      --paper-deep:   #f7f6f6;                /* light warm gray — section bands */
+      --paper:        #ffffff;
+      --paper-deep:   #f7f6f6;
 
-      /* Near-black charcoal, never pure #000 */
-      --ink:          #2c2c2c;                /* deep charcoal */
-      --ink-soft:     #3D3B32;                /* softened charcoal */
-      --muted:        #A9A296;                /* warm gray — structural neutral */
+      --ink:          #2c2c2c;
+      --ink-soft:     #3D3B32;
+      --muted:        #A9A296;
 
-      /* Brand accent — dark moss green */
       --moss:         #314235;
       --moss-light:   #3F5645;
       --moss-deep:    #243125;
 
-      /* Lime highlight — bright chartreuse green */
       --mustard:      #fdfe52;
       --mustard-soft:  #eaeb3c;
 
-      /* Supporting organic tones */
-      --olive-brown:  #7C7446;                /* organic accent */
-      --sage:         #8F9878;                /* desaturated green */
-      --wood:         #8B684B;                /* natural material accent */
+      --olive-brown:  #7C7446;
+      --sage:         #8F9878;
+      --wood:         #8B684B;
 
-      /* Charcoal for dark sections */
       --earth:        #2c2c2c;
 
-      /* Accent aliases — moss green as primary accent */
       --accent:         var(--moss);
       --accent-light:   var(--moss-light);
       --accent-deep:    var(--moss-deep);
-      --accent-on-ink:  var(--mustard);        /* lime pops on charcoal */
+      --accent-on-ink:  var(--mustard);
 
-      --border:       #2c2c2c1A;               /* charcoal 10% */
-      --border-strong: #2c2c2c38;              /* charcoal 22% */
+      --border:       #2c2c2c1A;
+      --border-strong: #2c2c2c38;
 
       --font-display: 'ArizonaSerif', Georgia, serif;
       --font-body:    'ArizonaSans', system-ui, -apple-system, sans-serif;
       --font-mix:     'ArizonaMix', Georgia, serif;
       --font-mono:    ui-monospace, 'SF Mono', Menlo, monospace;
 
-      /* ─── Type scale (major-second 1.125, base 16) ─── */
-      --text-xs:   11px;            /* mono labels, chips */
-      --text-sm:   13px;            /* captions, small body */
-      --text-base: 15px;            /* body copy, nav, UI */
-      --text-md:   16px;            /* lede, body emphasis */
-      --text-lg:   18px;            /* pipeline names, subheads */
-      --text-xl:   20px;            /* hero lede, kicker lg */
-      --text-2xl:  24px;            /* support-card titles */
-      --text-3xl:  32px;            /* section heads min */
-      --text-4xl:  48px;            /* feature titles */
-      --text-5xl:  56px;            /* section heads max */
-      --text-6xl:  60px;            /* pricing big number */
+      --text-xs:   11px;
+      --text-sm:   13px;
+      --text-base: 15px;
+      --text-md:   16px;
+      --text-lg:   18px;
+      --text-xl:   20px;
+      --text-2xl:  24px;
+      --text-3xl:  32px;
+      --text-4xl:  48px;
+      --text-5xl:  56px;
+      --text-6xl:  60px;
 
-      /* ─── 8px baseline grid ─── */
       --space-1:   4px;
       --space-2:   8px;
       --space-3:   12px;
@@ -149,6 +138,8 @@
     .btn--paper:hover   { opacity: 0.9; }
     .btn--ghost   { background: transparent; color: var(--ink); border: 1px solid var(--border-strong); }
     .btn--ghost:hover { border-color: var(--ink); background: #2c2c2c0D; }
+    .btn--moss    { background: var(--moss); color: var(--paper); }
+    .btn--moss:hover { background: var(--moss-light); }
     .btn-arrow {
       display: inline-block;
       font-family: var(--font-display);
@@ -169,13 +160,6 @@
       letter-spacing: 0;
     }
 
-    /* ─── Display em (no color — italic + weight bump carries the emphasis) ─── */
-    .em-display {
-      font-style: italic;
-      font-weight: 500;
-      color: var(--ink);
-    }
-
     /* ─── Nav ─── */
     .nav { padding: 22px 0; }
     .nav-inner { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
@@ -191,38 +175,337 @@
     .nav-signin:hover { color: var(--ink); }
 
     /* ─── Hero ─── */
-    .hero { padding: 64px 0 88px; }
-    .hero-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr); gap: 72px; align-items: center; }
+    .hero { padding: 80px 0 100px; }
+    .hero-inner { max-width: 900px; }
+    .hero-eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--moss);
+      margin-bottom: var(--space-5);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .hero-eyebrow-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--moss);
+      animation: pulse-dot 2.2s infinite;
+    }
     .hero-headline {
       font-family: var(--font-display);
       font-weight: 100;
-      font-size: 5vw;
-      line-height: 0.94;
-      letter-spacing: -0.055em;
+      font-size: clamp(48px, 5.5vw, 80px);
+      line-height: 0.96;
+      letter-spacing: -0.05em;
       font-kerning: normal;
       font-feature-settings: "kern" 1;
-      margin: var(--space-5) 0 var(--space-5);
+      margin: 0 0 var(--space-6);
+      max-width: 14ch;
     }
     .hero-headline em { font-style: italic; font-weight: 400; color: var(--moss); letter-spacing: -0.055em; }
+    .hero-tagline {
+      font-family: var(--font-mix);
+      font-style: italic;
+      font-size: clamp(var(--text-xl), 2vw, var(--text-2xl));
+      color: var(--ink);
+      margin-bottom: var(--space-5);
+      letter-spacing: -0.01em;
+    }
     .hero-lede {
-      font-size: clamp(var(--text-lg), 1.5vw, var(--text-2xl));
-      line-height: 1.5;
+      font-size: clamp(var(--text-md), 1.3vw, var(--text-lg));
+      line-height: 1.55;
       color: var(--ink-soft);
-      max-width: 520px;
-      margin-bottom: var(--space-6);
+      max-width: 600px;
+      margin-bottom: var(--space-7);
     }
     .hero-ctas { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-7); }
-    .hero-tags {
-      display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-5);
+    .hero-signals {
+      display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5);
       font-family: var(--font-mix);
       font-style: italic;
       font-size: var(--text-sm);
       color: var(--ink-soft);
     }
-    .hero-tag::before { content: "·"; margin-right: 10px; color: var(--mustard); }
-    .hero-tag:first-child::before { content: ""; margin-right: 0; }
+    .hero-signal { display: inline-flex; align-items: center; gap: 8px; }
+    .hero-signal::before { content: "·"; color: var(--moss); font-weight: 600; font-size: 1.2em; }
+    .hero-signal:first-child::before { content: ""; margin: 0; }
 
-    /* ─── Article preview (card deck) ─── */
+    /* ─── Section frame ─── */
+    .section { padding: clamp(72px, 11vw, 132px) 0; }
+    .section--stone { background: var(--paper-deep); }
+    .section--ink { background: var(--earth); color: var(--paper); }
+    .section-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 14px;
+      margin-bottom: clamp(40px, 6vw, 68px);
+      max-width: 880px;
+    }
+    .section-head__kicker {
+      font-family: var(--font-mix);
+      font-style: italic;
+      font-size: var(--text-md);
+      color: var(--olive-brown);
+    }
+    .section--ink .section-head__kicker { color: var(--mustard); }
+    .section-head__title {
+      font-family: var(--font-display);
+      font-weight: 300;
+      font-size: clamp(var(--text-3xl), 3.8vw, var(--text-5xl));
+      line-height: 1.04;
+      letter-spacing: -0.035em;
+      color: var(--ink);
+    }
+    .section--ink .section-head__title { color: var(--paper); }
+    .section-head__title em { font-style: italic; font-weight: 400; color: var(--moss); }
+    .section--ink .section-head__title em { color: var(--mustard); }
+    .section-head__sub {
+      font-size: clamp(16px, 1.2vw, 18px);
+      line-height: 1.55;
+      color: var(--ink-soft);
+      max-width: 60ch;
+    }
+    .section--ink .section-head__sub { color: #E9E4DAB3; }
+
+    /* ─── Scroll reveal ─── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .reveal.revealed {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ─── Market Shift ─── */
+    .shift-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+      border: 1px solid var(--border);
+    }
+    .shift-card {
+      padding: 36px 30px;
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .shift-card:last-child { border-right: none; }
+    .shift-card__num {
+      font-family: var(--font-mix);
+      font-style: italic;
+      font-size: var(--text-sm);
+      color: var(--olive-brown);
+    }
+    .shift-card__title {
+      font-family: var(--font-display);
+      font-weight: 300;
+      font-size: clamp(var(--text-xl), 1.8vw, var(--text-2xl));
+      line-height: 1.12;
+      letter-spacing: -0.022em;
+      color: var(--ink);
+    }
+    .shift-card__title em { font-style: italic; font-weight: 500; color: var(--moss); }
+    .shift-card__body {
+      font-size: var(--text-base);
+      line-height: 1.55;
+      color: var(--ink-soft);
+    }
+
+    /* ─── Problem ─── */
+    .problem-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+      gap: 72px;
+      align-items: start;
+    }
+    .problem-tells { list-style: none; display: flex; flex-direction: column; gap: 0; }
+    .problem-tell {
+      display: flex; align-items: baseline; gap: 16px;
+      padding: 20px 0;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-display);
+      font-weight: 300;
+      font-size: clamp(var(--text-lg), 1.6vw, var(--text-2xl));
+      line-height: 1.2;
+      letter-spacing: -0.015em;
+      color: var(--ink);
+    }
+    .problem-tell:first-child { border-top: 1px solid var(--border); }
+    .problem-tell__icon {
+      font-family: var(--font-mix);
+      font-style: italic;
+      font-size: var(--text-sm);
+      color: var(--muted);
+      flex-shrink: 0;
+      width: 20px;
+      text-align: center;
+    }
+    .problem-consequence {
+      margin-top: var(--space-7);
+    }
+    .problem-consequence__text {
+      font-family: var(--font-display);
+      font-weight: 300;
+      font-size: clamp(var(--text-xl), 2vw, var(--text-3xl));
+      line-height: 1.2;
+      letter-spacing: -0.025em;
+      color: var(--ink);
+      max-width: 48ch;
+    }
+    .problem-consequence__text em { font-style: italic; font-weight: 400; color: var(--moss); }
+    .problem-cost {
+      margin-top: var(--space-5);
+      font-size: var(--text-md);
+      line-height: 1.55;
+      color: var(--ink-soft);
+      max-width: 52ch;
+    }
+
+    /* ─── Insight ─── */
+    .insight-quote {
+      font-family: var(--font-display);
+      font-weight: 100;
+      font-size: clamp(36px, 4.5vw, 64px);
+      line-height: 1.06;
+      letter-spacing: -0.04em;
+      color: var(--ink);
+      max-width: 16ch;
+      margin-bottom: var(--space-6);
+    }
+    .insight-quote em { font-style: italic; font-weight: 400; color: var(--moss); }
+    .insight-traits {
+      font-family: var(--font-mix);
+      font-style: italic;
+      font-size: clamp(var(--text-md), 1.3vw, var(--text-lg));
+      color: var(--ink-soft);
+      margin-bottom: var(--space-6);
+      max-width: 50ch;
+      line-height: 1.6;
+    }
+    .insight-body {
+      font-size: var(--text-md);
+      line-height: 1.55;
+      color: var(--ink-soft);
+      max-width: 52ch;
+      margin-bottom: var(--space-8);
+    }
+    .insight-body strong {
+      color: var(--ink);
+      font-weight: 500;
+    }
+
+    /* ─── Before / After ─── */
+    .ba { position: relative; overflow: hidden; border: 1px solid var(--border); background: var(--paper); }
+    .ba-side { padding: clamp(36px, 5vw, 60px); min-height: 320px; }
+    .ba-after { background: var(--paper); }
+    .ba-before-wrap {
+      position: absolute; top: 0; left: 0; height: 100%;
+      overflow: hidden;
+      border-right: 1.5px solid var(--ink);
+      z-index: 2;
+    }
+    .ba-before { background: var(--paper-deep); padding: clamp(36px, 5vw, 60px); min-height: 320px; width: 100%; }
+    .ba-label {
+      font-family: var(--font-mix); font-style: italic; font-size: var(--text-base);
+      margin-bottom: 18px;
+      display: inline-flex; align-items: center; gap: 8px;
+      color: var(--ink-soft);
+    }
+    .ba-label--after  { color: var(--moss); }
+    .ba-text {
+      font-family: var(--font-body);
+      font-weight: 400;
+      font-size: clamp(var(--text-base), 1.05vw, var(--text-md));
+      line-height: 1.55;
+      max-width: 56ch;
+      letter-spacing: 0;
+    }
+    .ba-text--before { font-style: italic; color: var(--muted); }
+    .ba-text--after  {
+      color: var(--ink);
+      font-family: var(--font-display);
+      font-weight: 400;
+      font-style: normal;
+      font-size: clamp(16px, 1.2vw, 18px);
+      line-height: 1.5;
+      letter-spacing: -0.01em;
+    }
+    .ba-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
+    .ba-tag {
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      padding: 4px 10px; letter-spacing: 0;
+    }
+    .ba-tag--muted    { border: 1px solid var(--muted); color: var(--muted); }
+    .ba-tag--verified { background: var(--moss); color: var(--paper); border: 1px solid var(--moss); }
+    .ba-handle { position: absolute; top: 0; width: 1.5px; height: 100%; z-index: 3; pointer-events: none; background: var(--ink); }
+    .ba-knob {
+      position: absolute; top: 50%; transform: translate(-50%, -50%);
+      width: 44px; height: 44px;
+      background: var(--ink); color: var(--paper);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none;
+    }
+    .ba-knob-area {
+      position: absolute; top: 0; height: 100%; width: 80px;
+      z-index: 4; cursor: col-resize;
+    }
+    .live-dot {
+      display: inline-block; width: 8px; height: 8px;
+      background: currentColor; border-radius: 50%;
+      animation: pulse-dot 2.2s infinite;
+    }
+    @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+    /* ─── Product — Pipeline ─── */
+    .pipeline-flow {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 0;
+      margin-top: 24px;
+      margin-bottom: var(--space-9);
+    }
+    .pipeline-flow::before {
+      content: "";
+      position: absolute;
+      top: 22px;
+      left: calc(100% / 14);
+      right: calc(100% / 14);
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--moss) 8%, var(--moss) 92%, transparent);
+    }
+    .pipeline-node { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 12px; gap: 14px; }
+    .pipeline-node__dot {
+      width: 44px; height: 44px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--paper);
+      border: 1px solid var(--ink);
+      color: var(--ink);
+      font-family: var(--font-mix);
+      font-style: italic;
+      font-size: var(--text-md);
+      border-radius: 50%;
+      position: relative;
+      z-index: 1;
+    }
+    .pipeline-node:first-child .pipeline-node__dot { background: var(--mustard); color: var(--ink); border-color: var(--mustard); }
+    .pipeline-node:last-child .pipeline-node__dot  { background: var(--mustard); color: var(--ink); border-color: var(--mustard); }
+    .pipeline-node__name {
+      font-family: var(--font-display);
+      font-weight: 400;
+      font-size: var(--text-lg);
+      letter-spacing: -0.015em;
+      color: var(--ink);
+    }
+    .pipeline-node__chip {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--ink-soft);
+      letter-spacing: 0;
+    }
+
+    /* ─── Product — Article Preview ─── */
     .preview { position: relative; }
     .preview::before,
     .preview::after {
@@ -336,7 +619,6 @@
     .chip-dot {
       width: 6px; height: 6px; border-radius: 50%; background: var(--moss);
     }
-
     .preview-stamp {
       position: absolute;
       top: -12px; right: -10px;
@@ -353,251 +635,139 @@
       z-index: 2;
       box-shadow: 0 2px 8px rgba(30,29,24,0.18);
     }
-
-    /* ─── Section frame ─── */
-    .section { padding: clamp(72px, 11vw, 132px) 0; }
-    .section--stone { background: var(--paper-deep); }
-    .section-head {
+    .product-output-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1fr);
-      gap: 14px;
-      margin-bottom: clamp(40px, 6vw, 68px);
-      max-width: 880px;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 72px;
+      align-items: start;
     }
-    .section-head__title {
-      font-family: var(--font-display);
-      font-weight: 300;
-      font-size: clamp(var(--text-3xl), 3.8vw, var(--text-5xl));
-      line-height: 1.04;
-      letter-spacing: -0.035em;
-      color: var(--ink);
+    .product-output-list {
+      list-style: none;
+      display: flex; flex-direction: column; gap: 0;
     }
-    .section-head__title em { font-style: italic; font-weight: 400; color: var(--moss); }
-    .section-head__sub {
-      font-size: clamp(16px, 1.2vw, 18px);
-      line-height: 1.55;
-      color: var(--ink-soft);
-      max-width: 60ch;
-    }
-
-    /* ─── Why Organic ─── */
-    .why-feature {
-      display: grid;
-      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-      gap: 64px;
-      align-items: center;
-      margin-bottom: 64px;
-    }
-    .why-feature__media {
-      position: relative;
-      aspect-ratio: 5 / 4;
-      overflow: hidden;
-      background: linear-gradient(135deg, var(--ink), #3D3B32);
-      border-radius: 12px;
-    }
-    .why-feature__img {
-      position: absolute; inset: 0;
-      width: 100%; height: 100%;
-      object-fit: cover;
-      filter: contrast(1.08) brightness(0.94);
-      opacity: 0.95;
-    }
-    .why-feature__media-tint {
-      position: absolute; inset: 0;
-      background: #31423520;
-      mix-blend-mode: color;
-      pointer-events: none;
-    }
-    .why-feature__media-overlay {
-      position: absolute; inset: 0;
-      background: linear-gradient(180deg, transparent 50%, #2c2c2c99 100%);
-      pointer-events: none;
-    }
-    .why-feature__media-tag {
-      position: absolute;
-      left: 24px; bottom: 20px;
-      font-family: var(--font-mix); font-style: italic; font-size: var(--text-sm);
-      color: var(--paper);
-    }
-    .why-feature__media-stamp {
-      position: absolute;
-      top: 20px; right: 20px;
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: 0;
-      color: var(--ink);
-      background: var(--paper);
-      padding: 5px 9px;
-      border: 1px solid var(--ink);
-    }
-    .why-feature__num {
-      font-family: var(--font-mix); font-style: italic;
-      font-size: var(--text-base);
-      color: var(--olive-brown);
-      margin-bottom: var(--space-3);
-    }
-    .why-feature__title {
-      font-family: var(--font-display);
-      font-weight: 300;
-      font-size: clamp(var(--text-3xl), 3.4vw, var(--text-4xl));
-      line-height: 1.06;
-      letter-spacing: -0.03em;
-      color: var(--ink);
-      margin-bottom: var(--space-5);
-    }
-    .why-feature__title em { font-style: italic; font-weight: 500; color: var(--moss); }
-    .why-feature__body {
+    .product-output-item {
+      display: flex; align-items: baseline; gap: 14px;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--border);
       font-size: var(--text-md);
-      line-height: 1.55;
-      color: var(--ink-soft);
-      max-width: 52ch;
-      margin-bottom: 12px;
+      color: var(--ink);
     }
-    .why-feature__body + .why-feature__body { margin-top: 0; }
+    .product-output-item:first-child { border-top: 1px solid var(--border); }
+    .product-output-item__dot {
+      width: 6px; height: 6px; border-radius: 50%; background: var(--moss);
+      flex-shrink: 0;
+      position: relative; top: -2px;
+    }
 
-    .why-supporting {
+    /* ─── Moat ─── */
+    .moat-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 0;
-      border-top: 1px solid var(--border);
+      border: 1px solid var(--border);
     }
-    .why-support {
-      padding: 36px 32px 32px 0;
+    .moat-card {
+      padding: 36px 30px;
       border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
       display: flex; flex-direction: column; gap: 10px;
     }
-    .why-support:nth-child(2) { padding-left: 32px; }
-    .why-support:nth-child(3) { padding-left: 32px; border-right: none; padding-right: 0; }
-    .why-support__num {
-      font-family: var(--font-mix); font-style: italic;
+    .moat-card:nth-child(3n) { border-right: none; }
+    .moat-card:nth-child(n+4) { border-bottom: none; }
+    .moat-card__num {
+      font-family: var(--font-mix);
+      font-style: italic;
       font-size: var(--text-sm);
-      color: var(--ink-soft);
+      color: var(--olive-brown);
     }
-    .why-support__title {
+    .moat-card__title {
       font-family: var(--font-display);
       font-weight: 300;
-      font-size: clamp(var(--text-xl), 1.8vw, var(--text-2xl));
-      line-height: 1.1;
+      font-size: clamp(var(--text-xl), 1.6vw, var(--text-2xl));
+      line-height: 1.12;
       letter-spacing: -0.022em;
       color: var(--ink);
     }
-    .why-support__title em { font-style: italic; font-weight: 500; color: var(--moss); }
-    .why-support__body {
+    .moat-card__body {
       font-size: var(--text-base);
       line-height: 1.55;
       color: var(--ink-soft);
-      max-width: 38ch;
+      max-width: 36ch;
     }
 
-    /* ─── Pipeline ─── */
-    .pipeline-flow {
-      position: relative;
+    /* ─── Audience ─── */
+    .audience-layout {
       display: grid;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
-      gap: 0;
-      margin-top: 24px;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+      gap: 72px;
+      align-items: start;
     }
-    .pipeline-flow::before {
-      content: "";
-      position: absolute;
-      top: 22px;
-      left: calc(100% / 14);
-      right: calc(100% / 14);
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--moss) 8%, var(--moss) 92%, transparent);
-    }
-    .pipeline-node { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 12px; gap: 14px; }
-    .pipeline-node__dot {
-      width: 44px; height: 44px;
-      display: flex; align-items: center; justify-content: center;
-      background: var(--paper);
-      border: 1px solid var(--ink);
-      color: var(--ink);
-      font-family: var(--font-mix);
-      font-style: italic;
-      font-size: var(--text-md);
-      border-radius: 50%;
-      position: relative;
-      z-index: 1;
-    }
-    .pipeline-node:first-child .pipeline-node__dot { background: var(--mustard); color: var(--ink); border-color: var(--mustard); }
-    .pipeline-node:last-child .pipeline-node__dot  { background: var(--mustard); color: var(--ink); border-color: var(--mustard); }
-    .pipeline-node__name {
+    .audience-reframe {
       font-family: var(--font-display);
-      font-weight: 400;
-      font-size: var(--text-lg);
-      letter-spacing: -0.015em;
+      font-weight: 300;
+      font-size: clamp(var(--text-2xl), 2.4vw, var(--text-3xl));
+      line-height: 1.14;
+      letter-spacing: -0.025em;
       color: var(--ink);
+      margin-bottom: var(--space-6);
     }
-    .pipeline-node__chip {
+    .audience-reframe em { font-style: italic; font-weight: 400; color: var(--moss); }
+    .audience-shift {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+      margin-bottom: var(--space-7);
+    }
+    .audience-shift__col {
+      padding: 20px 24px;
+    }
+    .audience-shift__col--old {
+      background: var(--paper-deep);
+      border: 1px solid var(--border);
+    }
+    .audience-shift__col--new {
+      background: var(--moss);
+      color: var(--paper);
+    }
+    .audience-shift__label {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      color: var(--ink-soft);
-      letter-spacing: 0;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      opacity: 0.6;
     }
-
-    /* ─── Before / After ─── */
-    .ba { position: relative; overflow: hidden; border: 1px solid var(--border); background: var(--paper); }
-    .ba-side { padding: clamp(36px, 5vw, 60px); min-height: 320px; }
-    .ba-after { background: var(--paper); }
-    .ba-before-wrap {
-      position: absolute; top: 0; left: 0; height: 100%;
-      overflow: hidden;
-      border-right: 1.5px solid var(--ink);
-      z-index: 2;
+    .audience-shift__col--new .audience-shift__label { opacity: 0.7; }
+    .audience-shift__quote {
+      font-family: var(--font-display);
+      font-weight: 300;
+      font-size: var(--text-lg);
+      line-height: 1.2;
+      letter-spacing: -0.015em;
     }
-    .ba-before { background: var(--paper-deep); padding: clamp(36px, 5vw, 60px); min-height: 320px; width: 100%; }
-    .ba-label {
-      font-family: var(--font-mix); font-style: italic; font-size: var(--text-base);
-      margin-bottom: 18px;
-      display: inline-flex; align-items: center; gap: 8px;
-      color: var(--ink-soft);
+    .audience-list {
+      list-style: none;
+      display: flex; flex-direction: column; gap: 0;
     }
-    .ba-label--after  { color: var(--moss); }
-    .ba-text {
-      font-family: var(--font-body);
-      font-weight: 400;
-      font-size: clamp(var(--text-base), 1.05vw, var(--text-md));
-      line-height: 1.55;
-      max-width: 56ch;
-      letter-spacing: 0;
-    }
-    .ba-text--before { font-style: italic; color: var(--muted); }
-    .ba-text--after  {
+    .audience-item {
+      display: flex; align-items: baseline; gap: 14px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: var(--text-md);
       color: var(--ink);
+    }
+    .audience-item:first-child { border-top: 1px solid var(--border); }
+    .audience-item__dot {
+      width: 6px; height: 6px; border-radius: 50%; background: var(--moss);
+      flex-shrink: 0;
+      position: relative; top: -2px;
+    }
+    .audience-item__label {
       font-family: var(--font-display);
       font-weight: 400;
-      font-style: normal;
-      font-size: clamp(16px, 1.2vw, 18px);
-      line-height: 1.5;
+      font-size: var(--text-md);
       letter-spacing: -0.01em;
     }
-    .ba-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
-    .ba-tag {
-      font-family: var(--font-mono); font-size: var(--text-xs);
-      padding: 4px 10px; letter-spacing: 0;
-    }
-    .ba-tag--muted    { border: 1px solid var(--muted); color: var(--muted); }
-    .ba-tag--verified { background: var(--moss); color: var(--paper); border: 1px solid var(--moss); }
-    .ba-handle { position: absolute; top: 0; width: 1.5px; height: 100%; z-index: 3; pointer-events: none; background: var(--ink); }
-    .ba-knob {
-      position: absolute; top: 50%; transform: translate(-50%, -50%);
-      width: 44px; height: 44px;
-      background: var(--ink); color: var(--paper);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      pointer-events: none;
-    }
-    .ba-knob-area {
-      position: absolute; top: 0; height: 100%; width: 80px;
-      z-index: 4; cursor: col-resize;
-    }
-    .live-dot {
-      display: inline-block; width: 8px; height: 8px;
-      background: currentColor; border-radius: 50%;
-      animation: pulse-dot 2.2s infinite;
-    }
-    @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
     /* ─── Pricing ─── */
     .pricing-grid {
@@ -761,18 +931,11 @@
     /* ─── Responsive ─── */
     @media (max-width: 1024px) {
       .hero { padding: 48px 0 72px; }
-      .hero-grid { grid-template-columns: 1fr; gap: 48px; }
-      .preview-card { transform: rotate(0deg); }
+      .shift-grid { grid-template-columns: repeat(2, 1fr); }
+      .shift-card:nth-child(2) { border-right: none; }
+      .shift-card:nth-child(n+3) { border-top: 1px solid var(--border); }
 
-      .why-feature { grid-template-columns: 1fr; gap: 36px; margin-bottom: 56px; }
-      .why-supporting { grid-template-columns: 1fr; border-top: 1px solid var(--border); }
-      .why-support {
-        border-right: none;
-        border-bottom: 1px solid var(--border);
-        padding: 28px 0;
-      }
-      .why-support:nth-child(2), .why-support:nth-child(3) { padding-left: 0; }
-      .why-support:last-child { border-bottom: none; }
+      .problem-layout { grid-template-columns: 1fr; gap: 48px; }
 
       .pipeline-flow { grid-template-columns: 1fr; gap: 0; }
       .pipeline-flow::before {
@@ -783,6 +946,15 @@
       .pipeline-node { flex-direction: row; align-items: center; text-align: left; gap: 18px; padding: 12px 0; }
       .pipeline-node__dot { flex-shrink: 0; }
 
+      .product-output-grid { grid-template-columns: 1fr; gap: 48px; }
+
+      .moat-grid { grid-template-columns: repeat(2, 1fr); }
+      .moat-card:nth-child(2n) { border-right: none; }
+      .moat-card:nth-child(n+5) { border-bottom: none; }
+      .moat-card:nth-child(4) { border-bottom: 1px solid var(--border); }
+
+      .audience-layout { grid-template-columns: 1fr; gap: 48px; }
+
       .pricing-grid { grid-template-columns: 1fr; }
       .tier { border-right: none; border-bottom: 1px solid var(--border); }
       .tier:last-child { border-bottom: none; }
@@ -790,6 +962,16 @@
     @media (max-width: 900px) { :root { --px: 24px; } }
     @media (max-width: 640px) {
       .nav-links { display: none; }
+      .shift-grid { grid-template-columns: 1fr; }
+      .shift-card { border-right: none; border-bottom: 1px solid var(--border); }
+      .shift-card:last-child { border-bottom: none; }
+
+      .moat-grid { grid-template-columns: 1fr; }
+      .moat-card { border-right: none; }
+      .moat-card:last-child { border-bottom: none; }
+
+      .audience-shift { grid-template-columns: 1fr; }
+
       .footer-inner { flex-direction: column; align-items: flex-start; }
       .footer-right { flex-wrap: wrap; }
     }
@@ -810,6 +992,31 @@
   <script type="text/babel">
     const { useState, useEffect, useRef, useCallback } = React;
 
+    /* ─── Scroll Reveal Hook ─── */
+    function useReveal(threshold = 0.15) {
+      const ref = useRef(null);
+      useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const observer = new IntersectionObserver(
+          ([entry]) => { if (entry.isIntersecting) { el.classList.add('revealed'); observer.unobserve(el); } },
+          { threshold }
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+      }, [threshold]);
+      return ref;
+    }
+
+    function Reveal({ children, className = '', delay = 0 }) {
+      const ref = useReveal();
+      return (
+        <div ref={ref} className={`reveal ${className}`} style={delay ? { transitionDelay: `${delay}ms` } : undefined}>
+          {children}
+        </div>
+      );
+    }
+
     /* ─── Nav ─── */
     function Nav({ onStart }) {
       return (
@@ -820,8 +1027,8 @@
                 <img src="organic-logo.png" alt="Organic" width="142" height="36" style={{ height: '36px', width: 'auto', display: 'block' }} />
               </a>
               <div className="nav-links">
-                <a href="#why" className="nav-link">Product</a>
-                <a href="#pipeline" className="nav-link">Pipeline</a>
+                <a href="#product" className="nav-link">Product</a>
+                <a href="#moat" className="nav-link">Why Organic</a>
                 <a href="#pricing" className="nav-link">Pricing</a>
                 <a href="docs.html" className="nav-link">Docs</a>
                 <a href="changelog.html" className="nav-link">Changelog</a>
@@ -836,132 +1043,36 @@
       );
     }
 
-    /* ─── Article Preview ─── */
-    const PREVIEWS = [
-      {
-        topic: 'Greencard Law',
-        date: 'May 2026',
-        words: '2,340 words',
-        title: <span>H-1B to Green Card: the <em>EB-2 Timeline</em></span>,
-        excerpt: 'Residential timelines for employment-based green cards stretched 14% in 2026, with EB-2 priority dates moving slower than EB-3 for the first time in a decade. King County applicants face the longest waits.',
-        chips: ['on-brand', 'editorial', 'fact-checked'],
-        imageSrc: 'immigration-law.png',
-        imageTag: 'Editorial style · paper-and-ink',
-      },
-      {
-        topic: 'TrovaTrip',
-        date: 'May 2026',
-        words: '1,820 words',
-        title: <span>Why <em>group travel</em> is rebounding faster than solo</span>,
-        excerpt: 'Group bookings hit a six-year high in the first quarter of 2026, even as solo travel growth flattened. The pattern holds across three age brackets and four price tiers, and the reasons are stranger than they look.',
-        chips: ['on-brand', 'lifestyle', 'fact-checked'],
-        imageSrc: 'trovatrip-group-travel.png',
-        imageTag: 'Lifestyle style · sun-and-tile',
-      },
-      {
-        topic: 'Northwest Dental',
-        date: 'May 2026',
-        words: '1,640 words',
-        title: <span>Why your <em>dental practice</em> is invisible on Google</span>,
-        excerpt: 'Seven in ten new patients start with a local search, but most dental offices rank below the map pack. The clinics winning that slot post twice a month, answer the same twelve questions, and let the content do the intake. Here is the playbook they follow.',
-        chips: ['on-brand', 'clinical', 'fact-checked'],
-        imageSrc: 'dental-office.png',
-        imageTag: 'Clinical style · clean-light',
-      },
-    ];
-
-    function ArticlePreview() {
-      const [active, setActive] = useState(0);
-      const [display, setDisplay] = useState(0);
-      const [phase, setPhase] = useState('in'); // 'in' | 'out'
-      const cardRef = useRef(null);
-
-      useEffect(() => {
-        const id = setInterval(() => {
-          setPhase('out');
-          setTimeout(() => {
-            setActive(n => (n + 1) % PREVIEWS.length);
-          }, 350);
-        }, 5200);
-        return () => clearInterval(id);
-      }, []);
-
-      useEffect(() => {
-        setDisplay(active);
-        setPhase('in');
-      }, [active]);
-
-      const p = PREVIEWS[display];
-      const cardClass = `preview-card ${phase === 'out' ? 'fade-out' : 'fade-in'}`;
-
-      return (
-        <div className="preview">
-          <div className="preview-stamp">on brand</div>
-          <article className={cardClass} ref={cardRef}>
-            <div className="preview-image-wrap">
-              <img
-                className="preview-image"
-                src={p.imageSrc || `https://picsum.photos/seed/${p.imageSeed}/720/580`}
-                alt={`${p.topic} editorial photograph`}
-                onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                loading="lazy"
-              />
-              <div className="preview-image-tint" />
-              <div className="preview-image-overlay" />
-              <div className="preview-image-tag">{p.imageTag}</div>
-            </div>
-            <div className="preview-body">
-              <div className="preview-meta">
-                <span>{p.topic}</span>
-                <span className="preview-meta-dot" />
-                <span>{p.words}</span>
-                <span className="preview-meta-dot" />
-                <span>{p.date}</span>
-              </div>
-              <h3 className="preview-title">{p.title}</h3>
-              <p className="preview-excerpt">{p.excerpt}</p>
-              <div className="preview-chips">
-                {p.chips.map(c => (
-                  <span className={`chip${c === 'fact-checked' ? ' chip--verified' : ''}`} key={c}>
-                    {c === 'fact-checked' && <span className="chip-dot" />}{c}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </article>
-        </div>
-      );
-    }
-
     /* ─── Hero ─── */
     function Hero({ onStart }) {
       return (
         <section className="hero">
           <div className="container">
-            <div className="hero-grid">
-              <div>
-                <div className="kicker">The AI content platform</div>
-                <h1 className="hero-headline">
-                  An AI system of record for on-brand content creation.
-                </h1>
-                <p className="hero-lede">
-                  Organic is the content operations platform for brands that need AI-generated content to be on-brand, search-visible, fact-checked, fresh, visually consistent, and programmatically accessible.
-                </p>
-                <div className="hero-ctas">
-                  <button className="btn btn--ink" onClick={onStart}>
-                    Start free <span className="btn-arrow">↗</span>
-                  </button>
-                  <a href="#pipeline" className="btn btn--ghost">See the pipeline</a>
-                </div>
-                <div className="hero-tags">
-                  <span className="hero-tag">200 banned AI phrases</span>
-                  <span className="hero-tag">6 writing models</span>
-                  <span className="hero-tag">3-way fact-check</span>
-                  <span className="hero-tag">7-stage pipeline</span>
-                </div>
+            <div className="hero-inner">
+              <div className="hero-eyebrow">
+                <span className="hero-eyebrow-dot" />
+                Editorial infrastructure for the AI search era
               </div>
-              <div>
-                <ArticlePreview />
+              <h1 className="hero-headline">
+                Scale content without sounding <em>AI-generated.</em>
+              </h1>
+              <p className="hero-tagline">
+                The throughput of AI. The taste of an editorial team.
+              </p>
+              <p className="hero-lede">
+                Organic turns brand voice into editorial infrastructure — articles, imagery, metadata, and AI-search-ready formatting that reads like your internal team wrote it, not a generic AI model.
+              </p>
+              <div className="hero-ctas">
+                <button className="btn btn--ink" onClick={onStart}>
+                  Start free <span className="btn-arrow">↗</span>
+                </button>
+                <a href="#product" className="btn btn--ghost">See how it works</a>
+              </div>
+              <div className="hero-signals">
+                <span className="hero-signal">Voice modeling</span>
+                <span className="hero-signal">Editorial enforcement</span>
+                <span className="hero-signal">Generative search readiness</span>
+                <span className="hero-signal">Multi-brand governance</span>
               </div>
             </div>
           </div>
@@ -969,123 +1080,141 @@
       );
     }
 
-    /* ─── Why Organic ─── */
-    function WhyOrganic() {
+    /* ─── Market Shift ─── */
+    function MarketShift() {
       return (
-        <section className="section section--stone" id="why">
+        <section className="section section--stone" id="shift">
           <div className="container">
-            <div className="section-head">
-              <h2 className="section-head__title">
-                Four reasons it <em>doesn't read like AI.</em>
-              </h2>
-              <p className="section-head__sub">
-                Organic isn't a wrapper on a chat model. The output is shaped by a brand engine, rewritten by a humanizer, cross-checked by three models, and tied to a single studio that holds every brand.
-              </p>
-            </div>
-
-            <div className="why-feature">
-              <div className="why-feature__media">
-                <img
-                  className="why-feature__img"
-                  src="brand-engine.png"
-                  alt="A brand reference book opened on a desk, marking the editorial source for an Organic brand profile."
-                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                  loading="lazy"
-                />
-                <div className="why-feature__media-tint" />
-                <div className="why-feature__media-overlay" />
-                <div className="why-feature__media-stamp">brand-engine</div>
-                <div className="why-feature__media-tag">Imported from greencard-law.com · 12 sec</div>
-              </div>
-              <div>
-                <div className="why-feature__num">i. Brand engine</div>
-                <h3 className="why-feature__title">
-                  Voice, guidelines, banned words — imported from a <em>URL</em> in seconds.
-                </h3>
-                <p className="why-feature__body">
-                  Drop a homepage. Organic crawls the site, pulls writing samples, and produces a structured voice profile: tone descriptors, sentence rhythm, banned phrases, length rules.
-                </p>
-                <p className="why-feature__body">
-                  Edit any field, save it, and every future article writes against it. Reference articles are auto-fetched, cached, and injected as gold-standard few-shot examples. The brand engine is the part you tune once and use forever.
+            <Reveal>
+              <div className="section-head">
+                <div className="section-head__kicker">The macro</div>
+                <h2 className="section-head__title">
+                  The content landscape just <em>broke.</em>
+                </h2>
+                <p className="section-head__sub">
+                  The problem isn't creating content. It's creating content that doesn't damage your brand.
                 </p>
               </div>
-            </div>
-
-            <div className="why-supporting">
-              <div className="why-support">
-                <div className="why-support__num">ii. Humanization</div>
-                <h3 className="why-support__title">
-                  17 AI patterns rewritten. <em>200</em> cliché phrases banned.
-                </h3>
-                <p className="why-support__body">
-                  Each draft runs through a second pass that detects AI rhythm tells and rewrites them. Auto-humanize is per-brand. Output passes every detector we've tested.
-                </p>
-              </div>
-              <div className="why-support">
-                <div className="why-support__num">iii. Fact-check council</div>
-                <h3 className="why-support__title">
-                  Multiple models <em>cross-verify</em> every claim.
-                </h3>
-                <p className="why-support__body">
-                  Gemini, Grok, and a base model each verify the article. Disputed claims surface inline with one-click rewrites. Citations are sourced, anchored to publication dates, and embedded as schema.
-                </p>
-              </div>
-              <div className="why-support">
-                <div className="why-support__num">iv. Content architecture</div>
-                <h3 className="why-support__title">
-                  Pillar pages and <em>topical clusters.</em>
-                </h3>
-                <p className="why-support__body">
-                  Describe a topic. Organic returns a pillar plus six supporting pages, internal links mapped, overlap detection on. Generates the whole cluster in parallel, verifies it as a set.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-      );
-    }
-
-    /* ─── Pipeline ─── */
-    const STAGES = [
-      { name: 'Brand',    chip: 'brand-engine' },
-      { name: 'Write',    chip: 'voice-matched' },
-      { name: 'Humanize', chip: 'anti-AI' },
-      { name: 'Image',    chip: 'gpt-image-1' },
-      { name: 'Verify',   chip: '3-model' },
-      { name: 'Edit',     chip: 'tiptap' },
-      { name: 'Publish',  chip: 'wordpress' },
-    ];
-
-    function Pipeline() {
-      return (
-        <section className="section" id="pipeline">
-          <div className="container">
-            <div className="section-head">
-              <h2 className="section-head__title">
-                Seven stages. <em>One click.</em>
-              </h2>
-              <p className="section-head__sub">
-                A prompt enters at Brand. Three minutes later, a fact-checked, brand-voiced article with a hero image leaves at Publish. Every stage is inspectable, swappable, and overridable per brand.
-              </p>
-            </div>
-            <div className="pipeline-flow">
-              {STAGES.map((s, idx) => (
-                <div className="pipeline-node" key={s.name}>
-                  <div className="pipeline-node__dot">{romanize(idx + 1)}</div>
-                  <div>
-                    <div className="pipeline-node__name">{s.name}</div>
-                    <div className="pipeline-node__chip">{s.chip}</div>
+            </Reveal>
+            <Reveal delay={100}>
+              <div className="shift-grid">
+                <div className="shift-card">
+                  <div className="shift-card__num">i.</div>
+                  <div className="shift-card__title">AI search is changing <em>discovery.</em></div>
+                  <div className="shift-card__body">
+                    AI Overviews, ChatGPT citations, Perplexity answers, Gemini retrieval. The way people find companies is shifting from links to machine-generated summaries.
                   </div>
                 </div>
-              ))}
-            </div>
+                <div className="shift-card">
+                  <div className="shift-card__num">ii.</div>
+                  <div className="shift-card__title">Companies need <em>vastly more</em> content.</div>
+                  <div className="shift-card__body">
+                    Entity authority, structured extractability, topical coverage — the new ranking signals reward volume, specificity, and depth simultaneously.
+                  </div>
+                </div>
+                <div className="shift-card">
+                  <div className="shift-card__num">iii.</div>
+                  <div className="shift-card__title">Generic AI content is a <em>trust liability.</em></div>
+                  <div className="shift-card__body">
+                    Readers recognize it instantly. Search engines are learning to penalize it. Publishing low-trust content at scale actively harms your brand.
+                  </div>
+                </div>
+                <div className="shift-card">
+                  <div className="shift-card__num">iv.</div>
+                  <div className="shift-card__title">Editorial consistency is now <em>infrastructure.</em></div>
+                  <div className="shift-card__body">
+                    Scaling human editorial teams across hundreds of articles is too slow and too expensive. But the alternative can't be content that sounds like everyone else's.
+                  </div>
+                </div>
+              </div>
+            </Reveal>
           </div>
         </section>
       );
     }
 
-    function romanize(n) {
-      return ['i','ii','iii','iv','v','vi','vii'][n - 1] || String(n);
+    /* ─── The Problem ─── */
+    function Problem() {
+      return (
+        <section className="section" id="problem">
+          <div className="container">
+            <Reveal>
+              <div className="section-head">
+                <div className="section-head__kicker">The problem</div>
+                <h2 className="section-head__title">
+                  Most AI content sounds <em>the same.</em>
+                </h2>
+                <p className="section-head__sub">
+                  Readers recognize it instantly. So do search engines.
+                </p>
+              </div>
+            </Reveal>
+            <Reveal delay={100}>
+              <div className="problem-layout">
+                <div>
+                  <ul className="problem-tells">
+                    <li className="problem-tell">
+                      <span className="problem-tell__icon">×</span>
+                      Repetitive cadence
+                    </li>
+                    <li className="problem-tell">
+                      <span className="problem-tell__icon">×</span>
+                      Generic phrasing
+                    </li>
+                    <li className="problem-tell">
+                      <span className="problem-tell__icon">×</span>
+                      Shallow synthesis
+                    </li>
+                    <li className="problem-tell">
+                      <span className="problem-tell__icon">×</span>
+                      Fake authority
+                    </li>
+                  </ul>
+                </div>
+                <div className="problem-consequence">
+                  <p className="problem-consequence__text">
+                    As search shifts toward AI-generated answers, publishing low-trust content becomes <em>actively harmful</em> to a brand.
+                  </p>
+                  <p className="problem-cost">
+                    Meanwhile, scaling human editorial teams across dozens or hundreds of articles is too slow and too expensive. Companies are stuck between output that degrades trust and teams that can't scale.
+                  </p>
+                </div>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+      );
+    }
+
+    /* ─── The Insight ─── */
+    function Insight() {
+      return (
+        <section className="section section--stone" id="insight">
+          <div className="container">
+            <Reveal>
+              <div className="insight-quote">
+                Every strong brand has invisible <em>editorial DNA.</em>
+              </div>
+            </Reveal>
+            <Reveal delay={80}>
+              <p className="insight-traits">
+                Sentence rhythm. Vocabulary. Structural habits. Taste. Depth. What they never say.
+              </p>
+            </Reveal>
+            <Reveal delay={140}>
+              <p className="insight-body">
+                <strong>Generic AI tools ignore all of it.</strong> They produce text that's technically correct and editorially vacant — indistinguishable from any other AI output. The voice that makes a brand recognizable disappears.
+              </p>
+              <p className="insight-body">
+                <strong>Organic captures and operationalizes that editorial layer.</strong> Instead of generating "AI content," Organic generates content that feels internally authored.
+              </p>
+            </Reveal>
+            <Reveal delay={200}>
+              <BeforeAfter />
+            </Reveal>
+          </div>
+        </section>
+      );
     }
 
     /* ─── Before / After ─── */
@@ -1134,68 +1263,357 @@
       const afterTags  = ['22% cost drop', '47-day permits', 'WA-specific', 'cited', '2023 anchor', 'FAQ schema'];
 
       return (
-        <section className="section section--stone" id="beforeafter">
-          <div className="container">
-            <div className="section-head">
-              <h2 className="section-head__title">
-                Raw GPT, then <em>Organic.</em>
-              </h2>
-              <p className="section-head__sub">
-                The same prompt, run through a vanilla writing model versus the Organic pipeline. Drag the divider.
+        <div style={{ marginTop: 'var(--space-7)' }}>
+          <div className="ba" ref={containerRef}>
+            <div className="ba-side ba-after">
+              <div className="ba-label ba-label--after">
+                <span className="live-dot" />
+                After, Organic
+              </div>
+              <p className="ba-text ba-text--after">
+                Residential solar installations in Washington dropped 22% in cost since 2023, but permitting now averages 47 days. King County homeowners face the longest waits. Here is what the data shows and how to clear it.
               </p>
+              <div className="ba-tags">
+                {afterTags.map(t => <span className="ba-tag ba-tag--verified" key={t}>{t}</span>)}
+              </div>
             </div>
-            <div className="ba" ref={containerRef}>
-              <div className="ba-side ba-after">
-                <div className="ba-label ba-label--after">
-                  <span className="live-dot" />
-                  After, Organic
-                </div>
-                <p className="ba-text ba-text--after">
-                  Residential solar installations in Washington dropped 22% in cost since 2023, but permitting now averages 47 days. King County homeowners face the longest waits. Here is what the data shows and how to clear it.
+
+            <div className="ba-before-wrap" style={{ width: `${pos}%` }}>
+              <div className="ba-before" style={{ width: w || '100%' }}>
+                <div className="ba-label">Before, raw GPT</div>
+                <p className="ba-text ba-text--before">
+                  Solar energy is an important pathway for homeowners looking to reduce their electricity bills. In an ever-evolving landscape, it is crucial to dive in and understand the nuances of going solar. Many experts agree that harnessing the power of the sun is a game-changer for sustainable living.
                 </p>
                 <div className="ba-tags">
-                  {afterTags.map(t => <span className="ba-tag ba-tag--verified" key={t}>{t}</span>)}
+                  {beforeTags.map(t => <span className="ba-tag ba-tag--muted" key={t}>{t}</span>)}
                 </div>
               </div>
-
-              <div className="ba-before-wrap" style={{ width: `${pos}%` }}>
-                <div className="ba-before" style={{ width: w || '100%' }}>
-                  <div className="ba-label">Before, raw GPT</div>
-                  <p className="ba-text ba-text--before">
-                    Solar energy is an important pathway for homeowners looking to reduce their electricity bills. In an ever-evolving landscape, it is crucial to dive in and understand the nuances of going solar. Many experts agree that harnessing the power of the sun is a game-changer for sustainable living.
-                  </p>
-                  <div className="ba-tags">
-                    {beforeTags.map(t => <span className="ba-tag ba-tag--muted" key={t}>{t}</span>)}
-                  </div>
-                </div>
-              </div>
-
-              <div className="ba-handle" style={{ left: `${pos}%` }}>
-                <div className="ba-knob">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                    <path d="M5 3L2 8L5 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M11 3L14 8L11 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-              </div>
-              <div
-                className="ba-knob-area"
-                style={{ left: `calc(${pos}% - 40px)` }}
-                onMouseDown={() => { dragging.current = true; }}
-                onTouchStart={() => { dragging.current = true; }}
-                role="separator"
-                aria-orientation="vertical"
-                aria-label="Compare before and after"
-                aria-valuenow={Math.round(pos)}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'ArrowLeft') setPos(p => Math.max(0, p - 5));
-                  if (e.key === 'ArrowRight') setPos(p => Math.min(100, p + 5));
-                }}
-              />
             </div>
+
+            <div className="ba-handle" style={{ left: `${pos}%` }}>
+              <div className="ba-knob">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M5 3L2 8L5 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M11 3L14 8L11 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            </div>
+            <div
+              className="ba-knob-area"
+              style={{ left: `calc(${pos}% - 40px)` }}
+              onMouseDown={() => { dragging.current = true; }}
+              onTouchStart={() => { dragging.current = true; }}
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Compare before and after"
+              aria-valuenow={Math.round(pos)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowLeft') setPos(p => Math.max(0, p - 5));
+                if (e.key === 'ArrowRight') setPos(p => Math.min(100, p + 5));
+              }}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    /* ─── Article Preview ─── */
+    const PREVIEWS = [
+      {
+        topic: 'Greencard Law',
+        date: 'May 2026',
+        words: '2,340 words',
+        title: <span>H-1B to Green Card: the <em>EB-2 Timeline</em></span>,
+        excerpt: 'Residential timelines for employment-based green cards stretched 14% in 2026, with EB-2 priority dates moving slower than EB-3 for the first time in a decade. King County applicants face the longest waits.',
+        chips: ['on-brand', 'editorial', 'fact-checked'],
+        imageSrc: 'immigration-law.png',
+        imageTag: 'Editorial style · paper-and-ink',
+      },
+      {
+        topic: 'TrovaTrip',
+        date: 'May 2026',
+        words: '1,820 words',
+        title: <span>Why <em>group travel</em> is rebounding faster than solo</span>,
+        excerpt: 'Group bookings hit a six-year high in the first quarter of 2026, even as solo travel growth flattened. The pattern holds across three age brackets and four price tiers, and the reasons are stranger than they look.',
+        chips: ['on-brand', 'lifestyle', 'fact-checked'],
+        imageSrc: 'trovatrip-group-travel.png',
+        imageTag: 'Lifestyle style · sun-and-tile',
+      },
+      {
+        topic: 'Northwest Dental',
+        date: 'May 2026',
+        words: '1,640 words',
+        title: <span>Why your <em>dental practice</em> is invisible on Google</span>,
+        excerpt: 'Seven in ten new patients start with a local search, but most dental offices rank below the map pack. The clinics winning that slot post twice a month, answer the same twelve questions, and let the content do the intake.',
+        chips: ['on-brand', 'clinical', 'fact-checked'],
+        imageSrc: 'dental-office.png',
+        imageTag: 'Clinical style · clean-light',
+      },
+    ];
+
+    function ArticlePreview() {
+      const [active, setActive] = useState(0);
+      const [display, setDisplay] = useState(0);
+      const [phase, setPhase] = useState('in');
+      const cardRef = useRef(null);
+
+      useEffect(() => {
+        const id = setInterval(() => {
+          setPhase('out');
+          setTimeout(() => {
+            setActive(n => (n + 1) % PREVIEWS.length);
+          }, 350);
+        }, 5200);
+        return () => clearInterval(id);
+      }, []);
+
+      useEffect(() => {
+        setDisplay(active);
+        setPhase('in');
+      }, [active]);
+
+      const p = PREVIEWS[display];
+      const cardClass = `preview-card ${phase === 'out' ? 'fade-out' : 'fade-in'}`;
+
+      return (
+        <div className="preview">
+          <div className="preview-stamp">on brand</div>
+          <article className={cardClass} ref={cardRef}>
+            <div className="preview-image-wrap">
+              <img
+                className="preview-image"
+                src={p.imageSrc}
+                alt={`${p.topic} editorial photograph`}
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                loading="lazy"
+              />
+              <div className="preview-image-tint" />
+              <div className="preview-image-overlay" />
+              <div className="preview-image-tag">{p.imageTag}</div>
+            </div>
+            <div className="preview-body">
+              <div className="preview-meta">
+                <span>{p.topic}</span>
+                <span className="preview-meta-dot" />
+                <span>{p.words}</span>
+                <span className="preview-meta-dot" />
+                <span>{p.date}</span>
+              </div>
+              <h3 className="preview-title">{p.title}</h3>
+              <p className="preview-excerpt">{p.excerpt}</p>
+              <div className="preview-chips">
+                {p.chips.map(c => (
+                  <span className={`chip${c === 'fact-checked' ? ' chip--verified' : ''}`} key={c}>
+                    {c === 'fact-checked' && <span className="chip-dot" />}{c}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </article>
+        </div>
+      );
+    }
+
+    /* ─── Product ─── */
+    const STAGES = [
+      { name: 'Brand',    chip: 'brand-engine' },
+      { name: 'Write',    chip: 'voice-matched' },
+      { name: 'Humanize', chip: 'anti-AI' },
+      { name: 'Image',    chip: 'gpt-image-1' },
+      { name: 'Verify',   chip: '3-model' },
+      { name: 'Edit',     chip: 'tiptap' },
+      { name: 'Publish',  chip: 'wordpress' },
+    ];
+
+    function romanize(n) {
+      return ['i','ii','iii','iv','v','vi','vii'][n - 1] || String(n);
+    }
+
+    const OUTPUT_ITEMS = [
+      'Long-form articles calibrated to your voice',
+      'Editorial-quality imagery matched to your visual style',
+      'SEO metadata, slugs, and structured schema',
+      'FAQ blocks with FAQPage schema markup',
+      'Internal linking across topical clusters',
+      'AI Overview-ready formatting and entity markup',
+      'Humanized output that passes every AI detector',
+    ];
+
+    function Product() {
+      return (
+        <section className="section" id="product">
+          <div className="container">
+            <Reveal>
+              <div className="section-head">
+                <div className="section-head__kicker">The product</div>
+                <h2 className="section-head__title">
+                  One prompt. <em>Complete editorial output.</em>
+                </h2>
+                <p className="section-head__sub">
+                  Organic turns a single prompt into a full content package — calibrated to your company's actual voice system. Not "AI content." Content that feels internally authored.
+                </p>
+              </div>
+            </Reveal>
+
+            <Reveal delay={80}>
+              <div className="pipeline-flow">
+                {STAGES.map((s, idx) => (
+                  <div className="pipeline-node" key={s.name}>
+                    <div className="pipeline-node__dot">{romanize(idx + 1)}</div>
+                    <div>
+                      <div className="pipeline-node__name">{s.name}</div>
+                      <div className="pipeline-node__chip">{s.chip}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Reveal>
+
+            <Reveal delay={140}>
+              <div className="product-output-grid">
+                <div>
+                  <ul className="product-output-list">
+                    {OUTPUT_ITEMS.map(item => (
+                      <li className="product-output-item" key={item}>
+                        <span className="product-output-item__dot" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <ArticlePreview />
+                </div>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+      );
+    }
+
+    /* ─── The Moat ─── */
+    const MOAT_ITEMS = [
+      {
+        num: 'i.',
+        title: 'Voice modeling',
+        body: 'Drop a URL. Organic crawls the site, extracts writing samples, and produces a structured voice profile — tone, sentence rhythm, banned phrases, length rules. Edit once, use forever.',
+      },
+      {
+        num: 'ii.',
+        title: 'Editorial enforcement',
+        body: '200 AI cliché phrases are banned. 17 rhythm patterns are detected and rewritten. Every draft passes through a second humanization layer tuned per brand.',
+      },
+      {
+        num: 'iii.',
+        title: 'Anti-generic output',
+        body: 'Output passes every AI detector we\'ve tested. Not by tricking classifiers — by actually writing differently. Specific data, real citations, editorial rhythm.',
+      },
+      {
+        num: 'iv.',
+        title: 'Multi-brand consistency',
+        body: 'Unlimited brand profiles in one studio. Each with its own voice system, visual style, banned words, and editorial rules. Switch between clients in one click.',
+      },
+      {
+        num: 'v.',
+        title: 'Structured publishing',
+        body: 'Schema generation, FAQ markup, topical clusters with internal linking, pillar page architecture, overlap detection. Content that search engines can parse and cite.',
+      },
+      {
+        num: 'vi.',
+        title: 'Human-taste replication',
+        body: 'Three models cross-verify every factual claim. Reference articles are injected as few-shot examples. The system doesn\'t approximate your voice — it writes against it.',
+      },
+    ];
+
+    function Moat() {
+      return (
+        <section className="section section--stone" id="moat">
+          <div className="container">
+            <Reveal>
+              <div className="section-head">
+                <div className="section-head__kicker">What makes Organic different</div>
+                <h2 className="section-head__title">
+                  Your moat isn't article generation. <em>Neither is ours.</em>
+                </h2>
+                <p className="section-head__sub">
+                  Article generation, SEO, prompts, images — those are table stakes. The important story is everything underneath.
+                </p>
+              </div>
+            </Reveal>
+            <Reveal delay={100}>
+              <div className="moat-grid">
+                {MOAT_ITEMS.map(m => (
+                  <div className="moat-card" key={m.num}>
+                    <div className="moat-card__num">{m.num}</div>
+                    <div className="moat-card__title">{m.title}</div>
+                    <div className="moat-card__body">{m.body}</div>
+                  </div>
+                ))}
+              </div>
+            </Reveal>
+          </div>
+        </section>
+      );
+    }
+
+    /* ─── Who It's For ─── */
+    const AUDIENCES = [
+      'VC-backed startups scaling content before headcount',
+      'SEO-heavy businesses competing for AI Overview citations',
+      'Media companies maintaining editorial identity at volume',
+      'Marketplaces with thousands of category pages',
+      'Fintech, legal, and healthcare brands where trust is non-negotiable',
+      'PE portfolio companies with lean teams and aggressive timelines',
+      'Agencies managing multiple brand voices simultaneously',
+    ];
+
+    function Audience() {
+      return (
+        <section className="section" id="audience">
+          <div className="container">
+            <Reveal>
+              <div className="section-head">
+                <div className="section-head__kicker">Who it's for</div>
+                <h2 className="section-head__title">
+                  Built for teams that care <em>how they sound.</em>
+                </h2>
+              </div>
+            </Reveal>
+            <Reveal delay={100}>
+              <div className="audience-layout">
+                <div>
+                  <p className="audience-reframe">
+                    The strongest wedge isn't "content creation." It's protecting <em>brand integrity</em> while scaling AI content.
+                  </p>
+                  <div className="audience-shift">
+                    <div className="audience-shift__col audience-shift__col--old">
+                      <div className="audience-shift__label">Old question</div>
+                      <div className="audience-shift__quote">"Can AI help us write?"</div>
+                    </div>
+                    <div className="audience-shift__col audience-shift__col--new">
+                      <div className="audience-shift__label">Better question</div>
+                      <div className="audience-shift__quote">"How do we avoid flooding our brand with garbage?"</div>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: 'var(--text-md)', color: 'var(--ink-soft)', lineHeight: 1.55, maxWidth: '48ch' }}>
+                    Very different budget conversation. Especially when brand trust is revenue-critical.
+                  </p>
+                </div>
+                <div>
+                  <ul className="audience-list">
+                    {AUDIENCES.map(a => (
+                      <li className="audience-item" key={a}>
+                        <span className="audience-item__dot" />
+                        <span className="audience-item__label">{a}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </Reveal>
           </div>
         </section>
       );
@@ -1234,37 +1652,42 @@
 
     function Pricing({ onStart }) {
       return (
-        <section className="section" id="pricing">
+        <section className="section section--stone" id="pricing">
           <div className="container">
-            <div className="section-head">
-              <h2 className="section-head__title">
-                Three plans. <em>No per-word billing.</em>
-              </h2>
-              <p className="section-head__sub">
-                Pricing is by the article, with a flat overage rate. No tokens to count, no surprises at the end of the month.
-              </p>
-            </div>
-            <div className="pricing-grid">
-              {TIERS.map(t => (
-                <div className={`tier ${t.featured ? 'tier--featured' : ''}`} key={t.name}>
-                  <div className="tier__name">
-                    {t.name}
-                    {t.badge && <span className="tier__badge">{t.badge}</span>}
+            <Reveal>
+              <div className="section-head">
+                <div className="section-head__kicker">Pricing</div>
+                <h2 className="section-head__title">
+                  Three plans. <em>No per-word billing.</em>
+                </h2>
+                <p className="section-head__sub">
+                  Pricing is by the article, with a flat overage rate. No tokens to count, no surprises at the end of the month.
+                </p>
+              </div>
+            </Reveal>
+            <Reveal delay={100}>
+              <div className="pricing-grid">
+                {TIERS.map(t => (
+                  <div className={`tier ${t.featured ? 'tier--featured' : ''}`} key={t.name}>
+                    <div className="tier__name">
+                      {t.name}
+                      {t.badge && <span className="tier__badge">{t.badge}</span>}
+                    </div>
+                    <div className="tier__price">{t.price}</div>
+                    <div className="tier__period">{t.period}</div>
+                    <div className="tier__per">{t.per}</div>
+                    <ul className="tier__features">
+                      {t.features.map(f => <li className="tier__feature" key={f}>{f}</li>)}
+                    </ul>
+                    <div className="tier__cta">
+                      <button className={`btn ${t.featured ? 'btn--paper' : 'btn--ink'}`} onClick={onStart}>
+                        Start free <span className="btn-arrow">↗</span>
+                      </button>
+                    </div>
                   </div>
-                  <div className="tier__price">{t.price}</div>
-                  <div className="tier__period">{t.period}</div>
-                  <div className="tier__per">{t.per}</div>
-                  <ul className="tier__features">
-                    {t.features.map(f => <li className="tier__feature" key={f}>{f}</li>)}
-                  </ul>
-                  <div className="tier__cta">
-                    <button className={`btn ${t.featured ? 'btn--paper' : 'btn--ink'}`} onClick={onStart}>
-                      Start free <span className="btn-arrow">↗</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </Reveal>
           </div>
         </section>
       );
@@ -1276,10 +1699,10 @@
         <section className="final-cta">
           <div className="container">
             <h2 className="final-cta-headline">
-              Less AI.<br /> <em>More Organic.</em>
+              The throughput of AI.<br /> <em>The taste of an editorial team.</em>
             </h2>
             <p className="final-cta-lede">
-              Import your brand. Generate your first cluster. Publish in minutes.
+              Train AI to write like your company. Not like everyone else's.
             </p>
             <button className="btn btn--paper" onClick={onStart}>
               Start free <span className="btn-arrow">↗</span>
@@ -1418,8 +1841,6 @@
       );
     }
 
-
-
     /* ─── App ─── */
     function App() {
       const [modalOpen, setModalOpen] = useState(false);
@@ -1430,9 +1851,12 @@
         <>
           <Nav onStart={open} />
           <Hero onStart={open} />
-          <WhyOrganic />
-          <Pipeline />
-          <BeforeAfter />
+          <MarketShift />
+          <Problem />
+          <Insight />
+          <Product />
+          <Moat />
+          <Audience />
           <Pricing onStart={open} />
           <FinalCTA onStart={open} />
           <Footer />

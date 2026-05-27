@@ -1,4 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+
+export const config = {
+    maxDuration: 300,
+    api: { bodyParser: { sizeLimit: "10mb" } },
+};
 import slugify from "slugify";
 import { getSupabase } from "@/lib/supabase";
 import { requireAuth, getUserAccounts } from "@/lib/auth";
@@ -78,13 +83,13 @@ const BlogSchema = {
                 },
             },
             minItems: 3,
-            maxItems: 5,
+            maxItems: 8,
         },
         key_takeaways: {
             type: "array",
             items: { type: "string" },
-            minItems: 3,
-            maxItems: 5,
+            minItems: 4,
+            maxItems: 8,
         },
         how_to_steps: {
             type: "array",

@@ -29,6 +29,7 @@ export type CompanyRecord = {
     evals: BrandEngine["evals"] | null;
     auto_humanize: boolean | null;
     include_toc: boolean | null;
+    quality_rules: string[] | null;
     created_at: string;
 };
 
@@ -143,6 +144,11 @@ export function buildBrandEngine(company: CompanyRecord): BrandEngine {
 
     // Table of Contents toggle
     (base as any).include_toc = company.include_toc === true; // default false
+
+    // Quality improvement rules (from editorial reviews)
+    if (company.quality_rules && company.quality_rules.length > 0) {
+        base.quality_rules = company.quality_rules;
+    }
 
     // Update system prompt core to reflect the new brand
     base.prompt_layers.system.core = `You represent the ${company.name} brand.${company.tagline ? ` Tagline: "${company.tagline}".` : ""

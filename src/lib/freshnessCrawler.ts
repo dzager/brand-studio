@@ -338,6 +338,45 @@ async function fetchFactPage(url: string, firecrawlApiKey?: string): Promise<Cra
     }
 }
 
+/**
+ * Crawl a single page URL for fact freshness auditing.
+ * Skips sitemap discovery and BFS — just fetches and processes the one URL.
+ */
+export async function crawlSinglePage(pageUrl: string): Promise<DeepCrawlResult> {
+    const startTime = Date.now();
+
+    let normalizedUrl = pageUrl.trim();
+    if (!normalizedUrl.startsWith("http://") && !normalizedUrl.startsWith("https://")) {
+        normalizedUrl = `https://${normalizedUrl}`;
+    }
+
+    const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
+    const page = await fetchFactPage(normalizedUrl, firecrawlApiKey);
+
+    if (!page) {
+        return {
+            root_url: normalizedUrl,
+            pages: [],
+            pages_discovered: 1,
+            pages_crawled: 0,
+            pages_skipped: 1,
+            elapsed_ms: Date.now() - startTime,
+        };
+    }
+
+    // Strip internal BFS links if present
+    delete (page as any)._links;
+
+    return {
+        root_url: normalizedUrl,
+        pages: [page],
+        pages_discovered: 1,
+        pages_crawled: 1,
+        pages_skipped: 0,
+        elapsed_ms: Date.now() - startTime,
+    };
+}
+
 // ── Main Export ──────────────────────────────────────────────────────────
 
 /**

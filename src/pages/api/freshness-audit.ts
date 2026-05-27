@@ -8,7 +8,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getSupabase } from "@/lib/supabase";
 import { requireAuth, getUserAccounts } from "@/lib/auth";
-import { deepCrawl } from "@/lib/freshnessCrawler";
+import { deepCrawl, crawlSinglePage } from "@/lib/freshnessCrawler";
 import { runAudit } from "@/lib/freshnessEngine";
 
 export const config = {
@@ -46,7 +46,7 @@ async function handleCreate(
     res: NextApiResponse,
     accounts: { account_id: string; role: string; company_id?: string | null }[]
 ) {
-    const { url, company_id, max_pages } = req.body ?? {};
+    const { url, company_id, max_pages, single_page } = req.body ?? {};
 
     if (!url || typeof url !== "string" || url.trim().length < 4) {
         return res.status(400).json({ error: "A valid URL is required." });
@@ -72,8 +72,32 @@ async function handleCreate(
     if (insertError) return res.status(500).json({ error: insertError.message });
     const auditId = audit.id;
 
+    // Respond immediately so the client can start additional audits concurrently.
+    // The heavy crawl + audit pipeline runs in the background.
+    res.status(200).json({ id: auditId, status: "running" });
+
+    // Fire-and-forget: run the audit pipeline in the background
+    runAuditPipeline(sb, auditId, url.trim(), company_id, max_pages, !!single_page).catch((err) => {
+        console.error(`[freshness-audit] Background pipeline error for ${auditId}:`, err);
+    });
+}
+
+/**
+ * Runs the full crawl → extract → verify → report pipeline.
+ * Called fire-and-forget after the HTTP response has been sent.
+ */
+async function runAuditPipeline(
+    sb: ReturnType<typeof getSupabase>,
+    auditId: string,
+    siteUrl: string,
+    companyId: string | undefined,
+    maxPages: number | undefined,
+    singlePage: boolean
+) {
     try {
-        const crawlResult = await deepCrawl(url.trim(), { maxPages: max_pages ?? 30 });
+        const crawlResult = singlePage
+            ? await crawlSinglePage(siteUrl)
+            : await deepCrawl(siteUrl, { maxPages: maxPages ?? 30 });
 
         if (crawlResult.pages_crawled === 0) {
             throw new Error("No pages could be crawled. The website may be blocking automated bot requests (e.g., Cloudflare protection or HTTP 403/404).");
@@ -85,7 +109,7 @@ async function handleCreate(
 
         const report = await runAudit(
             crawlResult,
-            company_id || "",
+            companyId || "",
             undefined, // onProgress
             async (partialReport) => {
                 await sb.from("freshness_audits")
@@ -113,21 +137,10 @@ async function handleCreate(
                 completed_at: new Date().toISOString(),
             })
             .eq("id", auditId);
-
-        return res.status(200).json({
-            id: auditId,
-            status: "complete",
-            pages_crawled: report.pages_crawled,
-            total_facts: report.total_facts_extracted,
-            issues_found: report.issues_found,
-            critical_issues: report.critical_issues,
-            overall_health: report.overall_health,
-        });
     } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
         await sb.from("freshness_audits")
             .update({ status: "failed", error: message, completed_at: new Date().toISOString() })
             .eq("id", auditId);
-        return res.status(500).json({ error: message, id: auditId });
     }
 }

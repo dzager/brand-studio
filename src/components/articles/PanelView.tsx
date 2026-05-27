@@ -29,9 +29,11 @@ import {
     ChevronDown, FileText, ClipboardCopy, Scissors, Crop,
     Scale, ExternalLink, ShieldCheck, Wand2, ChevronRight,
     X, Maximize2, Video, Play, ArrowLeftRight, ListChecks,
+    Star, Award, TrendingUp, Target, Shield, Brain, Lightbulb, AlertTriangle,
 } from "lucide-react";
 import type { ConsulResult, ConsulClaimReview } from "@/lib/consulPrompts";
 import type { CompareResult } from "@/pages/api/compare-article";
+import type { QualityRatingResult } from "@/pages/api/rate-quality";
 import { cn } from "@/lib/utils";
 
 type SearchImage = {
@@ -204,6 +206,18 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     const [compareResult, setCompareResult] = useState<CompareResult | null>(null);
     const [compareErr, setCompareErr] = useState<string | null>(null);
     const [compareCollapsed, setCompareCollapsed] = useState(true);
+
+    // Quality rating
+    const [ratingLoading, setRatingLoading] = useState(false);
+    const [ratingResult, setRatingResult] = useState<QualityRatingResult | null>(null);
+    const [ratingErr, setRatingErr] = useState<string | null>(null);
+    const [ratingCollapsed, setRatingCollapsed] = useState(true);
+
+    // Improve from weakness
+    const [improvingWeakness, setImprovingWeakness] = useState<number | null>(null);
+    const [improvedWeaknesses, setImprovedWeaknesses] = useState<Set<number>>(new Set());
+    const [savingRule, setSavingRule] = useState<number | null>(null);
+    const [savedRules, setSavedRules] = useState<Set<number>>(new Set());
 
 
 
@@ -470,6 +484,96 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
             onSuccess: (data: any) => { setCompareResult(data); setComparing(false); },
             onError: (errMsg) => { setCompareErr(errMsg); setComparing(false); },
         });
+    }
+
+    async function handleRateQuality() {
+        if (!displayArticle.html) return;
+        setRatingLoading(true); setRatingErr(null); setRatingResult(null);
+        await runTask({
+            type: "quality-rating",
+            label: `Rate: ${article.title.slice(0, 40)}`,
+            endpoint: "/api/rate-quality",
+            body: {
+                html: displayArticle.html,
+                title: article.title,
+                excerpt: article.excerpt || undefined,
+                company_id: article.company_id ?? undefined,
+            },
+            meta: { articleId: article.id },
+            onSuccess: (data: any) => { setRatingResult(data); setRatingLoading(false); },
+            onError: (errMsg) => { setRatingErr(errMsg); setRatingLoading(false); },
+        });
+    }
+
+    /** Improve article by addressing a specific weakness */
+    async function handleImproveWeakness(weaknessIndex: number) {
+        if (!displayArticle.html || !ratingResult) return;
+        const weakness = ratingResult.top_weaknesses[weaknessIndex];
+        if (!weakness) return;
+        setImprovingWeakness(weaknessIndex);
+        try {
+            const r = await fetch("/api/improve-from-weakness", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    html: displayArticle.html,
+                    weakness: typeof weakness === "string" ? weakness : JSON.stringify(weakness),
+                    title: article.title,
+                }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data?.error || "Improve failed");
+            const saveResp = await fetch(`/api/articles/${article.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ html: data.html }),
+            });
+            const saveData = await saveResp.json();
+            if (!saveResp.ok) throw new Error(saveData.error || "Save failed");
+            onUpdate({ ...article, ...saveData });
+            setImprovedWeaknesses((prev) => new Set(prev).add(weaknessIndex));
+        } catch (e: any) { alert(`Improve failed: ${e.message}`); }
+        finally { setImprovingWeakness(null); }
+    }
+
+    /** Improve all remaining weaknesses sequentially */
+    async function handleImproveAll() {
+        if (!ratingResult) return;
+        const remaining = ratingResult.top_weaknesses
+            .map((_, i) => i)
+            .filter((i) => !improvedWeaknesses.has(i));
+        for (const i of remaining) {
+            await handleImproveWeakness(i);
+        }
+    }
+
+    /** Save a weakness as a quality rule for future article generation */
+    async function handleSaveQualityRule(weaknessIndex: number) {
+        if (!ratingResult || !article.company_id) return;
+        const weakness = ratingResult.top_weaknesses[weaknessIndex];
+        if (!weakness) return;
+        setSavingRule(weaknessIndex);
+        try {
+            const getResp = await fetch(`/api/companies/${article.company_id}`);
+            const companyData = await getResp.json();
+            if (!getResp.ok) throw new Error(companyData?.error || "Failed to fetch company");
+            const currentRules: string[] = companyData.quality_rules ?? [];
+            const ruleText = typeof weakness === "string" ? weakness : JSON.stringify(weakness);
+            if (currentRules.includes(ruleText)) {
+                setSavedRules((prev) => new Set(prev).add(weaknessIndex));
+                return;
+            }
+            const updatedRules = [...currentRules, ruleText];
+            const putResp = await fetch(`/api/companies/${article.company_id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ quality_rules: updatedRules }),
+            });
+            const putData = await putResp.json();
+            if (!putResp.ok) throw new Error(putData?.error || "Failed to save rule");
+            setSavedRules((prev) => new Set(prev).add(weaknessIndex));
+        } catch (e: any) { alert(`Save rule failed: ${e.message}`); }
+        finally { setSavingRule(null); }
     }
 
     function toggleConsulClaim(index: number) {
@@ -1632,11 +1736,11 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
 
             {/* Actions — grouped by purpose */}
             <div className="flex items-center gap-1.5 flex-wrap pb-4 border-b border-border">
-                {/* ── Content ── */}
+                {/* ── Copy & Publish ── */}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" className={cn("gap-1.5", copied && "text-success border-success")}>
-                            {copied ? <><CheckCircle2 className="h-3.5 w-3.5" /> {copied === "rich" ? "Copied for CMS" : "Copied"}</> : <><Copy className="h-3.5 w-3.5" /> Copy</>}
+                        <Button variant="outline" size="sm" className={cn("gap-1.5", copied && "text-success border-success", !copied && published && "text-success border-success")}>
+                            {copied ? <><CheckCircle2 className="h-3.5 w-3.5" /> {copied === "rich" ? "Copied for CMS" : "Copied"}</> : published ? <><CheckCircle2 className="h-3.5 w-3.5" /> Published!</> : <><Copy className="h-3.5 w-3.5" /> Copy & Publish</>}
                             <ChevronDown className="h-3 w-3 ml-0.5 opacity-60" />
                         </Button>
                     </DropdownMenuTrigger>
@@ -1657,11 +1761,16 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                                 <div className="text-xs text-muted-foreground">Text only, no formatting</div>
                             </div>
                         </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={handlePublish} disabled={publishing} className="gap-2 cursor-pointer">
+                            <Rocket className="h-4 w-4" />
+                            <div>
+                                <div className="font-medium">{publishing ? "Publishing…" : "Publish to Website"}</div>
+                                <div className="text-xs text-muted-foreground">Push to your CMS via webhook</div>
+                            </div>
+                        </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
-                <Button variant="outline" size="sm" onClick={handlePublish} disabled={publishing} className={cn("gap-1.5", published && "text-success border-success")}>
-                    {publishing ? "Publishing…" : published ? <><CheckCircle2 className="h-3.5 w-3.5" /> Published!</> : <><Rocket className="h-3.5 w-3.5" /> Publish</>}
-                </Button>
                 <Button variant="outline" size="sm" onClick={startEdit} className="gap-1.5">
                     <Pencil className="h-3.5 w-3.5" /> Edit
                 </Button>
@@ -1722,28 +1831,62 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
 
                 <Separator orientation="vertical" className="h-6 mx-1" />
 
-                {/* ── Quality ── */}
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button variant="outline" size="sm" onClick={checkSimilarity} disabled={checkingSimilarity || !article.company_id}
-                                className={cn("gap-1.5", similarResults !== null && similarResults.length === 0 && "text-success border-success", similarResults !== null && similarResults.length > 0 && "text-amber-500 border-amber-500")}>
-                                {checkingSimilarity ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Checking…</> : similarResults !== null ? <><Search className="h-3.5 w-3.5" /> {similarResults.length === 0 ? "No Overlap" : `${similarResults.length} Similar`}</> : <><Search className="h-3.5 w-3.5" /> Similarity</>}
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                            Checks for content overlap with other articles in this brand to prevent keyword cannibalization
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-                <Button variant="outline" size="sm" onClick={handleConsulCheck} disabled={consulChecking || !displayArticle.html}
-                    className="gap-1.5 border-primary/30">
-                    {consulChecking ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Consulting…</> : consulResult ? <><Scale className="h-3.5 w-3.5" /> Re-check</> : <><Scale className="h-3.5 w-3.5" /> Fact-Check Consul</>}
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => { setShowCompareModal(true); setCompareUrl(""); setCompareErr(null); }} disabled={comparing || !displayArticle.html}
-                    className={cn("gap-1.5", compareResult && "border-primary/50")}>
-                    {comparing ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Comparing…</> : compareResult ? <><ArrowLeftRight className="h-3.5 w-3.5" /> Re-compare</> : <><ArrowLeftRight className="h-3.5 w-3.5" /> Compare</>}
-                </Button>
+                {/* ── Quality (grouped dropdown) ── */}
+                {(() => {
+                    const anyRunning = checkingSimilarity || consulChecking || comparing || ratingLoading;
+                    const checksRun = (similarResults !== null ? 1 : 0) + (consulResult ? 1 : 0) + (compareResult ? 1 : 0) + (ratingResult ? 1 : 0);
+                    return (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" className={cn("gap-1.5", checksRun > 0 && "border-primary/50")}>
+                                    {anyRunning ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+                                    {anyRunning ? "Running…" : checksRun > 0 ? `Quality (${checksRun})` : "Quality"}
+                                    <ChevronDown className="h-3 w-3 ml-0.5 opacity-60" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="min-w-[240px]">
+                                <DropdownMenuLabel>Quality Checks</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={checkSimilarity} disabled={checkingSimilarity || !article.company_id} className="gap-2 cursor-pointer">
+                                    {checkingSimilarity ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                                    <div>
+                                        <div className="font-medium">Similarity</div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {checkingSimilarity ? "Checking…" : similarResults !== null ? (similarResults.length === 0 ? "✓ No overlap found" : `⚠ ${similarResults.length} similar article${similarResults.length !== 1 ? "s" : ""}`) : "Check for content overlap"}
+                                        </div>
+                                    </div>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={handleConsulCheck} disabled={consulChecking || !displayArticle.html} className="gap-2 cursor-pointer">
+                                    {consulChecking ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Scale className="h-4 w-4" />}
+                                    <div>
+                                        <div className="font-medium">Fact-Check Consul</div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {consulChecking ? "Consulting models…" : consulResult ? `✓ ${consulResult.overall_verdict === "pass" ? "Passed" : consulResult.overall_verdict === "needs_review" ? "Needs review" : "Failed"} · ${consulResult.claims.length} claims` : "Multi-model fact verification"}
+                                        </div>
+                                    </div>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { setShowCompareModal(true); setCompareUrl(""); setCompareErr(null); }} disabled={comparing || !displayArticle.html} className="gap-2 cursor-pointer">
+                                    {comparing ? <RefreshCw className="h-4 w-4 animate-spin" /> : <ArrowLeftRight className="h-4 w-4" />}
+                                    <div>
+                                        <div className="font-medium">Compare</div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {comparing ? "Comparing…" : compareResult ? "✓ Comparison complete" : "Compare against a competitor URL"}
+                                        </div>
+                                    </div>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={handleRateQuality} disabled={ratingLoading || !displayArticle.html} className="gap-2 cursor-pointer">
+                                    {ratingLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Star className="h-4 w-4" />}
+                                    <div>
+                                        <div className="font-medium">Rate Quality</div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {ratingLoading ? "Rating…" : ratingResult ? `✓ Score: ${ratingResult.overall_score}/100` : "AI content quality scoring"}
+                                        </div>
+                                    </div>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    );
+                })()}
 
                 <Separator orientation="vertical" className="h-6 mx-1" />
 
@@ -2013,6 +2156,226 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                                     </div>
                                 );
                             })}
+                        </CardContent>
+                        </CollapsibleContent>
+                    </Card>
+                    </Collapsible>
+                );
+            })()}
+
+            {/* Quality Rating Results */}
+            {ratingErr && (
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>Quality rating failed: {ratingErr}</AlertDescription>
+                </Alert>
+            )}
+            {ratingResult && (() => {
+                const VERDICT_MAP: Record<string, { bg: string; text: string; label: string }> = {
+                    not_competitive: { bg: "#ef4444", text: "#fff", label: "Not Competitive" },
+                    competitive: { bg: "#f59e0b", text: "#fff", label: "Competitive" },
+                    highly_competitive: { bg: "#22c55e", text: "#fff", label: "Highly Competitive" },
+                    category_defining: { bg: "#8b5cf6", text: "#fff", label: "Category-Defining" },
+                };
+                const verdict = VERDICT_MAP[ratingResult.final_verdict] ?? VERDICT_MAP.competitive;
+                const scoreColor = (s: number) => s >= 8 ? "#22c55e" : s >= 5 ? "#f59e0b" : "#ef4444";
+                const overallColor = scoreColor(ratingResult.overall_score);
+                const scores = [
+                    { label: "SEO", value: ratingResult.seo_score, icon: <Target className="h-3 w-3" /> },
+                    { label: "GEO / AEO", value: ratingResult.geo_aeo_score, icon: <Brain className="h-3 w-3" /> },
+                    { label: "Editorial", value: ratingResult.editorial_quality_score, icon: <Sparkles className="h-3 w-3" /> },
+                    { label: "Info Gain", value: ratingResult.information_gain_score, icon: <Lightbulb className="h-3 w-3" /> },
+                    { label: "Trust", value: ratingResult.trustworthiness_score, icon: <Shield className="h-3 w-3" /> },
+                ];
+                return (
+                    <Collapsible open={!ratingCollapsed} onOpenChange={(open) => setRatingCollapsed(!open)}>
+                    <Card className="border-amber-500/20">
+                        <CollapsibleTrigger asChild>
+                        <button className="w-full p-4 flex items-center justify-between gap-2 cursor-pointer hover:bg-muted/30 transition-colors rounded-t-lg">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <Star className="h-4 w-4 text-amber-500" />
+                                <span className="text-xs font-semibold uppercase tracking-wider text-amber-500">Quality Rating</span>
+                                <Badge style={{ backgroundColor: overallColor }} className="text-white ml-1 text-sm font-bold px-2">
+                                    {ratingResult.overall_score}/10
+                                </Badge>
+                                <Badge style={{ backgroundColor: verdict.bg, color: verdict.text }} className="ml-0.5">
+                                    {verdict.label}
+                                </Badge>
+                                {ratingCollapsed && (
+                                    <span className="text-[11px] text-muted-foreground">· {ratingResult.top_weaknesses.length} weaknesses · {ratingResult.highest_leverage_improvements.length} improvements</span>
+                                )}
+                            </div>
+                            <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", ratingCollapsed && "-rotate-90")} />
+                        </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                        <CardContent className="p-4 pt-0 space-y-5">
+                            {/* Executive Summary */}
+                            <p className="text-sm leading-relaxed">{ratingResult.executive_summary}</p>
+
+                            {/* Score Gauges */}
+                            <div className="space-y-2.5">
+                                <h4 className="text-sm font-medium flex items-center gap-1.5"><Award className="h-3.5 w-3.5 text-amber-500" /> Dimension Scores</h4>
+                                {scores.map((s, i) => {
+                                    const pct = (s.value / 10) * 100;
+                                    const color = scoreColor(s.value);
+                                    return (
+                                        <div key={i}>
+                                            <div className="flex items-center justify-between mb-0.5">
+                                                <span className="text-xs font-medium flex items-center gap-1.5">{s.icon} {s.label}</span>
+                                                <span className="text-xs font-bold" style={{ color }}>{s.value}/10</span>
+                                            </div>
+                                            <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: color }} />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Top Weaknesses */}
+                            {ratingResult.top_weaknesses.length > 0 && (
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h4 className="text-sm font-medium flex items-center gap-1.5 text-red-500">
+                                            <AlertCircle className="h-3.5 w-3.5" /> Top Weaknesses
+                                        </h4>
+                                        {(() => {
+                                            const remaining = ratingResult.top_weaknesses.filter((_, i) => !improvedWeaknesses.has(i)).length;
+                                            const allDone = remaining === 0;
+                                            return remaining > 0 || allDone ? (
+                                                <Button
+                                                    variant={allDone ? "ghost" : "outline"}
+                                                    size="sm"
+                                                    className={cn("h-6 text-[11px] gap-1 px-2", allDone && "text-success")}
+                                                    disabled={improvingWeakness !== null || allDone}
+                                                    onClick={handleImproveAll}
+                                                >
+                                                    {improvingWeakness !== null ? <><RefreshCw className="h-2.5 w-2.5 animate-spin" /> Improving {improvedWeaknesses.size + 1}/{ratingResult.top_weaknesses.length}…</> : allDone ? <><CheckCircle2 className="h-2.5 w-2.5" /> All Improved</> : <><Wand2 className="h-2.5 w-2.5" /> Improve All ({remaining})</>}
+                                                </Button>
+                                            ) : null;
+                                        })()}
+                                    </div>
+                                    <ul className="space-y-2">
+                                        {ratingResult.top_weaknesses.map((w, i) => (
+                                            <li key={i} className={cn("text-xs p-2.5 rounded-md border transition-colors", improvedWeaknesses.has(i) ? "border-success/30 bg-success/5" : "border-red-500/15 bg-red-500/5")}>
+                                                <div className="flex gap-2">
+                                                    {improvedWeaknesses.has(i)
+                                                        ? <CheckCircle2 className="h-3 w-3 text-success shrink-0 mt-0.5" />
+                                                        : <AlertCircle className="h-3 w-3 text-red-400 shrink-0 mt-0.5" />
+                                                    }
+                                                    <span className={cn("text-muted-foreground flex-1", improvedWeaknesses.has(i) && "line-through opacity-60")}>
+                                                        {typeof w === "string" ? w : JSON.stringify(w)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 mt-2 ml-5">
+                                                    <Button
+                                                        variant={improvedWeaknesses.has(i) ? "ghost" : "outline"}
+                                                        size="sm"
+                                                        className={cn("h-6 text-[11px] gap-1 px-2", improvedWeaknesses.has(i) && "text-success")}
+                                                        disabled={improvingWeakness !== null || improvedWeaknesses.has(i)}
+                                                        onClick={() => handleImproveWeakness(i)}
+                                                    >
+                                                        {improvingWeakness === i ? <><RefreshCw className="h-2.5 w-2.5 animate-spin" /> Improving…</> : improvedWeaknesses.has(i) ? <><CheckCircle2 className="h-2.5 w-2.5" /> Improved</> : <><Wand2 className="h-2.5 w-2.5" /> Improve</>}
+                                                    </Button>
+                                                    {article.company_id && (
+                                                        <Button
+                                                            variant={savedRules.has(i) ? "ghost" : "ghost"}
+                                                            size="sm"
+                                                            className={cn("h-6 text-[11px] gap-1 px-2", savedRules.has(i) ? "text-success" : "text-muted-foreground hover:text-foreground")}
+                                                            disabled={savingRule !== null || savedRules.has(i)}
+                                                            onClick={() => handleSaveQualityRule(i)}
+                                                        >
+                                                            {savingRule === i ? <><RefreshCw className="h-2.5 w-2.5 animate-spin" /> Saving…</> : savedRules.has(i) ? <><CheckCircle2 className="h-2.5 w-2.5" /> Saved to Prompts</> : <><BookOpen className="h-2.5 w-2.5" /> Add to Future Prompts</>}
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {/* Highest Leverage Improvements */}
+                            {ratingResult.highest_leverage_improvements.length > 0 && (
+                                <div className="p-3 rounded-md border border-dashed border-amber-500/20 bg-amber-500/5">
+                                    <h4 className="text-xs font-semibold text-amber-600 mb-2 flex items-center gap-1.5">
+                                        <TrendingUp className="h-3.5 w-3.5" /> Highest Leverage Improvements
+                                    </h4>
+                                    <ol className="space-y-1.5">
+                                        {ratingResult.highest_leverage_improvements.map((imp, i) => (
+                                            <li key={i} className="text-xs text-foreground flex gap-2">
+                                                <span className="text-amber-500 font-bold shrink-0">{i + 1}.</span>
+                                                {typeof imp === "string" ? imp : JSON.stringify(imp)}
+                                            </li>
+                                        ))}
+                                    </ol>
+                                </div>
+                            )}
+
+                            {/* Rewrite Recommendations */}
+                            {ratingResult.rewrite_recommendations.length > 0 && (
+                                <details className="group">
+                                    <summary className="cursor-pointer text-xs font-medium flex items-center gap-1.5 text-primary hover:text-primary/80 transition-colors">
+                                        <Wand2 className="h-3 w-3" /> Rewrite Recommendations ({ratingResult.rewrite_recommendations.length})
+                                    </summary>
+                                    <ul className="mt-2 space-y-2">
+                                        {ratingResult.rewrite_recommendations.map((r, i) => (
+                                            <li key={i} className="text-xs text-muted-foreground p-2 rounded-md bg-muted/50 border border-border">
+                                                {typeof r === "string" ? r : typeof r === "object" && r !== null && "before" in r && "after" in r ? (<><strong>Before:</strong> {(r as any).before}<br /><strong>After:</strong> {(r as any).after}</>) : JSON.stringify(r)}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </details>
+                            )}
+
+                            {/* Missing Content Opportunities */}
+                            {ratingResult.missing_content_opportunities.length > 0 && (
+                                <details className="group">
+                                    <summary className="cursor-pointer text-xs font-medium flex items-center gap-1.5 text-blue-500 hover:text-blue-400 transition-colors">
+                                        <Lightbulb className="h-3 w-3" /> Missing Content ({ratingResult.missing_content_opportunities.length})
+                                    </summary>
+                                    <ul className="mt-2 space-y-1.5">
+                                        {ratingResult.missing_content_opportunities.map((m, i) => (
+                                            <li key={i} className="text-xs text-muted-foreground flex gap-2">
+                                                <span className="text-blue-400 shrink-0">+</span>{typeof m === "string" ? m : JSON.stringify(m)}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </details>
+                            )}
+
+                            {/* Cluster Expansion Ideas */}
+                            {ratingResult.cluster_expansion_ideas.length > 0 && (
+                                <details className="group">
+                                    <summary className="cursor-pointer text-xs font-medium flex items-center gap-1.5 text-purple-500 hover:text-purple-400 transition-colors">
+                                        <Layers className="h-3 w-3" /> Cluster Expansion Ideas ({ratingResult.cluster_expansion_ideas.length})
+                                    </summary>
+                                    <ul className="mt-2 space-y-1.5">
+                                        {ratingResult.cluster_expansion_ideas.map((c, i) => (
+                                            <li key={i} className="text-xs text-muted-foreground flex gap-2">
+                                                <span className="text-purple-400 shrink-0">→</span>{typeof c === "string" ? c : JSON.stringify(c)}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </details>
+                            )}
+
+                            {/* AI Detection Risks */}
+                            {ratingResult.ai_detection_risks.length > 0 && (
+                                <div className="p-3 rounded-md border border-orange-500/20 bg-orange-500/5">
+                                    <h4 className="text-xs font-semibold text-orange-500 mb-2 flex items-center gap-1.5">
+                                        <AlertTriangle className="h-3.5 w-3.5" /> AI-Detection Risks
+                                    </h4>
+                                    <ul className="space-y-1.5">
+                                        {ratingResult.ai_detection_risks.map((r, i) => (
+                                            <li key={i} className="text-xs text-muted-foreground flex gap-2">
+                                                <AlertTriangle className="h-3 w-3 text-orange-400 shrink-0 mt-0.5" />{typeof r === "string" ? r : JSON.stringify(r)}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
                         </CardContent>
                         </CollapsibleContent>
                     </Card>

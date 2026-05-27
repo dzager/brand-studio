@@ -15,9 +15,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   ShieldCheck, Plus, AlertCircle, Globe, Clock, CheckCircle2,
   XCircle, Loader2, ChevronRight, ChevronDown, ExternalLink,
-  AlertTriangle, Info, Download, Trash2,
+  AlertTriangle, Info, Download, Trash2, FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export const getServerSideProps: GetServerSideProps = async () => ({ props: {} });
 
@@ -275,24 +278,54 @@ function ReportViewer({ auditId, status }: { auditId: string; status?: string })
   return (
     <div className="p-6 space-y-6 overflow-y-auto h-full">
       {/* Summary stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-lg border p-3 text-center">
-          <p className={cn("text-3xl font-bold tabular-nums", healthColor(report.overall_health))}>{report.overall_health}</p>
-          <p className="text-xs text-muted-foreground mt-1">Health Score</p>
+      <TooltipProvider delayDuration={200}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="rounded-lg border p-3 text-center cursor-default">
+                <p className={cn("text-3xl font-bold tabular-nums", healthColor(report.overall_health))}>{report.overall_health}</p>
+                <p className="text-xs text-muted-foreground mt-1">Health Score</p>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-[220px] text-center">
+              Overall content accuracy rating (0–100). 90+ is healthy, 70–89 needs attention, below 70 is critical.
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="rounded-lg border p-3 text-center cursor-default">
+                <p className="text-3xl font-bold tabular-nums">{report.pages_crawled}</p>
+                <p className="text-xs text-muted-foreground mt-1">Pages Crawled</p>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-[220px] text-center">
+              Number of pages discovered and analyzed during this audit.
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="rounded-lg border p-3 text-center cursor-default">
+                <p className="text-3xl font-bold tabular-nums">{report.total_facts_verified}<span className="text-lg text-muted-foreground">/{report.total_facts_extracted}</span></p>
+                <p className="text-xs text-muted-foreground mt-1">Facts Verified</p>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-[220px] text-center">
+              Facts cross-checked against external sources out of total facts extracted from your content.
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="rounded-lg border p-3 text-center cursor-default">
+                <p className={cn("text-3xl font-bold tabular-nums", report.critical_issues > 0 ? "text-destructive" : "text-green-500")}>{report.issues_found}</p>
+                <p className="text-xs text-muted-foreground mt-1">Issues Found{report.critical_issues > 0 ? ` (${report.critical_issues} critical)` : ""}</p>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-[220px] text-center">
+              Total factual issues detected — outdated claims, internal conflicts, or unverifiable statements. Critical issues need immediate attention.
+            </TooltipContent>
+          </Tooltip>
         </div>
-        <div className="rounded-lg border p-3 text-center">
-          <p className="text-3xl font-bold tabular-nums">{report.pages_crawled}</p>
-          <p className="text-xs text-muted-foreground mt-1">Pages Crawled</p>
-        </div>
-        <div className="rounded-lg border p-3 text-center">
-          <p className="text-3xl font-bold tabular-nums">{report.total_facts_verified}<span className="text-lg text-muted-foreground">/{report.total_facts_extracted}</span></p>
-          <p className="text-xs text-muted-foreground mt-1">Facts Verified</p>
-        </div>
-        <div className="rounded-lg border p-3 text-center">
-          <p className={cn("text-3xl font-bold tabular-nums", report.critical_issues > 0 ? "text-destructive" : "text-green-500")}>{report.issues_found}</p>
-          <p className="text-xs text-muted-foreground mt-1">Issues Found{report.critical_issues > 0 ? ` (${report.critical_issues} critical)` : ""}</p>
-        </div>
-      </div>
+      </TooltipProvider>
 
       <p className="text-xs text-muted-foreground">Completed in {formatDuration(report.elapsed_ms)} · {report.total_facts_verified} of {report.total_facts_extracted} facts verified externally</p>
 
@@ -351,7 +384,7 @@ export default function FreshnessPage() {
   const [showForm, setShowForm] = useState(false);
   const [auditUrl, setAuditUrl] = useState("");
   const [auditCompanyId, setAuditCompanyId] = useState("");
-  const [creating, setCreating] = useState(false);
+  const [auditScope, setAuditScope] = useState<"site" | "page">("site");
 
   const fetchData = useCallback(async (background = false) => {
     if (!background) setLoading(true);
@@ -383,20 +416,22 @@ export default function FreshnessPage() {
 
   async function onStartAudit() {
     if (!auditUrl.trim()) return;
-    setCreating(true);
-    await runTask({
+    const url = auditUrl.trim();
+    const companyId = auditCompanyId || undefined;
+    const isSinglePage = auditScope === "page";
+    // Reset form immediately — the API returns instantly now
+    setAuditUrl("");
+    setShowForm(false);
+    runTask({
       type: "freshness-audit",
-      label: `Audit: ${auditUrl.trim().replace(/^https?:\/\//, "").slice(0, 40)}`,
+      label: `${isSinglePage ? "Page" : "Site"}: ${url.replace(/^https?:\/\//, "").slice(0, 40)}`,
       endpoint: "/api/freshness-audit",
-      body: { url: auditUrl.trim(), company_id: auditCompanyId || undefined, max_pages: 30 },
+      body: { url, company_id: companyId, max_pages: isSinglePage ? 1 : 30, single_page: isSinglePage },
       meta: { link: "/freshness" },
       onSuccess: (data: any) => {
-        setCreating(false);
-        setShowForm(false);
-        setAuditUrl("");
         fetchData().then(() => { if (data?.id) setSelectedId(data.id); });
       },
-      onError: () => { setCreating(false); fetchData(); },
+      onError: () => { fetchData(); },
     });
   }
 
@@ -425,20 +460,41 @@ export default function FreshnessPage() {
         {/* New Audit Form */}
         {showForm && (
           <div className="mb-4 p-4 rounded-lg border border-primary/20 bg-primary/[0.02] space-y-3 shrink-0 animate-in fade-in-0 slide-in-from-top-2">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-primary" />
-              <span className="text-sm font-semibold">New Freshness Audit</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold">New Freshness Audit</span>
+              </div>
+              <div className="flex items-center rounded-md border border-input bg-background p-0.5">
+                <button
+                  onClick={() => setAuditScope("site")}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs font-medium transition-colors",
+                    auditScope === "site" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Globe className="h-3 w-3" /> Full Site
+                </button>
+                <button
+                  onClick={() => setAuditScope("page")}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs font-medium transition-colors",
+                    auditScope === "page" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <FileText className="h-3 w-3" /> Single Page
+                </button>
+              </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-[1fr_200px] gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs">Website URL</Label>
+                <Label className="text-xs">{auditScope === "page" ? "Page URL" : "Website URL"}</Label>
                 <Input
                   value={auditUrl}
                   onChange={e => setAuditUrl(e.target.value)}
-                  placeholder="e.g., https://example.com"
+                  placeholder={auditScope === "page" ? "e.g., https://example.com/blog/my-article" : "e.g., https://example.com"}
                   className="text-sm"
-                  onKeyDown={e => { if (e.key === "Enter" && !creating) onStartAudit(); }}
-                  disabled={creating}
+                  onKeyDown={e => { if (e.key === "Enter") onStartAudit(); }}
                   autoFocus
                 />
               </div>
@@ -448,18 +504,20 @@ export default function FreshnessPage() {
                   value={auditCompanyId}
                   onChange={e => setAuditCompanyId(e.target.value)}
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  disabled={creating}
                 >
                   <option value="">— None —</option>
                   {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
             </div>
+            {auditScope === "page" && (
+              <p className="text-[11px] text-muted-foreground">Single-page mode skips site crawling and audits only the specific URL you provide.</p>
+            )}
             <div className="flex justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setShowForm(false)} disabled={creating}>Cancel</Button>
-              <Button size="sm" onClick={onStartAudit} disabled={creating || !auditUrl.trim()} className="gap-1.5">
+              <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
+              <Button size="sm" onClick={onStartAudit} disabled={!auditUrl.trim()} className="gap-1.5">
                 <ShieldCheck className="h-3.5 w-3.5" />
-                {creating ? "Auditing…" : "Start Audit"}
+                {auditScope === "page" ? "Audit Page" : "Audit Site"}
               </Button>
             </div>
           </div>
