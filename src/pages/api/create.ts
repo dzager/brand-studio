@@ -338,41 +338,181 @@ Which style best fits this article? Respond with JSON only.`;
             ? slugify(blog.seo.slug, { lower: true, strict: true, trim: true })
             : slugify(blog.title, { lower: true, strict: true, trim: true });
 
-        // ── Step 1b: Auto-humanize if enabled ─────────────────────────
-        const shouldHumanize = (brand as any).auto_humanize !== false;
+        // ── Save raw article to DB immediately ──────────────────────────
+        // This ensures the article is persisted before we start the long
+        // humanization + image pipeline, which can exceed serverless timeouts.
+        const seoWithAeo = {
+            ...blog.seo,
+            faq: blog.faq,
+            key_takeaways: blog.key_takeaways,
+            content_type: blog.content_type,
+        };
 
-        if (shouldHumanize) {
-            console.log("Auto-humanizing article content...");
+        const jsonld = buildAllJsonLd({
+            article: {
+                title: blog.title,
+                slug,
+                excerpt: blog.excerpt,
+                html: blog.html,
+                keywords: blog.seo.keywords,
+            },
+            faq: blog.faq,
+            content_type: blog.content_type,
+            how_to_steps: blog.how_to_steps,
+        });
 
-            // Humanize body HTML first (largest call, and title/excerpt depend on original for context)
-            const bodyPrompt = buildBlogHumanizePrompt(blog.html, blog.title, brand);
+        let savedArticleId: string | null = null;
+        try {
+            const { data: savedArticle } = await getSupabase().from("articles").insert({
+                title: blog.title,
+                slug,
+                excerpt: blog.excerpt,
+                html: blog.html,
+                image_base64: null,
+                image_prompt: null,
+                seo: seoWithAeo,
+                outline: blog.outline,
+                model_used: selectedModel,
+                image_style: styleId,
+                company_id: company_id || null,
+                account_id: accountId || null,
+            }).select("id").single();
+            savedArticleId = savedArticle?.id ?? null;
+        } catch (saveErr) {
+            console.error("Failed to save article to Supabase:", saveErr);
+        }
+
+        // Increment usage counter immediately
+        if (accountId) {
+            try { await incrementArticleCount(accountId); }
+            catch (usageErr) { console.warn("Failed to increment usage counter:", usageErr); }
+        }
+
+        // ── Respond immediately ─────────────────────────────────────────
+        // The client navigates away and uses the "article-created" event to
+        // refresh the article list from Supabase. We return the raw blog data
+        // so the task panel can show success.
+        res.status(200).json({
+            title: blog.title,
+            slug,
+            excerpt: blog.excerpt,
+            outline: blog.outline,
+            html: blog.html,
+            seo: blog.seo,
+            image_prompt: "",
+            image_base64: null,
+            faq: blog.faq,
+            key_takeaways: blog.key_takeaways,
+            how_to_steps: blog.how_to_steps,
+            content_type: blog.content_type,
+            jsonld,
+        });
+
+        // ── Fire-and-forget: humanize + generate image in background ────
+        // The function continues executing after res.json() until maxDuration.
+        // All updates go directly to the DB row.
+        polishArticleInBackground({
+            articleId: savedArticleId,
+            blog,
+            brand,
+            brandCategories,
+            styleId,
+            composite_product_image_url,
+            composite_bg_image_url,
+            compositeOverrideBgPrompt,
+        }).catch((err) => {
+            console.error(`[create] Background polish failed for ${savedArticleId}:`, err);
+        });
+    } catch (err) {
+        console.error("API /api/create error:", err);
+
+        const message =
+            err instanceof Error ? err.message : "Unknown server error";
+
+        return res.status(500).json({ error: message });
+    }
+}
+
+/**
+ * Runs humanization + image generation after the HTTP response has been sent.
+ * Updates the saved article row in Supabase as each step completes.
+ */
+async function polishArticleInBackground({
+    articleId,
+    blog,
+    brand,
+    brandCategories,
+    styleId,
+    composite_product_image_url,
+    composite_bg_image_url,
+    compositeOverrideBgPrompt,
+}: {
+    articleId: string | null;
+    blog: BlogOutput;
+    brand: ReturnType<typeof buildBrandEngine>;
+    brandCategories: ReturnType<typeof getImageStyleCategories>;
+    styleId: string;
+    composite_product_image_url?: string;
+    composite_bg_image_url?: string;
+    compositeOverrideBgPrompt?: string;
+}) {
+    if (!articleId) return;
+
+    const sb = getSupabase();
+    let currentTitle = blog.title;
+    let currentExcerpt = blog.excerpt;
+    let currentHtml = blog.html;
+
+    // ── Humanization ────────────────────────────────────────────────
+    const shouldHumanize = (brand as any).auto_humanize !== false;
+
+    if (shouldHumanize) {
+        console.log(`[background] Humanizing article ${articleId}...`);
+
+        try {
+            // Humanize body HTML (largest call)
+            const bodyPrompt = buildBlogHumanizePrompt(currentHtml, currentTitle, brand);
             const humanizedHtml = await getTextResponse("gpt-5.4", "", bodyPrompt, { temperature: 0.5 });
             if (humanizedHtml && humanizedHtml.length > 100) {
-                blog.html = humanizedHtml;
+                currentHtml = humanizedHtml;
             }
 
             // Run title + excerpt humanization in parallel
             const [humanizedTitle, humanizedExcerpt] = await Promise.all([
                 getTextResponse("gpt-5.4", "", buildShortContentHumanizePrompt(
-                    blog.title,
+                    currentTitle,
                     "This is a blog post title. Keep it concise, specific, and punchy. Do not use generic framing.",
                     brand
                 ), { temperature: 0.5 }),
                 getTextResponse("gpt-5.4", "", buildShortContentHumanizePrompt(
-                    blog.excerpt,
+                    currentExcerpt,
                     "This is a blog post excerpt/summary. Keep it to 1-2 sentences, factual and direct. No generic framing.",
                     brand
                 ), { temperature: 0.5 }),
             ]);
             if (humanizedTitle && humanizedTitle.length > 5) {
-                blog.title = humanizedTitle;
+                currentTitle = humanizedTitle;
             }
             if (humanizedExcerpt && humanizedExcerpt.length > 10) {
-                blog.excerpt = humanizedExcerpt;
+                currentExcerpt = humanizedExcerpt;
             }
-        }
 
-        // ── Step 2: Generate image ──────────────────────────────────────
+            // Save humanized content to DB
+            await sb.from("articles").update({
+                title: currentTitle,
+                excerpt: currentExcerpt,
+                html: currentHtml,
+                humanized: true,
+            }).eq("id", articleId);
+
+            console.log(`[background] Humanization saved for ${articleId}`);
+        } catch (humErr) {
+            console.error(`[background] Humanization failed for ${articleId}:`, humErr);
+        }
+    }
+
+    // ── Image generation ────────────────────────────────────────────
+    try {
         const resolvedStyle = brandCategories.find((c) => c.id === styleId);
         const isCompositeStyle = resolvedStyle?.type === "composite";
         const hasCompositeProduct = composite_product_image_url && typeof composite_product_image_url === "string";
@@ -381,8 +521,7 @@ Which style best fits this article? Respond with JSON only.`;
         let image_base64: string | null = null;
 
         if (isCompositeStyle && hasCompositeProduct) {
-            // ── Composite pipeline ─────────────────────────────────────
-            console.log(`[create] Using composite pipeline for style "${styleId}"`);
+            console.log(`[background] Composite image for ${articleId}...`);
             const photo = brand.photography_style;
             let brandDirective = resolvedStyle?.image_prompt_style
                 ? `Visual style: ${resolvedStyle.image_prompt_style}\n`
@@ -404,116 +543,47 @@ Which style best fits this article? Respond with JSON only.`;
                 productImageUrl: composite_product_image_url,
                 backgroundImageUrl: bgImageUrl,
                 backgroundPrompt: bgPrompt,
-                articleTitle: blog.title,
-                articleExcerpt: blog.excerpt,
+                articleTitle: currentTitle,
+                articleExcerpt: currentExcerpt,
                 brandStyleDirective: brandDirective,
             });
             image_base64 = compositeResult.image_base64;
             finalImagePrompt = `Composite: ${compositeResult.background_prompt}`;
         } else {
-            // ── Standard AI image generation ───────────────────────────
+            console.log(`[background] Generating image for ${articleId}...`);
             const imgSystem = compileImageSystemPrompt(brand);
             const imgUser = compileImageUserPrompt({
-                title: blog.title,
-                excerpt: blog.excerpt,
+                title: currentTitle,
+                excerpt: currentExcerpt,
                 brand,
                 styleId,
             });
 
             finalImagePrompt = await getTextResponse("gpt-4.1-mini", imgSystem, imgUser);
-
             image_base64 = await generateImageBase64(
-                finalImagePrompt || `Editorial photo for: ${blog.title}`
+                finalImagePrompt || `Editorial photo for: ${currentTitle}`
             );
         }
 
-        // Auto-save to Supabase — include AEO data in the seo column
-        const seoWithAeo = {
-            ...blog.seo,
-            faq: blog.faq,
-            key_takeaways: blog.key_takeaways,
-            content_type: blog.content_type,
-        };
-
-        try {
-            const { data: savedArticle } = await getSupabase().from("articles").insert({
-                title: blog.title,
-                slug,
-                excerpt: blog.excerpt,
-                html: blog.html,
-                image_base64,
-                image_prompt: finalImagePrompt,
-                seo: seoWithAeo,
-                outline: blog.outline,
-                model_used: selectedModel,
-                image_style: styleId,
-                company_id: company_id || null,
-                account_id: accountId || null,
-            }).select("id").single();
-
-            // Generate and persist embedding (non-blocking on failure)
-            if (savedArticle?.id) {
-                try {
-                    const embText = buildArticleEmbeddingText(blog.title, blog.html);
-                    const embedding = await generateEmbedding(embText);
-                    const vectorStr = formatVectorForSupabase(embedding);
-                    await getSupabase()
-                        .from("articles")
-                        .update({ embedding: vectorStr })
-                        .eq("id", savedArticle.id);
-                } catch (embErr) {
-                    console.warn("Failed to generate/save article embedding:", embErr);
-                }
-
-                // Increment usage counter
-                if (accountId) {
-                    try {
-                        await incrementArticleCount(accountId);
-                    } catch (usageErr) {
-                        console.warn("Failed to increment usage counter:", usageErr);
-                    }
-                }
-            }
-        } catch (saveErr) {
-            console.error("Failed to save article to Supabase:", saveErr);
-            // Don't block the response if save fails
-        }
-
-        // Generate JSON-LD structured data
-        const jsonld = buildAllJsonLd({
-            article: {
-                title: blog.title,
-                slug,
-                excerpt: blog.excerpt,
-                html: blog.html,
-                keywords: blog.seo.keywords,
-            },
-            faq: blog.faq,
-            content_type: blog.content_type,
-            how_to_steps: blog.how_to_steps,
-        });
-
-        return res.status(200).json({
-            title: blog.title,
-            slug,
-            excerpt: blog.excerpt,
-            outline: blog.outline,
-            html: blog.html,
-            seo: blog.seo,
-            image_prompt: finalImagePrompt,
+        // Save image to DB
+        await sb.from("articles").update({
             image_base64,
-            faq: blog.faq,
-            key_takeaways: blog.key_takeaways,
-            how_to_steps: blog.how_to_steps,
-            content_type: blog.content_type,
-            jsonld,
-        });
-    } catch (err) {
-        console.error("API /api/create error:", err);
+            image_prompt: finalImagePrompt,
+        }).eq("id", articleId);
 
-        const message =
-            err instanceof Error ? err.message : "Unknown server error";
+        console.log(`[background] Image saved for ${articleId}`);
+    } catch (imgErr) {
+        console.error(`[background] Image generation failed for ${articleId}:`, imgErr);
+    }
 
-        return res.status(500).json({ error: message });
+    // ── Embedding (non-blocking) ────────────────────────────────────
+    try {
+        const embText = buildArticleEmbeddingText(currentTitle, currentHtml);
+        const embedding = await generateEmbedding(embText);
+        const vectorStr = formatVectorForSupabase(embedding);
+        await sb.from("articles").update({ embedding: vectorStr }).eq("id", articleId);
+        console.log(`[background] Embedding saved for ${articleId}`);
+    } catch (embErr) {
+        console.warn(`[background] Embedding failed for ${articleId}:`, embErr);
     }
 }
