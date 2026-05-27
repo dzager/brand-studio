@@ -1060,7 +1060,7 @@
                 AI throughput. Editorial taste.
               </p>
               <p className="hero-lede">
-                Organic turns your brand voice into a content engine — articles, imagery, and structured metadata that read like your team wrote them.
+                Organic is a content intelligence and generation platform — it creates brand-aligned articles, fact-checks them with multiple AI models, scores their quality, and optimizes them for AI search retrieval.
               </p>
               <div className="hero-ctas">
                 <button className="btn btn--ink" onClick={onStart}>
@@ -1092,7 +1092,7 @@
                   The content landscape just <em>broke.</em>
                 </h2>
                 <p className="section-head__sub">
-                  Creating content is easy. Creating content that doesn't damage your brand is not.
+                  Creating content is easy. Creating content that helps your brand is not.
                 </p>
               </div>
             </Reveal>
@@ -1133,58 +1133,7 @@
       );
     }
 
-    /* ─── The Problem ─── */
-    function Problem() {
-      return (
-        <section className="section" id="problem">
-          <div className="container">
-            <Reveal>
-              <div className="section-head">
-                <div className="section-head__kicker">The problem</div>
-                <h2 className="section-head__title">
-                  Most AI content sounds <em>the same.</em>
-                </h2>
-                <p className="section-head__sub">
-                  Readers recognize it instantly. So do search engines.
-                </p>
-              </div>
-            </Reveal>
-            <Reveal delay={100}>
-              <div className="problem-layout">
-                <div>
-                  <ul className="problem-tells">
-                    <li className="problem-tell">
-                      <span className="problem-tell__icon">×</span>
-                      Repetitive cadence
-                    </li>
-                    <li className="problem-tell">
-                      <span className="problem-tell__icon">×</span>
-                      Generic phrasing
-                    </li>
-                    <li className="problem-tell">
-                      <span className="problem-tell__icon">×</span>
-                      Shallow synthesis
-                    </li>
-                    <li className="problem-tell">
-                      <span className="problem-tell__icon">×</span>
-                      Fake authority
-                    </li>
-                  </ul>
-                </div>
-                <div className="problem-consequence">
-                  <p className="problem-consequence__text">
-                    In an AI-answer world, low-trust content is <em>actively harmful</em> to your brand.
-                  </p>
-                  <p className="problem-cost">
-                    Human teams can't scale. Generic AI degrades trust. Most companies are stuck between the two.
-                  </p>
-                </div>
-              </div>
-            </Reveal>
-          </div>
-        </section>
-      );
-    }
+
 
     /* ─── The Insight ─── */
     function Insight() {
@@ -1852,7 +1801,7 @@
           <Nav onStart={open} />
           <Hero onStart={open} />
           <MarketShift />
-          <Problem />
+
           <Insight />
           <Product />
           <Moat />

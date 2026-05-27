@@ -143,7 +143,7 @@ function assertEnv() {
 
 export default async function handler(
     req: NextApiRequest,
-    res: NextApiResponse<SuccessResponse | ErrorResponse>
+    res: NextApiResponse
 ) {
     try {
         assertEnv();
@@ -194,192 +194,37 @@ export default async function handler(
         // Check article usage limits (if we have an account)
         if (accountId) {
             const usage = await checkArticleLimit(accountId);
-            // Usage is always allowed (overage billing), but we log it
             if (usage.overage > 0) {
                 console.log(`[create] Account ${accountId} is in overage: ${usage.used}/${usage.limit} (${usage.overage} over)`);
             }
         }
 
-        // Validate and resolve style AFTER we know the brand
-        // (will be re-validated below after brand engine is built)
-        let styleId = "default";
-        const rawStyle = image_style;
-
-        const selectedModel = resolveModelId(requestedModel);
-
-        // Build brand engine from the selected company
-        const { data: companyData, error: companyErr } = await getSupabase()
-            .from("companies")
-            .select("*")
-            .eq("id", company_id)
-            .single();
-
-        if (companyErr || !companyData) {
-            return res.status(400).json({ error: "Company not found" });
-        }
-
-        const brand = buildBrandEngine(companyData as CompanyRecord);
-
-        // Resolve the style against the brand's available categories
-        const brandCategories = getImageStyleCategories(brand);
-        if (
-            typeof rawStyle === "string" &&
-            brandCategories.some((c) => c.id === rawStyle)
-        ) {
-            styleId = rawStyle;
-        } else if (brandCategories.length > 1) {
-            // Auto-recommend style based on prompt content
-            try {
-                const styleDescriptions = brandCategories
-                    .map(
-                        (s, i) =>
-                            `${i + 1}. **${s.label}** (id: ${s.id})\n   Narrative: ${s.narrative || "N/A"}\n   Cues: ${(s.storytelling_cues || []).join(", ") || "N/A"}\n   Prompt style: ${s.image_prompt_style || "N/A"}`
-                    )
-                    .join("\n\n");
-
-                const recSystem = `You are an expert creative director. Given an article topic and a list of available image styles, recommend the single best-fit style. Be concise and practical.
-
-Respond with ONLY valid JSON in this exact format:
-{"id": "<style id>", "reason": "<1 sentence explanation>"}`;
-
-                const recUser = `Article topic: "${rawCreationPrompt.trim()}"
-
-Available image styles:
-
-${styleDescriptions}
-
-Which style best fits this article? Respond with JSON only.`;
-
-                const recRaw = await getTextResponse("gpt-4.1-mini", recSystem, recUser, { temperature: 0.2 });
-                const recJson = recRaw.replace(/^```json?\s*/i, "").replace(/\s*```$/i, "");
-                const recResult = JSON.parse(recJson);
-
-                if (recResult?.id && brandCategories.some((c) => c.id === recResult.id)) {
-                    styleId = recResult.id;
-                    console.log(`Auto-recommended image style "${styleId}": ${recResult.reason || ""}`);
-                }
-            } catch (recErr) {
-                console.warn("Image style auto-recommendation failed (non-blocking), using default:", recErr);
-            }
-        }
-
-        // Fetch account-level base prompt overrides (if any)
-        let baseSystemPromptOverride: string | undefined;
-        if (accountId) {
-            try {
-                const { data: acctData } = await getSupabase()
-                    .from("accounts")
-                    .select("base_system_prompt")
-                    .eq("id", accountId)
-                    .single();
-                if (acctData?.base_system_prompt) {
-                    baseSystemPromptOverride = acctData.base_system_prompt;
-                }
-            } catch {
-                // Non-blocking — fall back to hardcoded defaults
-            }
-        }
-
-        let system = compileBlogSystemPrompt(brand, { baseOverride: baseSystemPromptOverride });
-
-        // Fetch and inject reference articles if the company has any
-        if (brand.reference_articles && brand.reference_articles.length > 0) {
-            const refSection = await compileReferenceArticles(brand.reference_articles);
-            if (refSection) {
-                system += refSection;
-            }
-        }
-
-        // ── Inject snippet collection context (if provided) ────────
-        let creation_prompt = rawCreationPrompt.trim();
-
-        if (typeof snippet_collection_id === "string" && snippet_collection_id) {
-            try {
-                const { data: collection } = await getSupabase()
-                    .from("snippet_collections")
-                    .select("name, snippets")
-                    .eq("id", snippet_collection_id)
-                    .single();
-
-                if (collection && Array.isArray(collection.snippets) && collection.snippets.length > 0) {
-                    let researchContext = `\n\n## Research Context\n`;
-                    researchContext += `This article should incorporate findings from the research collection "${collection.name}".\n\n`;
-                    researchContext += `### Research Snippets\n`;
-                    for (const snippet of collection.snippets) {
-                        researchContext += `- ${snippet.text}`;
-                        if (snippet.note) researchContext += ` (Note: ${snippet.note})`;
-                        if (snippet.source_title) researchContext += ` [Source: ${snippet.source_title}]`;
-                        researchContext += `\n`;
-                    }
-                    researchContext += `\nUse these research snippets as factual grounding. Cite specific data points and weave them naturally into the article.\n`;
-                    creation_prompt = `${creation_prompt}\n${researchContext}`;
-                    console.log(`[create] Injected ${collection.snippets.length} snippets from collection "${collection.name}"`);
-                }
-            } catch (collErr) {
-                console.warn("[create] Failed to fetch snippet collection (non-blocking):", collErr);
-            }
-        }
-
-        const user = compileUserPrompt({
-            creation_prompt,
-            brand,
-            word_count: typeof word_count === "string" && word_count ? word_count : undefined,
-        });
-
-        const blog = await getStructuredResponse<BlogOutput>(
-            selectedModel,
-            system,
-            user,
-            BlogSchema,
-            { schemaName: "blog_post" }
-        );
-
-        const slug = blog.seo.slug
-            ? slugify(blog.seo.slug, { lower: true, strict: true, trim: true })
-            : slugify(blog.title, { lower: true, strict: true, trim: true });
-
-        // ── Save raw article to DB immediately ──────────────────────────
-        // This ensures the article is persisted before we start the long
-        // humanization + image pipeline, which can exceed serverless timeouts.
-        const seoWithAeo = {
-            ...blog.seo,
-            faq: blog.faq,
-            key_takeaways: blog.key_takeaways,
-            content_type: blog.content_type,
-        };
-
-        const jsonld = buildAllJsonLd({
-            article: {
-                title: blog.title,
-                slug,
-                excerpt: blog.excerpt,
-                html: blog.html,
-                keywords: blog.seo.keywords,
-            },
-            faq: blog.faq,
-            content_type: blog.content_type,
-            how_to_steps: blog.how_to_steps,
-        });
+        // ── Create placeholder article & respond immediately ────────────
+        // This ensures the client gets a response in <2 seconds regardless
+        // of how long the LLM pipeline takes.
+        const placeholderTitle = rawCreationPrompt.trim().slice(0, 120) || "New Article";
+        const placeholderSlug = slugify(placeholderTitle, { lower: true, strict: true, trim: true });
 
         let savedArticleId: string | null = null;
         try {
             const { data: savedArticle } = await getSupabase().from("articles").insert({
-                title: blog.title,
-                slug,
-                excerpt: blog.excerpt,
-                html: blog.html,
+                title: placeholderTitle,
+                slug: placeholderSlug,
+                excerpt: "Generating article…",
+                html: "<p>Article is being generated. This page will update automatically when ready.</p>",
                 image_base64: null,
                 image_prompt: null,
-                seo: seoWithAeo,
-                outline: blog.outline,
-                model_used: selectedModel,
-                image_style: styleId,
+                seo: {},
+                outline: [],
+                model_used: resolveModelId(requestedModel),
+                image_style: image_style || "default",
                 company_id: company_id || null,
                 account_id: accountId || null,
             }).select("id").single();
             savedArticleId = savedArticle?.id ?? null;
         } catch (saveErr) {
-            console.error("Failed to save article to Supabase:", saveErr);
+            console.error("Failed to create placeholder article:", saveErr);
+            return res.status(500).json({ error: "Failed to create article record" });
         }
 
         // Increment usage counter immediately
@@ -388,202 +233,307 @@ Which style best fits this article? Respond with JSON only.`;
             catch (usageErr) { console.warn("Failed to increment usage counter:", usageErr); }
         }
 
-        // ── Respond immediately ─────────────────────────────────────────
-        // The client navigates away and uses the "article-created" event to
-        // refresh the article list from Supabase. We return the raw blog data
-        // so the task panel can show success.
+        // Respond immediately — client will see the article in the list
         res.status(200).json({
-            title: blog.title,
-            slug,
-            excerpt: blog.excerpt,
-            outline: blog.outline,
-            html: blog.html,
-            seo: blog.seo,
-            image_prompt: "",
-            image_base64: null,
-            faq: blog.faq,
-            key_takeaways: blog.key_takeaways,
-            how_to_steps: blog.how_to_steps,
-            content_type: blog.content_type,
-            jsonld,
+            id: savedArticleId,
+            title: placeholderTitle,
+            slug: placeholderSlug,
+            status: "generating",
         });
 
-        // ── Fire-and-forget: humanize + generate image in background ────
+        // ── Fire-and-forget: run entire pipeline in background ──────────
         // The function continues executing after res.json() until maxDuration.
-        // All updates go directly to the DB row.
-        polishArticleInBackground({
-            articleId: savedArticleId,
-            blog,
-            brand,
-            brandCategories,
-            styleId,
+        runArticlePipeline({
+            articleId: savedArticleId!,
+            rawCreationPrompt,
+            requestedModel,
+            word_count,
+            company_id,
+            snippet_collection_id,
+            image_style,
             composite_product_image_url,
             composite_bg_image_url,
             compositeOverrideBgPrompt,
-        }).catch((err) => {
-            console.error(`[create] Background polish failed for ${savedArticleId}:`, err);
+            accountId,
+        }).catch(async (err) => {
+            console.error(`[create] Background pipeline failed for ${savedArticleId}:`, err);
+            // Update the article with an error state so the user knows
+            if (savedArticleId) {
+                try {
+                    await getSupabase().from("articles").update({
+                        html: `<p>Article generation failed: ${err instanceof Error ? err.message : "Unknown error"}. Please try again.</p>`,
+                        excerpt: "Generation failed — please regenerate.",
+                    }).eq("id", savedArticleId);
+                } catch { /* best-effort */ }
+            }
         });
     } catch (err) {
         console.error("API /api/create error:", err);
-
-        const message =
-            err instanceof Error ? err.message : "Unknown server error";
-
+        const message = err instanceof Error ? err.message : "Unknown server error";
         return res.status(500).json({ error: message });
     }
 }
 
 /**
- * Runs humanization + image generation after the HTTP response has been sent.
- * Updates the saved article row in Supabase as each step completes.
+ * Full article generation pipeline — runs in the background after HTTP response.
+ * Updates the DB row progressively so the article improves over time:
+ *   1. Generate blog content → save
+ *   2. Humanize content → save
+ *   3. Generate image → save
+ *   4. Generate embedding → save
  */
-async function polishArticleInBackground({
+async function runArticlePipeline({
     articleId,
-    blog,
-    brand,
-    brandCategories,
-    styleId,
+    rawCreationPrompt,
+    requestedModel,
+    word_count,
+    company_id,
+    snippet_collection_id,
+    image_style,
     composite_product_image_url,
     composite_bg_image_url,
     compositeOverrideBgPrompt,
+    accountId,
 }: {
-    articleId: string | null;
-    blog: BlogOutput;
-    brand: ReturnType<typeof buildBrandEngine>;
-    brandCategories: ReturnType<typeof getImageStyleCategories>;
-    styleId: string;
+    articleId: string;
+    rawCreationPrompt: string;
+    requestedModel?: string;
+    word_count?: string;
+    company_id: string;
+    snippet_collection_id?: string;
+    image_style?: string;
     composite_product_image_url?: string;
     composite_bg_image_url?: string;
     compositeOverrideBgPrompt?: string;
+    accountId?: string;
 }) {
-    if (!articleId) return;
-
     const sb = getSupabase();
+    const selectedModel = resolveModelId(requestedModel);
+    let styleId = "default";
+    const rawStyle = image_style;
+
+    // ── Build brand engine ──────────────────────────────────────────
+    const { data: companyData, error: companyErr } = await sb
+        .from("companies")
+        .select("*")
+        .eq("id", company_id)
+        .single();
+
+    if (companyErr || !companyData) {
+        throw new Error("Company not found");
+    }
+
+    const brand = buildBrandEngine(companyData as CompanyRecord);
+    const brandCategories = getImageStyleCategories(brand);
+
+    // Resolve image style
+    if (typeof rawStyle === "string" && brandCategories.some((c) => c.id === rawStyle)) {
+        styleId = rawStyle;
+    } else if (brandCategories.length > 1) {
+        try {
+            const styleDescriptions = brandCategories
+                .map((s, i) =>
+                    `${i + 1}. **${s.label}** (id: ${s.id})\n   Narrative: ${s.narrative || "N/A"}\n   Cues: ${(s.storytelling_cues || []).join(", ") || "N/A"}\n   Prompt style: ${s.image_prompt_style || "N/A"}`
+                )
+                .join("\n\n");
+
+            const recSystem = `You are an expert creative director. Given an article topic and a list of available image styles, recommend the single best-fit style. Be concise and practical.\n\nRespond with ONLY valid JSON in this exact format:\n{"id": "<style id>", "reason": "<1 sentence explanation>"}`;
+            const recUser = `Article topic: "${rawCreationPrompt.trim()}"\n\nAvailable image styles:\n\n${styleDescriptions}\n\nWhich style best fits this article? Respond with JSON only.`;
+            const recRaw = await getTextResponse("gpt-4.1-mini", recSystem, recUser, { temperature: 0.2 });
+            const recJson = recRaw.replace(/^```json?\s*/i, "").replace(/\s*```$/i, "");
+            const recResult = JSON.parse(recJson);
+            if (recResult?.id && brandCategories.some((c) => c.id === recResult.id)) {
+                styleId = recResult.id;
+                console.log(`[pipeline] Auto-recommended image style "${styleId}": ${recResult.reason || ""}`);
+            }
+        } catch (recErr) {
+            console.warn("[pipeline] Image style auto-recommendation failed, using default:", recErr);
+        }
+    }
+
+    // Fetch account-level base prompt overrides
+    let baseSystemPromptOverride: string | undefined;
+    if (accountId) {
+        try {
+            const { data: acctData } = await sb
+                .from("accounts")
+                .select("base_system_prompt")
+                .eq("id", accountId)
+                .single();
+            if (acctData?.base_system_prompt) {
+                baseSystemPromptOverride = acctData.base_system_prompt;
+            }
+        } catch { /* Non-blocking */ }
+    }
+
+    let system = compileBlogSystemPrompt(brand, { baseOverride: baseSystemPromptOverride });
+
+    // Fetch and inject reference articles
+    if (brand.reference_articles && brand.reference_articles.length > 0) {
+        const refSection = await compileReferenceArticles(brand.reference_articles);
+        if (refSection) {
+            system += refSection;
+        }
+    }
+
+    // Inject snippet collection context
+    let creation_prompt = rawCreationPrompt.trim();
+    if (typeof snippet_collection_id === "string" && snippet_collection_id) {
+        try {
+            const { data: collection } = await sb
+                .from("snippet_collections")
+                .select("name, snippets")
+                .eq("id", snippet_collection_id)
+                .single();
+
+            if (collection && Array.isArray(collection.snippets) && collection.snippets.length > 0) {
+                let researchContext = `\n\n## Research Context\n`;
+                researchContext += `This article should incorporate findings from the research collection "${collection.name}".\n\n`;
+                researchContext += `### Research Snippets\n`;
+                for (const snippet of collection.snippets) {
+                    researchContext += `- ${snippet.text}`;
+                    if (snippet.note) researchContext += ` (Note: ${snippet.note})`;
+                    if (snippet.source_title) researchContext += ` [Source: ${snippet.source_title}]`;
+                    researchContext += `\n`;
+                }
+                researchContext += `\nUse these research snippets as factual grounding. Cite specific data points and weave them naturally into the article.\n`;
+                creation_prompt = `${creation_prompt}\n${researchContext}`;
+                console.log(`[pipeline] Injected ${collection.snippets.length} snippets from collection "${collection.name}"`);
+            }
+        } catch (collErr) {
+            console.warn("[pipeline] Failed to fetch snippet collection (non-blocking):", collErr);
+        }
+    }
+
+    const user = compileUserPrompt({
+        creation_prompt,
+        brand,
+        word_count: typeof word_count === "string" && word_count ? word_count : undefined,
+    });
+
+    // ── Step 1: Generate blog content ───────────────────────────────
+    console.log(`[pipeline] Generating blog for article ${articleId}...`);
+    const blog = await getStructuredResponse<BlogOutput>(
+        selectedModel,
+        system,
+        user,
+        BlogSchema,
+        { schemaName: "blog_post" }
+    );
+
+    const slug = blog.seo.slug
+        ? slugify(blog.seo.slug, { lower: true, strict: true, trim: true })
+        : slugify(blog.title, { lower: true, strict: true, trim: true });
+
+    const seoWithAeo = {
+        ...blog.seo,
+        faq: blog.faq,
+        key_takeaways: blog.key_takeaways,
+        content_type: blog.content_type,
+    };
+
+    const jsonld = buildAllJsonLd({
+        article: { title: blog.title, slug, excerpt: blog.excerpt, html: blog.html, keywords: blog.seo.keywords },
+        faq: blog.faq,
+        content_type: blog.content_type,
+        how_to_steps: blog.how_to_steps,
+    });
+
+    // Save raw blog content immediately
+    await sb.from("articles").update({
+        title: blog.title,
+        slug,
+        excerpt: blog.excerpt,
+        html: blog.html,
+        seo: seoWithAeo,
+        outline: blog.outline,
+        model_used: selectedModel,
+        image_style: styleId,
+    }).eq("id", articleId);
+    console.log(`[pipeline] Blog content saved for ${articleId}`);
+
+    // ── Step 2: Humanize ────────────────────────────────────────────
     let currentTitle = blog.title;
     let currentExcerpt = blog.excerpt;
     let currentHtml = blog.html;
-
-    // ── Humanization ────────────────────────────────────────────────
     const shouldHumanize = (brand as any).auto_humanize !== false;
 
     if (shouldHumanize) {
-        console.log(`[background] Humanizing article ${articleId}...`);
-
         try {
-            // Humanize body HTML (largest call)
+            console.log(`[pipeline] Humanizing article ${articleId}...`);
             const bodyPrompt = buildBlogHumanizePrompt(currentHtml, currentTitle, brand);
             const humanizedHtml = await getTextResponse("gpt-5.4", "", bodyPrompt, { temperature: 0.5 });
             if (humanizedHtml && humanizedHtml.length > 100) {
                 currentHtml = humanizedHtml;
             }
 
-            // Run title + excerpt humanization in parallel
             const [humanizedTitle, humanizedExcerpt] = await Promise.all([
                 getTextResponse("gpt-5.4", "", buildShortContentHumanizePrompt(
-                    currentTitle,
-                    "This is a blog post title. Keep it concise, specific, and punchy. Do not use generic framing.",
-                    brand
+                    currentTitle, "This is a blog post title. Keep it concise, specific, and punchy. Do not use generic framing.", brand
                 ), { temperature: 0.5 }),
                 getTextResponse("gpt-5.4", "", buildShortContentHumanizePrompt(
-                    currentExcerpt,
-                    "This is a blog post excerpt/summary. Keep it to 1-2 sentences, factual and direct. No generic framing.",
-                    brand
+                    currentExcerpt, "This is a blog post excerpt/summary. Keep it to 1-2 sentences, factual and direct. No generic framing.", brand
                 ), { temperature: 0.5 }),
             ]);
-            if (humanizedTitle && humanizedTitle.length > 5) {
-                currentTitle = humanizedTitle;
-            }
-            if (humanizedExcerpt && humanizedExcerpt.length > 10) {
-                currentExcerpt = humanizedExcerpt;
-            }
+            if (humanizedTitle && humanizedTitle.length > 5) currentTitle = humanizedTitle;
+            if (humanizedExcerpt && humanizedExcerpt.length > 10) currentExcerpt = humanizedExcerpt;
 
-            // Save humanized content to DB
             await sb.from("articles").update({
-                title: currentTitle,
-                excerpt: currentExcerpt,
-                html: currentHtml,
-                humanized: true,
+                title: currentTitle, excerpt: currentExcerpt, html: currentHtml, humanized: true,
             }).eq("id", articleId);
-
-            console.log(`[background] Humanization saved for ${articleId}`);
+            console.log(`[pipeline] Humanization saved for ${articleId}`);
         } catch (humErr) {
-            console.error(`[background] Humanization failed for ${articleId}:`, humErr);
+            console.error(`[pipeline] Humanization failed for ${articleId}:`, humErr);
         }
     }
 
-    // ── Image generation ────────────────────────────────────────────
+    // ── Step 3: Generate image ──────────────────────────────────────
     try {
         const resolvedStyle = brandCategories.find((c) => c.id === styleId);
         const isCompositeStyle = resolvedStyle?.type === "composite";
         const hasCompositeProduct = composite_product_image_url && typeof composite_product_image_url === "string";
-
         let finalImagePrompt = "";
         let image_base64: string | null = null;
 
         if (isCompositeStyle && hasCompositeProduct) {
-            console.log(`[background] Composite image for ${articleId}...`);
+            console.log(`[pipeline] Composite image for ${articleId}...`);
             const photo = brand.photography_style;
             let brandDirective = resolvedStyle?.image_prompt_style
-                ? `Visual style: ${resolvedStyle.image_prompt_style}\n`
-                : "";
-            brandDirective += [
-                `Lighting: ${photo.lighting}`,
-                `Mood: ${photo.mood}`,
-                `Feel: ${photo.global_feel.join(", ")}`,
-            ].join(". ") + ".";
-
+                ? `Visual style: ${resolvedStyle.image_prompt_style}\n` : "";
+            brandDirective += [`Lighting: ${photo.lighting}`, `Mood: ${photo.mood}`, `Feel: ${photo.global_feel.join(", ")}`].join(". ") + ".";
             const bgPrompt = (typeof compositeOverrideBgPrompt === "string" && compositeOverrideBgPrompt.trim())
-                ? compositeOverrideBgPrompt.trim()
-                : resolvedStyle?.composite_bg_prompt || undefined;
+                ? compositeOverrideBgPrompt.trim() : resolvedStyle?.composite_bg_prompt || undefined;
             const bgImageUrl = (typeof composite_bg_image_url === "string" && composite_bg_image_url.trim())
-                ? composite_bg_image_url.trim()
-                : resolvedStyle?.composite_bg_image_url || undefined;
-
+                ? composite_bg_image_url.trim() : resolvedStyle?.composite_bg_image_url || undefined;
             const compositeResult = await generateCompositeImage({
                 productImageUrl: composite_product_image_url,
-                backgroundImageUrl: bgImageUrl,
-                backgroundPrompt: bgPrompt,
-                articleTitle: currentTitle,
-                articleExcerpt: currentExcerpt,
-                brandStyleDirective: brandDirective,
+                backgroundImageUrl: bgImageUrl, backgroundPrompt: bgPrompt,
+                articleTitle: currentTitle, articleExcerpt: currentExcerpt, brandStyleDirective: brandDirective,
             });
             image_base64 = compositeResult.image_base64;
             finalImagePrompt = `Composite: ${compositeResult.background_prompt}`;
         } else {
-            console.log(`[background] Generating image for ${articleId}...`);
+            console.log(`[pipeline] Generating image for ${articleId}...`);
             const imgSystem = compileImageSystemPrompt(brand);
-            const imgUser = compileImageUserPrompt({
-                title: currentTitle,
-                excerpt: currentExcerpt,
-                brand,
-                styleId,
-            });
-
+            const imgUser = compileImageUserPrompt({ title: currentTitle, excerpt: currentExcerpt, brand, styleId });
             finalImagePrompt = await getTextResponse("gpt-4.1-mini", imgSystem, imgUser);
-            image_base64 = await generateImageBase64(
-                finalImagePrompt || `Editorial photo for: ${currentTitle}`
-            );
+            image_base64 = await generateImageBase64(finalImagePrompt || `Editorial photo for: ${currentTitle}`);
         }
 
-        // Save image to DB
-        await sb.from("articles").update({
-            image_base64,
-            image_prompt: finalImagePrompt,
-        }).eq("id", articleId);
-
-        console.log(`[background] Image saved for ${articleId}`);
+        await sb.from("articles").update({ image_base64, image_prompt: finalImagePrompt }).eq("id", articleId);
+        console.log(`[pipeline] Image saved for ${articleId}`);
     } catch (imgErr) {
-        console.error(`[background] Image generation failed for ${articleId}:`, imgErr);
+        console.error(`[pipeline] Image generation failed for ${articleId}:`, imgErr);
     }
 
-    // ── Embedding (non-blocking) ────────────────────────────────────
+    // ── Step 4: Embedding ───────────────────────────────────────────
     try {
         const embText = buildArticleEmbeddingText(currentTitle, currentHtml);
         const embedding = await generateEmbedding(embText);
         const vectorStr = formatVectorForSupabase(embedding);
         await sb.from("articles").update({ embedding: vectorStr }).eq("id", articleId);
-        console.log(`[background] Embedding saved for ${articleId}`);
+        console.log(`[pipeline] Embedding saved for ${articleId}`);
     } catch (embErr) {
-        console.warn(`[background] Embedding failed for ${articleId}:`, embErr);
+        console.warn(`[pipeline] Embedding failed for ${articleId}:`, embErr);
     }
 }
