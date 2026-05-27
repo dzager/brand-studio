@@ -1,8 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
 export const config = {
+    api: { bodyParser: { sizeLimit: "10mb" }, responseLimit: false },
     maxDuration: 300,
-    api: { bodyParser: { sizeLimit: "10mb" } },
 };
 import slugify from "slugify";
 import { getSupabase } from "@/lib/supabase";

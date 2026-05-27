@@ -1,8 +1,13 @@
 // src/pages/api/clusters/[id]/generate.ts
 // POST: Generate a single article from a cluster strategy page.
 // Injects cluster context (internal links, keyword coordination) into the prompt.
-
 import type { NextApiRequest, NextApiResponse } from "next";
+
+export const config = {
+    api: { responseLimit: false },
+    maxDuration: 300,
+};
+
 import slugify from "slugify";
 import { getSupabase } from "@/lib/supabase";
 import { incrementArticleCount } from "@/lib/usage";
