@@ -344,31 +344,29 @@ Which style best fits this article? Respond with JSON only.`;
         if (shouldHumanize) {
             console.log("Auto-humanizing article content...");
 
-            // Humanize body HTML
+            // Humanize body HTML first (largest call, and title/excerpt depend on original for context)
             const bodyPrompt = buildBlogHumanizePrompt(blog.html, blog.title, brand);
             const humanizedHtml = await getTextResponse("gpt-5.4", "", bodyPrompt, { temperature: 0.5 });
             if (humanizedHtml && humanizedHtml.length > 100) {
                 blog.html = humanizedHtml;
             }
 
-            // Humanize title
-            const titlePrompt = buildShortContentHumanizePrompt(
-                blog.title,
-                "This is a blog post title. Keep it concise, specific, and punchy. Do not use generic framing.",
-                brand
-            );
-            const humanizedTitle = await getTextResponse("gpt-5.4", "", titlePrompt, { temperature: 0.5 });
+            // Run title + excerpt humanization in parallel
+            const [humanizedTitle, humanizedExcerpt] = await Promise.all([
+                getTextResponse("gpt-5.4", "", buildShortContentHumanizePrompt(
+                    blog.title,
+                    "This is a blog post title. Keep it concise, specific, and punchy. Do not use generic framing.",
+                    brand
+                ), { temperature: 0.5 }),
+                getTextResponse("gpt-5.4", "", buildShortContentHumanizePrompt(
+                    blog.excerpt,
+                    "This is a blog post excerpt/summary. Keep it to 1-2 sentences, factual and direct. No generic framing.",
+                    brand
+                ), { temperature: 0.5 }),
+            ]);
             if (humanizedTitle && humanizedTitle.length > 5) {
                 blog.title = humanizedTitle;
             }
-
-            // Humanize excerpt
-            const excerptPrompt = buildShortContentHumanizePrompt(
-                blog.excerpt,
-                "This is a blog post excerpt/summary. Keep it to 1-2 sentences, factual and direct. No generic framing.",
-                brand
-            );
-            const humanizedExcerpt = await getTextResponse("gpt-5.4", "", excerptPrompt, { temperature: 0.5 });
             if (humanizedExcerpt && humanizedExcerpt.length > 10) {
                 blog.excerpt = humanizedExcerpt;
             }

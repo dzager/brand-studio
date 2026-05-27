@@ -295,22 +295,22 @@ Which style best fits this article? Respond with JSON only.`;
                 blog.html = humanizedHtml;
             }
 
-            const titlePrompt = buildShortContentHumanizePrompt(
-                blog.title,
-                "This is a blog post title. Keep it concise, specific, and punchy.",
-                brand
-            );
-            const humanizedTitle = await getTextResponse("gpt-5.4", "", titlePrompt, { temperature: 0.5 });
+            // Run title + excerpt humanization in parallel
+            const [humanizedTitle, humanizedExcerpt] = await Promise.all([
+                getTextResponse("gpt-5.4", "", buildShortContentHumanizePrompt(
+                    blog.title,
+                    "This is a blog post title. Keep it concise, specific, and punchy.",
+                    brand
+                ), { temperature: 0.5 }),
+                getTextResponse("gpt-5.4", "", buildShortContentHumanizePrompt(
+                    blog.excerpt,
+                    "This is a blog post excerpt. Keep it to 1-2 sentences, factual and direct.",
+                    brand
+                ), { temperature: 0.5 }),
+            ]);
             if (humanizedTitle && humanizedTitle.length > 5) {
                 blog.title = humanizedTitle;
             }
-
-            const excerptPrompt = buildShortContentHumanizePrompt(
-                blog.excerpt,
-                "This is a blog post excerpt. Keep it to 1-2 sentences, factual and direct.",
-                brand
-            );
-            const humanizedExcerpt = await getTextResponse("gpt-5.4", "", excerptPrompt, { temperature: 0.5 });
             if (humanizedExcerpt && humanizedExcerpt.length > 10) {
                 blog.excerpt = humanizedExcerpt;
             }
