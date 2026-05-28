@@ -56,6 +56,11 @@ type Props = {
     onAutoCluster?: () => void;
 };
 
+const PLACEHOLDER_EXCERPTS = new Set([
+    "Generating article\u2026",
+    "Generation failed \u2014 please regenerate.",
+]);
+
 const ROLE_ORDER = ["pillar", "supporting", "long_tail"];
 const ROLE_COLORS: Record<string, string> = {
     pillar: "bg-primary",
@@ -68,6 +73,7 @@ type StrategyPage = {
     slug: string;
     role: string;
     articleId?: string;  // set if this page has a generated article
+    excerpt?: string | null;
     generated: boolean;
 };
 
@@ -179,6 +185,7 @@ export default function OutlineView({
                         slug: a.slug,
                         role: a.cluster_role || "supporting",
                         articleId: a.id,
+                        excerpt: a.excerpt,
                         generated: true,
                     });
                 }
@@ -365,6 +372,8 @@ export default function OutlineView({
                                                 <div className="pl-5 mt-0.5 space-y-px">
                                                     {pages.filter((p) => p.generated && p.articleId).map((page) => {
                                                         const roleColor = ROLE_COLORS[page.role] || "bg-muted-foreground";
+                                                        const isStillGenerating = page.excerpt ? PLACEHOLDER_EXCERPTS.has(page.excerpt) : false;
+                                                        const hasFailed = page.excerpt === "Generation failed \u2014 please regenerate.";
                                                         return (
                                                             <button
                                                                 key={page.articleId}
@@ -373,11 +382,24 @@ export default function OutlineView({
                                                                     "flex items-center gap-2 w-full px-2 py-1 text-left rounded-md transition-colors text-[13px]",
                                                                     selectedArticleId === page.articleId
                                                                         ? "bg-primary/10 text-primary font-medium"
-                                                                        : "text-foreground/70 hover:bg-muted/40"
+                                                                        : isStillGenerating
+                                                                            ? "text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                                                                            : hasFailed
+                                                                                ? "text-destructive hover:bg-destructive/10"
+                                                                                : "text-foreground/70 hover:bg-muted/40"
                                                                 )}
                                                             >
-                                                                <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", roleColor)} />
+                                                                {isStillGenerating && !hasFailed ? (
+                                                                    <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-amber-500 animate-pulse" />
+                                                                ) : hasFailed ? (
+                                                                    <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-destructive" />
+                                                                ) : (
+                                                                    <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", roleColor)} />
+                                                                )}
                                                                 <span className="truncate">{page.title}</span>
+                                                                {isStillGenerating && !hasFailed && (
+                                                                    <span className="ml-auto text-[10px] text-amber-500 shrink-0">\u27F3</span>
+                                                                )}
                                                             </button>
                                                         );
                                                     })}

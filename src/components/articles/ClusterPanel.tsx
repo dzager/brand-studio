@@ -176,6 +176,29 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
 
     useEffect(() => { loadCluster(); }, [loadCluster]);
 
+    // ── Auto-refresh when articles are still generating ─────────────
+    const hasGeneratingArticles = (cluster?.articles ?? []).some(
+        (a) => a.excerpt === "Generating article…"
+    );
+    useEffect(() => {
+        if (!hasGeneratingArticles) return;
+        const interval = setInterval(async () => {
+            try {
+                const r = await fetch(`/api/clusters/${clusterId}`);
+                const data = await r.json();
+                if (r.ok) {
+                    setCluster(data);
+                    // If no more generating articles, parent should refresh too
+                    const stillGenerating = (data.articles ?? []).some(
+                        (a: any) => a.excerpt === "Generating article…"
+                    );
+                    if (!stillGenerating) onUpdate();
+                }
+            } catch { /* silent */ }
+        }, 8000);
+        return () => clearInterval(interval);
+    }, [hasGeneratingArticles, clusterId, onUpdate]);
+
     // ── Share handlers ─────────────────────────────────────────────
     async function loadClusterInvites() {
         if (!cluster) return;
@@ -443,7 +466,19 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
         } catch (e: any) { alert(e.message); }
     }
 
+    function isArticleStillGenerating(article: ClusterArticle) {
+        return article.excerpt === "Generating article…" || article.excerpt === "Generation failed — please regenerate.";
+    }
+
+    function isArticleFailed(article: ClusterArticle) {
+        return article.excerpt === "Generation failed — please regenerate.";
+    }
+
     function isPageGenerated(slug: string) {
+        return (cluster?.articles ?? []).some((a) => a.slug === slug && !isArticleStillGenerating(a));
+    }
+
+    function isPageStarted(slug: string) {
         return (cluster?.articles ?? []).some((a) => a.slug === slug);
     }
 
@@ -929,9 +964,12 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                       ...(strategy.long_tail || []).map((p: any, i: number) => ({ page: p, type: "long_tail", idx: i })),
                     ].map(({ page, type, idx }) => {
                         const generated = isPageGenerated(page.slug);
+                        const started = isPageStarted(page.slug);
                         const pageKey = `${type}-${idx}`;
                         const isGeneratingThis = generatingPage === pageKey;
                         const articleMatch = (cluster?.articles ?? []).find((a) => a.slug === page.slug);
+                        const articleIsGenerating = articleMatch ? isArticleStillGenerating(articleMatch) : false;
+                        const articleHasFailed = articleMatch ? isArticleFailed(articleMatch) : false;
                         const roleColor = type === "pillar" ? "bg-primary" : type === "supporting" ? "bg-green-500" : "bg-amber-500";
                         const roleLabel = type === "pillar" ? "P" : type === "supporting" ? "S" : "L";
                         const roleTooltip = type === "pillar" ? "Pillar — The comprehensive cornerstone article that anchors this cluster" : type === "supporting" ? "Supporting — A mid-depth article that expands on a subtopic of the pillar" : "Long-tail — A focused, niche article targeting a specific long-tail keyword";
@@ -939,7 +977,7 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                         return (
                             <div key={pageKey} className={cn(
                                 "flex items-center gap-2.5 px-3 py-2 rounded-md transition-colors group",
-                                generated ? "bg-green-500/5" : "hover:bg-muted/40"
+                                generated ? "bg-green-500/5" : articleIsGenerating ? "bg-amber-500/5" : articleHasFailed ? "bg-destructive/5" : "hover:bg-muted/40"
                             )}>
                                 <TooltipProvider>
                                     <Tooltip>
@@ -954,7 +992,7 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                                     </Tooltip>
                                 </TooltipProvider>
                                 <div className="flex-1 min-w-0">
-                                    {generated && articleMatch ? (
+                                    {(generated || started) && articleMatch ? (
                                         <button onClick={() => onSelectArticle(articleMatch.id)}
                                             className="text-[13px] font-medium text-left hover:text-primary transition-colors truncate block w-full">
                                             {page.title}
@@ -963,8 +1001,14 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                                         <div className="text-[13px] font-medium truncate">{page.title}</div>
                                     )}
                                     <div className="text-[11px] text-muted-foreground truncate">{page.keyword}</div>
-                                    {page.description && (
+                                    {page.description && !articleIsGenerating && !articleHasFailed && (
                                         <div className="text-[11px] text-muted-foreground/70 mt-0.5 line-clamp-2 leading-relaxed">{page.description}</div>
+                                    )}
+                                    {articleIsGenerating && !articleHasFailed && (
+                                        <div className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">Generating…</div>
+                                    )}
+                                    {articleHasFailed && (
+                                        <div className="text-[11px] text-destructive mt-0.5">Generation failed — click to regenerate</div>
                                     )}
                                 </div>
                                 <div className="shrink-0 flex items-center gap-1">
@@ -992,6 +1036,10 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                                                 )
                                             )}
                                         </>
+                                    ) : articleIsGenerating ? (
+                                        <RefreshCw className="h-3 w-3 animate-spin text-amber-500" />
+                                    ) : articleHasFailed ? (
+                                        <AlertCircle className="h-3.5 w-3.5 text-destructive" />
                                     ) : (
                                         <Button variant="ghost" size="sm" onClick={() => generatePage(type, idx, pageKey)}
                                             disabled={!!generatingPage || batchGenerating} className="h-6 px-2 text-xs">
