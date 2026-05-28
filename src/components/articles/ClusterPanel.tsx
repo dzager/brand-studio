@@ -271,12 +271,33 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
     async function batchGenerate() {
         if (!cluster) return;
         const strategy = cluster.strategy;
-        const existingSlugs = new Set((cluster.articles ?? []).map((a) => a.slug));
+
+        // Only treat successfully completed articles as "done" — stuck/failed placeholders should be regenerated
+        const completedSlugs = new Set(
+            (cluster.articles ?? []).filter(a => !isArticleStillGenerating(a)).map(a => a.slug)
+        );
+
+        // Build a map of stuck placeholder articles by slug so we can delete them before regenerating
+        const stuckBySlug = new Map<string, string>();
+        for (const a of (cluster.articles ?? [])) {
+            if (isArticleStillGenerating(a)) {
+                stuckBySlug.set(a.slug, a.id);
+            }
+        }
+
         const pages: { type: string; index: number; slug: string }[] = [];
-        if (!existingSlugs.has(strategy.pillar.slug)) pages.push({ type: "pillar", index: 0, slug: strategy.pillar.slug });
-        strategy.supporting.forEach((p, i) => { if (!existingSlugs.has(p.slug)) pages.push({ type: "supporting", index: i, slug: p.slug }); });
-        strategy.long_tail.forEach((p, i) => { if (!existingSlugs.has(p.slug)) pages.push({ type: "long_tail", index: i, slug: p.slug }); });
+        if (!completedSlugs.has(strategy.pillar.slug)) pages.push({ type: "pillar", index: 0, slug: strategy.pillar.slug });
+        strategy.supporting.forEach((p, i) => { if (!completedSlugs.has(p.slug)) pages.push({ type: "supporting", index: i, slug: p.slug }); });
+        strategy.long_tail.forEach((p, i) => { if (!completedSlugs.has(p.slug)) pages.push({ type: "long_tail", index: i, slug: p.slug }); });
         if (pages.length === 0) return;
+
+        // Delete stuck placeholders before regenerating their slots (avoids duplicate slug records)
+        for (const p of pages) {
+            const stuckId = stuckBySlug.get(p.slug);
+            if (stuckId) {
+                try { await fetch(`/api/articles/${stuckId}`, { method: "DELETE" }); } catch { /* best-effort */ }
+            }
+        }
 
         setBatchGenerating(true); setBatchProgress({ current: 0, total: pages.length }); setPageGenErr(null);
 
@@ -615,7 +636,7 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
 
     const strategy = cluster.strategy;
     const totalPages = strategy ? 1 + (strategy.supporting?.length ?? 0) + (strategy.long_tail?.length ?? 0) : 0;
-    const generatedCount = cluster.articles?.length ?? 0;
+    const generatedCount = (cluster.articles ?? []).filter(a => !isArticleStillGenerating(a)).length;
 
     return (
         <>
