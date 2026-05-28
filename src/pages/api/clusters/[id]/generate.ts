@@ -316,33 +316,37 @@ Which style best fits this article? Respond with JSON only.`;
             cluster_role: role,
         });
 
-        // ── Fire-and-forget pipeline ────────────────────────────────────
-        runClusterPipeline({
-            articleId: savedArticleId!,
-            clusterId,
-            page,
-            role,
-            brand,
-            brandCategories,
-            styleId,
-            selectedModel,
-            system,
-            userBase,
-            image_mode,
-            strategy,
-            existingSiblings,
-            companyData,
-        }).catch(async (err) => {
-            console.error(`[cluster-gen] Pipeline failed for ${savedArticleId}:`, err);
+        // ── Await pipeline so the handler stays alive ──────────────────
+        // Response is already sent. Awaiting keeps the Vercel function
+        // running (up to maxDuration) instead of being frozen.
+        try {
+            await runClusterPipeline({
+                articleId: savedArticleId!,
+                clusterId,
+                page,
+                role,
+                brand,
+                brandCategories,
+                styleId,
+                selectedModel,
+                system,
+                userBase,
+                image_mode,
+                strategy,
+                existingSiblings,
+                companyData,
+            });
+        } catch (pipelineErr) {
+            console.error(`[cluster-gen] Pipeline failed for ${savedArticleId}:`, pipelineErr);
             if (savedArticleId) {
                 try {
                     await supabase.from("articles").update({
-                        html: `<p>Article generation failed: ${err instanceof Error ? err.message : "Unknown error"}. Please try again.</p>`,
+                        html: `<p>Article generation failed: ${pipelineErr instanceof Error ? pipelineErr.message : "Unknown error"}. Please try again.</p>`,
                         excerpt: "Generation failed — please regenerate.",
                     }).eq("id", savedArticleId);
                 } catch { /* best-effort */ }
             }
-        });
+        }
     } catch (err) {
         console.error(`API /api/clusters/${req.query.id}/generate error:`, err);
         const message = err instanceof Error ? err.message : "Unknown server error";

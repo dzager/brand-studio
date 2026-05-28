@@ -241,32 +241,34 @@ export default async function handler(
             status: "generating",
         });
 
-        // ── Fire-and-forget: run entire pipeline in background ──────────
-        // The function continues executing after res.json() until maxDuration.
-        runArticlePipeline({
-            articleId: savedArticleId!,
-            rawCreationPrompt,
-            requestedModel,
-            word_count,
-            company_id,
-            snippet_collection_id,
-            image_style,
-            composite_product_image_url,
-            composite_bg_image_url,
-            compositeOverrideBgPrompt,
-            accountId,
-        }).catch(async (err) => {
-            console.error(`[create] Background pipeline failed for ${savedArticleId}:`, err);
-            // Update the article with an error state so the user knows
+        // ── Await pipeline so the handler stays alive ────────────────────
+        // Response is already sent above. Awaiting keeps the Vercel
+        // function running (up to maxDuration) instead of being frozen.
+        try {
+            await runArticlePipeline({
+                articleId: savedArticleId!,
+                rawCreationPrompt,
+                requestedModel,
+                word_count,
+                company_id,
+                snippet_collection_id,
+                image_style,
+                composite_product_image_url,
+                composite_bg_image_url,
+                compositeOverrideBgPrompt,
+                accountId,
+            });
+        } catch (pipelineErr) {
+            console.error(`[create] Background pipeline failed for ${savedArticleId}:`, pipelineErr);
             if (savedArticleId) {
                 try {
                     await getSupabase().from("articles").update({
-                        html: `<p>Article generation failed: ${err instanceof Error ? err.message : "Unknown error"}. Please try again.</p>`,
+                        html: `<p>Article generation failed: ${pipelineErr instanceof Error ? pipelineErr.message : "Unknown error"}. Please try again.</p>`,
                         excerpt: "Generation failed — please regenerate.",
                     }).eq("id", savedArticleId);
                 } catch { /* best-effort */ }
             }
-        });
+        }
     } catch (err) {
         console.error("API /api/create error:", err);
         const message = err instanceof Error ? err.message : "Unknown server error";

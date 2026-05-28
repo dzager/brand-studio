@@ -105,6 +105,24 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     const [deleting, setDeleting] = useState(false);
     const [publishing, setPublishing] = useState(false);
     const [published, setPublished] = useState(false);
+
+    // ── Auto-refresh for generating articles ────────────────────────
+    const isGenerating = article.excerpt === "Generating article…" || article.excerpt === "Generation failed — please regenerate.";
+    useEffect(() => {
+        if (!isGenerating) return;
+        const interval = setInterval(async () => {
+            try {
+                const r = await fetch(`/api/articles/${article.id}`);
+                if (!r.ok) return;
+                const updated = await r.json();
+                // Check if real content has arrived
+                if (updated.excerpt && updated.excerpt !== "Generating article…") {
+                    onUpdate(updated);
+                }
+            } catch { /* silent */ }
+        }, 5000);
+        return () => clearInterval(interval);
+    }, [article.id, isGenerating, onUpdate]);
     const [copied, setCopied] = useState<false | "rich" | "plain">(false);
     const [regenerating, setRegenerating] = useState(false);
     const [regenErr, setRegenErr] = useState<string | null>(null);
