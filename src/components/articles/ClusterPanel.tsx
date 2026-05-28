@@ -309,6 +309,54 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
         });
     }
 
+    /** Identify articles stuck generating (placeholder excerpt for > 10 min) */
+    function getStuckArticles(): ClusterArticle[] {
+        const tenMinAgo = Date.now() - 10 * 60 * 1000;
+        return (cluster?.articles ?? []).filter((a) => {
+            if (!isArticleStillGenerating(a)) return false;
+            const created = new Date(a.created_at).getTime();
+            return created < tenMinAgo;
+        });
+    }
+
+    const stuckArticles = cluster ? getStuckArticles() : [];
+
+    /** Delete stuck placeholder articles, then regenerate them */
+    async function retryStuckArticles() {
+        if (!cluster || stuckArticles.length === 0) return;
+        setBatchGenerating(true); setPageGenErr(null);
+
+        // Step 1: Delete all stuck placeholders
+        for (const a of stuckArticles) {
+            try {
+                await fetch(`/api/articles/${a.id}`, { method: "DELETE" });
+            } catch { /* best-effort */ }
+        }
+
+        // Step 2: Reload cluster to clear deleted articles
+        await loadCluster();
+        onUpdate();
+        window.dispatchEvent(new Event("article-created"));
+
+        // Step 3: Re-run batch generate (which will now see those slots as empty)
+        setBatchGenerating(false);
+        // Small delay to let state settle
+        setTimeout(() => batchGenerate(), 300);
+    }
+
+    /** Retry a single stuck article — delete placeholder then regenerate the page */
+    async function retrySingleArticle(articleId: string, pageType: string, pageIndex: number, pageKey: string) {
+        setGeneratingPage(pageKey); setPageGenErr(null);
+        try {
+            // Delete the stuck placeholder
+            await fetch(`/api/articles/${articleId}`, { method: "DELETE" });
+            await loadCluster();
+            onUpdate();
+        } catch { /* best-effort */ }
+        // Generate fresh
+        await generatePage(pageType, pageIndex, pageKey);
+    }
+
     async function saveStrategy() {
         try {
             const parsed = JSON.parse(editStrategyJson);
@@ -611,6 +659,12 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                         : generatedCount >= totalPages ? <><CheckCircle2 className="h-3.5 w-3.5" /> All Generated</>
                             : <><Play className="h-3.5 w-3.5" /> Generate All ({totalPages - generatedCount})</>}
                 </Button>
+
+                {stuckArticles.length > 0 && (
+                    <Button size="sm" variant="outline" onClick={retryStuckArticles} disabled={batchGenerating} className="gap-1.5 text-amber-600 border-amber-500/40 hover:bg-amber-500/10 hover:text-amber-700">
+                        <RefreshCw className="h-3.5 w-3.5" /> Retry Stuck ({stuckArticles.length})
+                    </Button>
+                )}
 
                 <div className="ml-auto">
                 <DropdownMenu onOpenChange={(open) => { if (!open) setConfirmDelete(false); }}>
@@ -1037,9 +1091,26 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                                             )}
                                         </>
                                     ) : articleIsGenerating ? (
-                                        <RefreshCw className="h-3 w-3 animate-spin text-amber-500" />
+                                        (() => {
+                                            const isStuck = articleMatch && (Date.now() - new Date(articleMatch.created_at).getTime() > 10 * 60 * 1000);
+                                            return isStuck ? (
+                                                <Button variant="ghost" size="sm"
+                                                    onClick={() => articleMatch && retrySingleArticle(articleMatch.id, type, idx, pageKey)}
+                                                    disabled={!!generatingPage || batchGenerating}
+                                                    className="h-6 px-2 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 gap-1">
+                                                    <RefreshCw className="h-3 w-3" /> Retry
+                                                </Button>
+                                            ) : (
+                                                <RefreshCw className="h-3 w-3 animate-spin text-amber-500" />
+                                            );
+                                        })()
                                     ) : articleHasFailed ? (
-                                        <AlertCircle className="h-3.5 w-3.5 text-destructive" />
+                                        <Button variant="ghost" size="sm"
+                                            onClick={() => articleMatch && retrySingleArticle(articleMatch.id, type, idx, pageKey)}
+                                            disabled={!!generatingPage || batchGenerating}
+                                            className="h-6 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 gap-1">
+                                            <RefreshCw className="h-3 w-3" /> Retry
+                                        </Button>
                                     ) : (
                                         <Button variant="ghost" size="sm" onClick={() => generatePage(type, idx, pageKey)}
                                             disabled={!!generatingPage || batchGenerating} className="h-6 px-2 text-xs">
