@@ -203,7 +203,11 @@ export default async function handler(
         // ── Create placeholder article & respond immediately ────────────
         // This ensures the client gets a response in <2 seconds regardless
         // of how long the LLM pipeline takes.
-        const placeholderTitle = rawCreationPrompt.trim().slice(0, 120) || "New Article";
+        // Strip any prepended voice profile (separated by "---") to get the user's actual topic
+        const topicText = rawCreationPrompt.includes("\n---\n")
+            ? rawCreationPrompt.split("\n---\n").pop()!.trim()
+            : rawCreationPrompt.trim();
+        const placeholderTitle = topicText.slice(0, 120) || "New Article";
         const placeholderSlug = slugify(placeholderTitle, { lower: true, strict: true, trim: true });
 
         let savedArticleId: string | null = null;
