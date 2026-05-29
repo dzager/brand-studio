@@ -318,11 +318,8 @@ Which style best fits this article? Respond with JSON only.`;
             cluster_role: role,
         });
 
-        // ── Register pipeline with Vercel runtime ────────────────────────
-        // waitUntil() tells Vercel to keep the serverless function alive
-        // until the pipeline promise resolves, even after the response is sent.
-        waitUntil(
-            runClusterPipeline({
+        // ── Run pipeline in background ────────────────────────────────────
+        const pipelinePromise = runClusterPipeline({
                 articleId: savedArticleId!,
                 clusterId,
                 page,
@@ -357,8 +354,14 @@ Which style best fits this article? Respond with JSON only.`;
                             }).eq("id", savedArticleId);
                         } catch { /* best-effort */ }
                     }
-                })
-        );
+                });
+
+        // On Vercel: waitUntil() keeps the function alive. Locally: fall back to await.
+        try {
+            waitUntil(pipelinePromise);
+        } catch {
+            await pipelinePromise;
+        }
     } catch (err) {
         console.error(`API /api/clusters/${req.query.id}/generate error:`, err);
         const message = err instanceof Error ? err.message : "Unknown server error";

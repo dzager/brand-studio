@@ -247,13 +247,9 @@ export default async function handler(
             status: "generating",
         });
 
-        // ── Register pipeline with Vercel runtime ────────────────────────
-        // waitUntil() tells Vercel to keep the serverless function alive
-        // until the pipeline promise resolves, even after the response is
-        // sent. Without this, Vercel may freeze/kill the function
-        // immediately after res.json(), silently aborting the pipeline.
-        waitUntil(
-            runArticlePipeline({
+        // ── Run pipeline in background ────────────────────────────────────
+        // Build the pipeline promise with status tracking.
+        const pipelinePromise = runArticlePipeline({
                 articleId: savedArticleId!,
                 rawCreationPrompt,
                 requestedModel,
@@ -285,8 +281,16 @@ export default async function handler(
                             }).eq("id", savedArticleId);
                         } catch { /* best-effort */ }
                     }
-                })
-        );
+                });
+
+        // On Vercel: waitUntil() keeps the serverless function alive after the
+        // response is sent. Locally: waitUntil isn't available, so fall back
+        // to await (works fine since the Node.js dev server is long-lived).
+        try {
+            waitUntil(pipelinePromise);
+        } catch {
+            await pipelinePromise;
+        }
     } catch (err) {
         console.error("API /api/create error:", err);
         const message = err instanceof Error ? err.message : "Unknown server error";
