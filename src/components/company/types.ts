@@ -30,6 +30,7 @@ export type CompanyData = {
     reference_articles: string[] | null;
     auto_humanize: boolean | null;
     include_toc: boolean | null;
+    default_image_mode: "generate" | "library" | null;
     created_at: string;
     prompts: CompanyPrompt[];
 };
@@ -50,6 +51,7 @@ export type CompanyForm = {
     seo_content_guidelines: string;
     auto_humanize: boolean;
     include_toc: boolean;
+    default_image_mode: "generate" | "library";
     reference_articles: string[];
     useCustomStyles: boolean;
     image_style_categories: ImageStyleCategory[];

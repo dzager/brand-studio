@@ -14,6 +14,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { List, FileText, AlertCircle, Plus } from "lucide-react";
 
 
@@ -68,6 +71,14 @@ export default function ArticlesPage() {
     const [showManualCluster, setShowManualCluster] = useState(false);
     const [showAutoCluster, setShowAutoCluster] = useState(false);
     const [showCreateModal, setShowCreateModal] = useState(false);
+
+    // New Article modal state
+    const [showNewArticle, setShowNewArticle] = useState(false);
+    const [newTitle, setNewTitle] = useState("");
+    const [newClusterId, setNewClusterId] = useState<string>("__none__");
+    const [newArticleCompanyId, setNewArticleCompanyId] = useState<string>("__none__");
+    const [newArticleLoading, setNewArticleLoading] = useState(false);
+    const [newArticleErr, setNewArticleErr] = useState<string | null>(null);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -165,6 +176,48 @@ export default function ArticlesPage() {
         fetchData();
     }
 
+    // Clusters filtered by selected company in the new-article modal
+    const filteredClusters = newArticleCompanyId === "__none__"
+        ? clusters
+        : clusters.filter((c) => c.company_id === newArticleCompanyId);
+
+    async function handleCreateNewArticle() {
+        if (!newTitle.trim()) return;
+        setNewArticleLoading(true);
+        setNewArticleErr(null);
+        try {
+            const slug = newTitle.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+            const companyId = newArticleCompanyId === "__none__" ? undefined : newArticleCompanyId;
+            const clusterId = newClusterId === "__none__" ? undefined : newClusterId;
+            // If a cluster is selected, look up its company_id for auto-association
+            const clusterCompany = clusterId ? clusters.find((c) => c.id === clusterId)?.company_id : undefined;
+            const r = await fetch("/api/articles", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title: newTitle.trim(),
+                    slug,
+                    company_id: companyId || clusterCompany || undefined,
+                    cluster_id: clusterId || undefined,
+                }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || "Failed to create article");
+            setShowNewArticle(false);
+            setNewTitle("");
+            setNewClusterId("__none__");
+            setNewArticleCompanyId("__none__");
+            fetchData();
+            // Auto-select the new article
+            setSelectedArticleId(data.id);
+            setSelectedClusterId(null);
+        } catch (e: any) {
+            setNewArticleErr(e.message);
+        } finally {
+            setNewArticleLoading(false);
+        }
+    }
+
     const selectedArticle = articles.find((a) => a.id === selectedArticleId) || null;
 
     return (
@@ -232,6 +285,7 @@ export default function ArticlesPage() {
                                         onCreateAiCluster={() => setShowAiCluster(true)}
                                         onCreateManualCluster={() => setShowManualCluster(true)}
                                         onAutoCluster={() => setShowAutoCluster(true)}
+                                        onNewArticle={() => setShowNewArticle(true)}
                                     />
                                 </div>
 
@@ -292,6 +346,88 @@ export default function ArticlesPage() {
                 onOpenChange={setShowCreateModal}
                 onCreated={fetchData}
             />
+
+            {/* New Article Dialog — lightweight title + cluster picker */}
+            <Dialog open={showNewArticle} onOpenChange={(open) => {
+                if (!open) {
+                    setShowNewArticle(false);
+                    setNewTitle("");
+                    setNewClusterId("__none__");
+                    setNewArticleCompanyId("__none__");
+                    setNewArticleErr(null);
+                }
+            }}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>New Article</DialogTitle>
+                        <DialogDescription>
+                            Create a blank article. You can optionally assign it to a cluster.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-2">
+                        {/* Title */}
+                        <div className="space-y-1.5">
+                            <label htmlFor="new-article-title" className="text-sm font-medium">Title</label>
+                            <Input
+                                id="new-article-title"
+                                placeholder="e.g., The Ultimate Guide to…"
+                                value={newTitle}
+                                onChange={(e) => setNewTitle(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === "Enter" && newTitle.trim()) handleCreateNewArticle(); }}
+                                autoFocus
+                            />
+                        </div>
+
+                        {/* Company picker (only when multiple companies) */}
+                        {companyList.length > 1 && (
+                            <div className="space-y-1.5">
+                                <label htmlFor="new-article-company" className="text-sm font-medium">Company</label>
+                                <Select value={newArticleCompanyId} onValueChange={(v) => { setNewArticleCompanyId(v); setNewClusterId("__none__"); }}>
+                                    <SelectTrigger id="new-article-company" className="w-full">
+                                        <SelectValue placeholder="None" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="__none__">None</SelectItem>
+                                        {companyList.map((c) => (
+                                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
+                        {/* Cluster picker */}
+                        {filteredClusters.length > 0 && (
+                            <div className="space-y-1.5">
+                                <label htmlFor="new-article-cluster" className="text-sm font-medium">Cluster</label>
+                                <Select value={newClusterId} onValueChange={setNewClusterId}>
+                                    <SelectTrigger id="new-article-cluster" className="w-full">
+                                        <SelectValue placeholder="None" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="__none__">None (unclustered)</SelectItem>
+                                        {filteredClusters.map((c) => (
+                                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
+                        {newArticleErr && (
+                            <p className="text-sm text-destructive">{newArticleErr}</p>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowNewArticle(false)}>Cancel</Button>
+                        <Button onClick={handleCreateNewArticle} disabled={!newTitle.trim() || newArticleLoading}>
+                            {newArticleLoading ? "Creating…" : "Create Article"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

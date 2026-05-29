@@ -145,7 +145,7 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
 
     const [addingPageType, setAddingPageType] = useState<string | null>(null);
     const [newPage, setNewPage] = useState<ClusterPage>({
-        title: "", keyword: "", slug: "", description: "", word_count: "1,800", links_to: [],
+        title: "", keyword: "", slug: "", description: "", word_count: "1,200-2,500", links_to: [],
     });
     const [savingNewPage, setSavingNewPage] = useState(false);
 
@@ -176,9 +176,24 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
 
     useEffect(() => { loadCluster(); }, [loadCluster]);
 
+    // ── Sync imageMode from company default_image_mode ──────────────
+    useEffect(() => {
+        if (!cluster?.company_id) return;
+        fetch(`/api/companies/${cluster.company_id}`)
+            .then((r) => r.json())
+            .then((data) => {
+                if (data?.default_image_mode === "library") {
+                    setImageMode("search");
+                } else {
+                    setImageMode("ai");
+                }
+            })
+            .catch(() => { /* keep default */ });
+    }, [cluster?.company_id]);
+
     // ── Auto-refresh when articles are still generating ─────────────
     const hasGeneratingArticles = (cluster?.articles ?? []).some(
-        (a) => a.excerpt === "Generating article…"
+        (a) => a.excerpt === "Generating article…" || (a as any).status === "generating"
     );
     useEffect(() => {
         if (!hasGeneratingArticles) return;
@@ -190,7 +205,7 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                     setCluster(data);
                     // If no more generating articles, parent should refresh too
                     const stillGenerating = (data.articles ?? []).some(
-                        (a: any) => a.excerpt === "Generating article…"
+                        (a: any) => a.excerpt === "Generating article…" || a.status === "generating"
                     );
                     if (!stillGenerating) onUpdate();
                 }
@@ -536,11 +551,11 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
     }
 
     function isArticleStillGenerating(article: ClusterArticle) {
-        return article.excerpt === "Generating article…" || article.excerpt === "Generation failed — please regenerate.";
+        return article.excerpt === "Generating article…" || article.excerpt === "Generation failed — please regenerate." || (article as any).status === "generating" || (article as any).status === "failed";
     }
 
     function isArticleFailed(article: ClusterArticle) {
-        return article.excerpt === "Generation failed — please regenerate.";
+        return article.excerpt === "Generation failed — please regenerate." || (article as any).status === "failed";
     }
 
     function isPageGenerated(slug: string) {
@@ -566,7 +581,7 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
 
     function openAddPageForm(type: string) {
         setAddingPageType(type);
-        setNewPage({ title: "", keyword: "", slug: "", description: "", word_count: type === "pillar" ? "3,000" : type === "supporting" ? "1,800" : "800", links_to: [] });
+        setNewPage({ title: "", keyword: "", slug: "", description: "", word_count: type === "pillar" ? "2,500-5,000" : type === "supporting" ? "1,200-2,500" : "600-1,200", links_to: [] });
     }
 
     function handleNewPageFieldChange(field: keyof ClusterPage, value: string) {

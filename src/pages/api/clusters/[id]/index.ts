@@ -32,7 +32,7 @@ export default async function handler(
             // Get articles in this cluster
             const { data: articles, error: articlesErr } = await supabase
                 .from("articles")
-                .select("id, title, slug, excerpt, cluster_role, created_at, seo")
+                .select("id, title, slug, excerpt, cluster_role, created_at, seo, status")
                 .eq("cluster_id", id)
                 .order("created_at", { ascending: true });
 

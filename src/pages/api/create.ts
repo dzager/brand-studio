@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { waitUntil } from "@vercel/functions";
 
 export const config = {
     api: { bodyParser: { sizeLimit: "10mb" }, responseLimit: false },
@@ -220,6 +221,7 @@ export default async function handler(
                 image_style: image_style || "default",
                 company_id: company_id || null,
                 account_id: accountId || null,
+                status: "generating",
             }).select("id").single();
             savedArticleId = savedArticle?.id ?? null;
         } catch (saveErr) {
@@ -241,11 +243,13 @@ export default async function handler(
             status: "generating",
         });
 
-        // ── Await pipeline so the handler stays alive ────────────────────
-        // Response is already sent above. Awaiting keeps the Vercel
-        // function running (up to maxDuration) instead of being frozen.
-        try {
-            await runArticlePipeline({
+        // ── Register pipeline with Vercel runtime ────────────────────────
+        // waitUntil() tells Vercel to keep the serverless function alive
+        // until the pipeline promise resolves, even after the response is
+        // sent. Without this, Vercel may freeze/kill the function
+        // immediately after res.json(), silently aborting the pipeline.
+        waitUntil(
+            runArticlePipeline({
                 articleId: savedArticleId!,
                 rawCreationPrompt,
                 requestedModel,
@@ -257,18 +261,28 @@ export default async function handler(
                 composite_bg_image_url,
                 compositeOverrideBgPrompt,
                 accountId,
-            });
-        } catch (pipelineErr) {
-            console.error(`[create] Background pipeline failed for ${savedArticleId}:`, pipelineErr);
-            if (savedArticleId) {
-                try {
-                    await getSupabase().from("articles").update({
-                        html: `<p>Article generation failed: ${pipelineErr instanceof Error ? pipelineErr.message : "Unknown error"}. Please try again.</p>`,
-                        excerpt: "Generation failed — please regenerate.",
-                    }).eq("id", savedArticleId);
-                } catch { /* best-effort */ }
-            }
-        }
+            })
+                .then(async () => {
+                    console.log(`[create] Pipeline completed for ${savedArticleId}`);
+                    try {
+                        await getSupabase().from("articles").update({
+                            status: "ready",
+                        }).eq("id", savedArticleId);
+                    } catch { /* best-effort */ }
+                })
+                .catch(async (pipelineErr) => {
+                    console.error(`[create] Background pipeline failed for ${savedArticleId}:`, pipelineErr);
+                    if (savedArticleId) {
+                        try {
+                            await getSupabase().from("articles").update({
+                                status: "failed",
+                                html: `<p>Article generation failed: ${pipelineErr instanceof Error ? pipelineErr.message : "Unknown error"}. Please try again.</p>`,
+                                excerpt: "Generation failed — please regenerate.",
+                            }).eq("id", savedArticleId);
+                        } catch { /* best-effort */ }
+                    }
+                })
+        );
     } catch (err) {
         console.error("API /api/create error:", err);
         const message = err instanceof Error ? err.message : "Unknown server error";
@@ -490,7 +504,11 @@ async function runArticlePipeline({
     }
 
     // ── Step 3: Generate image ──────────────────────────────────────
-    try {
+    // Skip if the article already has an uploaded/existing image
+    const { data: existingArticle } = await sb.from("articles").select("image_base64").eq("id", articleId).single();
+    if (existingArticle?.image_base64) {
+        console.log(`[pipeline] Article ${articleId} already has an image — skipping image generation`);
+    } else try {
         const resolvedStyle = brandCategories.find((c) => c.id === styleId);
         const isCompositeStyle = resolvedStyle?.type === "composite";
         const hasCompositeProduct = composite_product_image_url && typeof composite_product_image_url === "string";

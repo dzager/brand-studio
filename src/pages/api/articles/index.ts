@@ -71,6 +71,8 @@ export default async function handler(
                 image_style,
                 company_id,
                 account_id,
+                cluster_id,
+                cluster_role,
             } = req.body;
 
             // Determine account_id
@@ -108,6 +110,8 @@ export default async function handler(
                     image_style,
                     company_id: company_id || null,
                     account_id: targetAccountId,
+                    cluster_id: cluster_id || null,
+                    cluster_role: cluster_role || null,
                 })
                 .select()
                 .single();

@@ -2,6 +2,7 @@
 // POST: Generate a single article from a cluster strategy page.
 // Injects cluster context (internal links, keyword coordination) into the prompt.
 import type { NextApiRequest, NextApiResponse } from "next";
+import { waitUntil } from "@vercel/functions";
 
 export const config = {
     api: { responseLimit: false },
@@ -292,6 +293,7 @@ Which style best fits this article? Respond with JSON only.`;
                 account_id: (companyData as any).account_id || null,
                 cluster_id: clusterId,
                 cluster_role: role,
+                status: "generating",
             }).select("id").single();
             savedArticleId = savedArticle?.id ?? null;
         } catch (saveErr) {
@@ -316,11 +318,11 @@ Which style best fits this article? Respond with JSON only.`;
             cluster_role: role,
         });
 
-        // ── Await pipeline so the handler stays alive ──────────────────
-        // Response is already sent. Awaiting keeps the Vercel function
-        // running (up to maxDuration) instead of being frozen.
-        try {
-            await runClusterPipeline({
+        // ── Register pipeline with Vercel runtime ────────────────────────
+        // waitUntil() tells Vercel to keep the serverless function alive
+        // until the pipeline promise resolves, even after the response is sent.
+        waitUntil(
+            runClusterPipeline({
                 articleId: savedArticleId!,
                 clusterId,
                 page,
@@ -335,18 +337,28 @@ Which style best fits this article? Respond with JSON only.`;
                 strategy,
                 existingSiblings,
                 companyData,
-            });
-        } catch (pipelineErr) {
-            console.error(`[cluster-gen] Pipeline failed for ${savedArticleId}:`, pipelineErr);
-            if (savedArticleId) {
-                try {
-                    await supabase.from("articles").update({
-                        html: `<p>Article generation failed: ${pipelineErr instanceof Error ? pipelineErr.message : "Unknown error"}. Please try again.</p>`,
-                        excerpt: "Generation failed — please regenerate.",
-                    }).eq("id", savedArticleId);
-                } catch { /* best-effort */ }
-            }
-        }
+            })
+                .then(async () => {
+                    console.log(`[cluster-gen] Pipeline completed for ${savedArticleId}`);
+                    try {
+                        await supabase.from("articles").update({
+                            status: "ready",
+                        }).eq("id", savedArticleId);
+                    } catch { /* best-effort */ }
+                })
+                .catch(async (pipelineErr) => {
+                    console.error(`[cluster-gen] Pipeline failed for ${savedArticleId}:`, pipelineErr);
+                    if (savedArticleId) {
+                        try {
+                            await supabase.from("articles").update({
+                                status: "failed",
+                                html: `<p>Article generation failed: ${pipelineErr instanceof Error ? pipelineErr.message : "Unknown error"}. Please try again.</p>`,
+                                excerpt: "Generation failed — please regenerate.",
+                            }).eq("id", savedArticleId);
+                        } catch { /* best-effort */ }
+                    }
+                })
+        );
     } catch (err) {
         console.error(`API /api/clusters/${req.query.id}/generate error:`, err);
         const message = err instanceof Error ? err.message : "Unknown server error";
@@ -436,7 +448,11 @@ async function runClusterPipeline({
     }
 
     // ── Step 3: Image ───────────────────────────────────────────────
-    try {
+    // Skip if the article already has an uploaded/existing image
+    const { data: existingRow } = await sb.from("articles").select("image_base64").eq("id", articleId).single();
+    if (existingRow?.image_base64) {
+        console.log(`[cluster-pipeline] Article ${articleId} already has an image — skipping image generation`);
+    } else try {
         let finalImagePrompt = "";
         let image_base64: string | null = null;
 

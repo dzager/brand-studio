@@ -81,6 +81,8 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
     const [extractThumbnail, setExtractThumbnail] = useState<string | null>(null);
     const [generatingThumbnail, setGeneratingThumbnail] = useState(false);
     const [generatingThumbIdx, setGeneratingThumbIdx] = useState<number | null>(null);
+    const [autoSaving, setAutoSaving] = useState(false);
+    const [autoSaved, setAutoSaved] = useState(false);
     const imageInputRef = useRef<HTMLInputElement>(null);
 
     /* ── Batch upload state ── */
@@ -97,19 +99,35 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
     };
     const [batchItems, setBatchItems] = useState<BatchImageItem[]>([]);
     const [batchAnalyzing, setBatchAnalyzing] = useState(false);
+    const [batchAutoSaved, setBatchAutoSaved] = useState(false);
     const [batchErr, setBatchErr] = useState<string | null>(null);
     const batchInputRef = useRef<HTMLInputElement>(null);
+
+    /** Persist image_style_categories to the database immediately */
+    async function autoSaveStyles(newCategories: import("@/brand/engine").ImageStyleCategory[]) {
+        const res = await fetch(`/api/companies/${company.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image_style_categories: newCategories.length > 0 ? newCategories : null }),
+        });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data?.error || "Failed to save styles");
+        }
+    }
 
     function openBatchUpload() {
         setShowBatchUpload(true);
         setBatchItems([]);
         setBatchAnalyzing(false);
+        setBatchAutoSaved(false);
         setBatchErr(null);
     }
     function closeBatchUpload() {
         setShowBatchUpload(false);
         setBatchItems([]);
         setBatchAnalyzing(false);
+        setBatchAutoSaved(false);
         setBatchErr(null);
     }
 
@@ -223,7 +241,7 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
         setBatchAnalyzing(false);
     }
 
-    function saveBatchStyles() {
+    async function saveBatchStyles() {
         const newStyles: import("@/brand/engine").ImageStyleCategory[] = batchItems
             .filter(item => item.status === "done" && item.result)
             .map(item => {
@@ -239,10 +257,11 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
                 };
             });
         if (newStyles.length === 0) return;
+        const merged = [...form.image_style_categories, ...newStyles];
         setForm(prev => ({
             ...prev,
             useCustomStyles: true,
-            image_style_categories: [...prev.image_style_categories, ...newStyles],
+            image_style_categories: merged,
         }));
         // Auto-expand the newly added styles
         setExpandedStyles(prev => {
@@ -251,18 +270,31 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
             newStyles.forEach((_, i) => next.add(startIdx + i));
             return next;
         });
-        closeBatchUpload();
+        // Auto-save to database
+        try {
+            await autoSaveStyles(merged);
+            setBatchAutoSaved(true);
+        } catch (e: any) {
+            setBatchErr(e.message || "Auto-save failed");
+        }
     }
 
     function openImageExtract() {
         setShowImageExtract(true); setExtractPreviewUrl(null); setExtractBase64(null);
         setExtracting(false); setExtractErr(null); setExtractResult(null); setExtractStyleName("");
-        setExtractThumbnail(null); setGeneratingThumbnail(false);
+        setExtractThumbnail(null); setGeneratingThumbnail(false); setAutoSaving(false); setAutoSaved(false);
     }
     function closeImageExtract() {
         setShowImageExtract(false); setExtractPreviewUrl(null); setExtractBase64(null);
         setExtracting(false); setExtractErr(null); setExtractResult(null); setExtractStyleName("");
-        setExtractThumbnail(null); setGeneratingThumbnail(false);
+        setExtractThumbnail(null); setGeneratingThumbnail(false); setAutoSaving(false); setAutoSaved(false);
+    }
+    /** Reset extraction state for uploading another image without closing the dialog */
+    function resetForAnother() {
+        setExtractPreviewUrl(null); setExtractBase64(null);
+        setExtracting(false); setExtractErr(null); setExtractResult(null); setExtractStyleName("");
+        setExtractThumbnail(null); setGeneratingThumbnail(false); setAutoSaving(false); setAutoSaved(false);
+        if (imageInputRef.current) imageInputRef.current.value = "";
     }
     function handleImageFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
@@ -276,38 +308,59 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
     }
     async function handleImageExtract() {
         if (!extractBase64) return;
-        setExtracting(true); setExtractErr(null); setExtractThumbnail(null);
-        const result = await runTask<{ style: ImageStyleAnalysis }>({
+        setExtracting(true); setExtractErr(null); setExtractThumbnail(null); setAutoSaved(false);
+        await runTask<{ style: ImageStyleAnalysis }>({
             type: "style-extract",
             label: "Extracting image style",
             endpoint: "/api/analyze-image-style",
             body: { image_base64: extractBase64 },
-            onSuccess: (data) => {
+            onSuccess: async (data) => {
                 setExtractResult(data.style); setExtractStyleName(data.style.style_name || "");
-                if (data.style.image_prompt_style) {
-                    setGeneratingThumbnail(true);
-                    runTask<{ thumbnail_base64: string }>({
-                        type: "thumbnail",
-                        label: `Thumbnail: ${data.style.style_name || "extracted style"}`,
-                        endpoint: "/api/generate-style-thumbnail",
-                        body: { image_prompt_style: data.style.image_prompt_style, style_name: data.style.style_name },
-                        meta: { link: `/company?id=${company.id}&tab=visual`, linkLabel: "View in Visual" },
-                        onSuccess: (d2) => { if (d2.thumbnail_base64) setExtractThumbnail(`data:image/jpeg;base64,${d2.thumbnail_base64}`); },
-                    }).finally(() => setGeneratingThumbnail(false));
+
+                // Use the uploaded image itself as the thumbnail (resized)
+                let thumbnailUrl: string | undefined;
+                if (extractBase64) {
+                    try {
+                        thumbnailUrl = await resizeToThumbnail(extractBase64);
+                        setExtractThumbnail(thumbnailUrl);
+                    } catch { /* thumbnail is non-critical */ }
+                }
+
+                // Build the style and auto-save to DB
+                const styleName = data.style.style_name || "Extracted Style";
+                const styleId = styleName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+                const ns: ImageStyleCategory = {
+                    id: styleId,
+                    label: styleName,
+                    narrative: data.style.narrative,
+                    storytelling_cues: data.style.storytelling_cues,
+                    image_prompt_style: data.style.image_prompt_style,
+                    thumbnail_url: thumbnailUrl,
+                };
+
+                // Update form state
+                let merged: ImageStyleCategory[] = [];
+                setForm(prev => {
+                    merged = [...prev.image_style_categories, ns];
+                    return { ...prev, useCustomStyles: true, image_style_categories: merged };
+                });
+                setExpandedStyles(prev => { const next = new Set(prev); next.add(merged.length - 1); return next; });
+
+                // Persist to DB
+                setAutoSaving(true);
+                try {
+                    // Need merged to be populated — setForm is async batched, so use computed value
+                    await autoSaveStyles(merged);
+                    setAutoSaved(true);
+                } catch (e: any) {
+                    setExtractErr(e.message || "Auto-save failed");
+                } finally {
+                    setAutoSaving(false);
                 }
             },
             onError: (err) => { setExtractErr(err); },
         });
         setExtracting(false);
-    }
-    function addExtractedStyle() {
-        if (!extractResult) return;
-        const name = extractStyleName.trim() || extractResult.style_name;
-        const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
-        const ns: ImageStyleCategory = { id, label: name, narrative: extractResult.narrative, storytelling_cues: extractResult.storytelling_cues, image_prompt_style: extractResult.image_prompt_style, thumbnail_url: extractThumbnail ?? undefined };
-        setForm(prev => ({ ...prev, useCustomStyles: true, image_style_categories: [...prev.image_style_categories, ns] }));
-        setExpandedStyles(prev => { const next = new Set(prev); next.add(form.image_style_categories.length); return next; });
-        closeImageExtract();
     }
 
     return (
@@ -468,21 +521,11 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
                 setExtractStyleName={setExtractStyleName}
                 extractThumbnail={extractThumbnail}
                 generatingThumbnail={generatingThumbnail}
-                onRegenerateThumbnail={() => {
-                    if (!extractResult?.image_prompt_style) return;
-                    setGeneratingThumbnail(true); setExtractThumbnail(null);
-                    runTask<{ thumbnail_base64: string }>({
-                        type: "thumbnail",
-                        label: `Thumbnail: ${extractStyleName || extractResult.style_name}`,
-                        endpoint: "/api/generate-style-thumbnail",
-                        body: { image_prompt_style: extractResult.image_prompt_style, style_name: extractStyleName || extractResult.style_name },
-                        meta: { link: `/company?id=${company.id}&tab=visual`, linkLabel: "View in Visual" },
-                        onSuccess: (d2) => { if (d2.thumbnail_base64) setExtractThumbnail(`data:image/jpeg;base64,${d2.thumbnail_base64}`); },
-                    }).finally(() => setGeneratingThumbnail(false));
-                }}
+                autoSaving={autoSaving}
+                autoSaved={autoSaved}
                 onFileSelect={handleImageFileSelect}
                 onExtract={handleImageExtract}
-                onAdd={addExtractedStyle}
+                onUploadAnother={resetForAnother}
                 onReplaceImage={() => { setExtractPreviewUrl(null); setExtractBase64(null); setExtractResult(null); setExtractErr(null); if (imageInputRef.current) imageInputRef.current.value = ""; }}
             />
 
@@ -493,19 +536,21 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
                 batchInputRef={batchInputRef}
                 items={batchItems}
                 analyzing={batchAnalyzing}
+                autoSaved={batchAutoSaved}
                 error={batchErr}
                 onFileSelect={handleBatchFileSelect}
                 onRemoveItem={removeBatchItem}
                 onUpdateName={(idx, name) => setBatchItems(prev => prev.map((item, i) => i === idx ? { ...item, styleName: name } : item))}
                 onAnalyze={analyzeBatchItems}
                 onSave={saveBatchStyles}
+                onUploadMore={() => { setBatchItems([]); setBatchAutoSaved(false); setBatchErr(null); }}
             />
         </div>
     );
 }
 
 /* ── Image Extract Dialog (split out to reduce main component size) ── */
-function ImageExtractDialog({ show, onClose, imageInputRef, extractPreviewUrl, extractBase64, extracting, extractErr, extractResult, extractStyleName, setExtractStyleName, extractThumbnail, generatingThumbnail, onRegenerateThumbnail, onFileSelect, onExtract, onAdd, onReplaceImage }: {
+function ImageExtractDialog({ show, onClose, imageInputRef, extractPreviewUrl, extractBase64, extracting, extractErr, extractResult, extractStyleName, setExtractStyleName, extractThumbnail, generatingThumbnail, autoSaving, autoSaved, onFileSelect, onExtract, onUploadAnother, onReplaceImage }: {
     show: boolean; onClose: () => void;
     imageInputRef: React.RefObject<HTMLInputElement | null>;
     extractPreviewUrl: string | null; extractBase64: string | null;
@@ -513,9 +558,9 @@ function ImageExtractDialog({ show, onClose, imageInputRef, extractPreviewUrl, e
     extractResult: ImageStyleAnalysis | null;
     extractStyleName: string; setExtractStyleName: (v: string) => void;
     extractThumbnail: string | null; generatingThumbnail: boolean;
-    onRegenerateThumbnail: () => void;
+    autoSaving: boolean; autoSaved: boolean;
     onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
-    onExtract: () => void; onAdd: () => void; onReplaceImage: () => void;
+    onExtract: () => void; onUploadAnother: () => void; onReplaceImage: () => void;
 }) {
     return (
         <Dialog open={show} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -535,7 +580,7 @@ function ImageExtractDialog({ show, onClose, imageInputRef, extractPreviewUrl, e
                         <div className="space-y-3">
                             <div className="relative rounded-xl overflow-hidden border border-border bg-black/5">
                                 <img src={extractPreviewUrl} alt="Uploaded reference" className="w-full max-h-72 object-contain" />
-                                <Button variant="secondary" size="sm" className="absolute top-2 right-2 h-7 gap-1 text-xs opacity-80 hover:opacity-100" onClick={onReplaceImage}><X className="h-3 w-3" /> Replace</Button>
+                                {!extractResult && <Button variant="secondary" size="sm" className="absolute top-2 right-2 h-7 gap-1 text-xs opacity-80 hover:opacity-100" onClick={onReplaceImage}><X className="h-3 w-3" /> Replace</Button>}
                             </div>
                             {!extractResult && <Button onClick={onExtract} disabled={extracting} className="w-full gap-2">{extracting ? (<><Loader2 className="h-4 w-4 animate-spin" /> Analyzing…</>) : (<><Sparkles className="h-4 w-4" /> Analyze Visual Style</>)}</Button>}
                         </div>
@@ -544,28 +589,41 @@ function ImageExtractDialog({ show, onClose, imageInputRef, extractPreviewUrl, e
                 {extractErr && <Alert variant="destructive" className="mt-3"><AlertCircle className="h-4 w-4" /><AlertDescription>{extractErr}</AlertDescription></Alert>}
                 {extractResult && (
                     <div className="mt-4 space-y-4">
-                        <Alert className="border-success bg-success/5"><CheckCircle2 className="h-4 w-4 text-success" /><AlertDescription className="text-success">Style extracted! Review below and add it.</AlertDescription></Alert>
+                        {/* Auto-save status */}
+                        {autoSaving && (
+                            <Alert className="border-primary/30 bg-primary/5">
+                                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                <AlertDescription className="text-primary">Saving style to your brand…</AlertDescription>
+                            </Alert>
+                        )}
+                        {autoSaved && (
+                            <Alert className="border-success bg-success/5">
+                                <CheckCircle2 className="h-4 w-4 text-success" />
+                                <AlertDescription className="text-success">
+                                    <strong>&ldquo;{extractStyleName}&rdquo;</strong> saved to your brand!
+                                </AlertDescription>
+                            </Alert>
+                        )}
+                        {!autoSaved && !autoSaving && (
+                            <Alert className="border-primary/30 bg-primary/5">
+                                <Sparkles className="h-4 w-4 text-primary" />
+                                <AlertDescription className="text-primary">Style extracted — saving…</AlertDescription>
+                            </Alert>
+                        )}
                         <div className="flex gap-4 items-start">
                             <div className="shrink-0">
                                 <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">Preview</Label>
                                 <div className="w-24 h-24 rounded-xl border border-border bg-muted/30 overflow-hidden shadow-sm">
-                                    {extractThumbnail ? (
-                                        <img src={extractThumbnail} alt="Style preview" className="w-full h-full object-cover" />
-                                    ) : generatingThumbnail ? (
-                                        <div className="w-full h-full flex flex-col items-center justify-center gap-1.5"><Loader2 className="h-5 w-5 animate-spin text-primary" /><span className="text-[10px] text-muted-foreground">Generating…</span></div>
+                                    {extractPreviewUrl ? (
+                                        <img src={extractPreviewUrl} alt="Style preview" className="w-full h-full object-cover" />
                                     ) : (
                                         <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-muted-foreground"><Camera className="h-5 w-5" /><span className="text-[10px]">No preview</span></div>
                                     )}
                                 </div>
-                                {!generatingThumbnail && (
-                                    <button type="button" onClick={onRegenerateThumbnail} className="mt-1.5 text-[10px] text-primary hover:underline cursor-pointer">
-                                        {extractThumbnail ? "↻ Regenerate" : "⟳ Generate preview"}
-                                    </button>
-                                )}
                             </div>
                             <div className="flex-1 space-y-1.5">
                                 <Label className="text-sm font-semibold">Style Name</Label>
-                                <Input value={extractStyleName} onChange={(e) => setExtractStyleName(e.target.value)} placeholder="e.g. Warm Editorial Glow" className="text-sm" />
+                                <Input value={extractStyleName} disabled className="text-sm bg-muted" />
                             </div>
                         </div>
                         <fieldset className="border border-border rounded-lg p-3.5 space-y-3">
@@ -585,7 +643,22 @@ function ImageExtractDialog({ show, onClose, imageInputRef, extractPreviewUrl, e
                         <fieldset className="border border-border rounded-lg p-3.5 space-y-1.5"><legend className="text-xs font-semibold px-1.5">📝 Prompt Style</legend><pre className="whitespace-pre-wrap break-words text-xs bg-muted p-3 rounded-md max-h-48 overflow-y-auto leading-relaxed">{extractResult.image_prompt_style}</pre></fieldset>
                         {extractResult.storytelling_cues?.length > 0 && <div className="space-y-1"><Label className="text-xs">Storytelling Cues</Label><div className="flex flex-wrap gap-1.5">{extractResult.storytelling_cues.map((c, i) => <Badge key={i} variant="outline" className="text-xs font-normal">{c}</Badge>)}</div></div>}
                         <div className="space-y-1"><Label className="text-xs">Narrative</Label><p className="text-xs text-muted-foreground leading-relaxed">{extractResult.narrative}</p></div>
-                        <div className="flex justify-end gap-2 pt-2"><Button variant="outline" onClick={onClose}>Cancel</Button><Button onClick={onAdd} className="gap-1.5"><Plus className="h-4 w-4" /> Add Style</Button></div>
+                        {/* Post-save actions: Upload Another or Done */}
+                        <div className="flex justify-end gap-2 pt-2">
+                            {autoSaved && (
+                                <>
+                                    <Button variant="outline" className="gap-1.5" onClick={onUploadAnother}>
+                                        <ImagePlus className="h-4 w-4" /> Upload Another
+                                    </Button>
+                                    <Button onClick={onClose} className="gap-1.5">
+                                        <CheckCircle2 className="h-4 w-4" /> Done
+                                    </Button>
+                                </>
+                            )}
+                            {!autoSaved && !autoSaving && (
+                                <Button variant="outline" onClick={onClose}>Close</Button>
+                            )}
+                        </div>
                     </div>
                 )}
             </DialogContent>
@@ -605,18 +678,20 @@ type BatchImageItem = {
     error: string | null;
 };
 
-function BatchImageUploadDialog({ show, onClose, batchInputRef, items, analyzing, error, onFileSelect, onRemoveItem, onUpdateName, onAnalyze, onSave }: {
+function BatchImageUploadDialog({ show, onClose, batchInputRef, items, analyzing, autoSaved, error, onFileSelect, onRemoveItem, onUpdateName, onAnalyze, onSave, onUploadMore }: {
     show: boolean;
     onClose: () => void;
     batchInputRef: React.RefObject<HTMLInputElement | null>;
     items: BatchImageItem[];
     analyzing: boolean;
+    autoSaved: boolean;
     error: string | null;
     onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
     onRemoveItem: (idx: number) => void;
     onUpdateName: (idx: number, name: string) => void;
     onAnalyze: () => void;
     onSave: () => void;
+    onUploadMore: () => void;
 }) {
     const doneCount = items.filter(i => i.status === "done").length;
     const errorCount = items.filter(i => i.status === "error").length;
@@ -762,20 +837,33 @@ function BatchImageUploadDialog({ show, onClose, batchInputRef, items, analyzing
 
                         {/* Action buttons */}
                         <div className="flex justify-end gap-2 pt-2">
-                            <Button variant="outline" onClick={onClose}>Cancel</Button>
-                            {hasQueued && (
-                                <Button onClick={onAnalyze} disabled={analyzing} className="gap-1.5">
-                                    {analyzing ? (
-                                        <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing…</>
-                                    ) : (
-                                        <><Sparkles className="h-4 w-4" /> Analyze {queuedCount} Image{queuedCount !== 1 ? "s" : ""}</>
+                            {autoSaved ? (
+                                <>
+                                    <Button variant="outline" className="gap-1.5" onClick={onUploadMore}>
+                                        <ImagePlus className="h-4 w-4" /> Upload More
+                                    </Button>
+                                    <Button onClick={onClose} className="gap-1.5">
+                                        <CheckCircle2 className="h-4 w-4" /> Done
+                                    </Button>
+                                </>
+                            ) : (
+                                <>
+                                    <Button variant="outline" onClick={onClose}>Cancel</Button>
+                                    {hasQueued && (
+                                        <Button onClick={onAnalyze} disabled={analyzing} className="gap-1.5">
+                                            {analyzing ? (
+                                                <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing…</>
+                                            ) : (
+                                                <><Sparkles className="h-4 w-4" /> Analyze {queuedCount} Image{queuedCount !== 1 ? "s" : ""}</>
+                                            )}
+                                        </Button>
                                     )}
-                                </Button>
-                            )}
-                            {allDone && doneCount > 0 && (
-                                <Button onClick={onSave} className="gap-1.5">
-                                    <Plus className="h-4 w-4" /> Save {doneCount} Style{doneCount !== 1 ? "s" : ""}
-                                </Button>
+                                    {allDone && doneCount > 0 && !autoSaved && (
+                                        <Button onClick={onSave} className="gap-1.5">
+                                            <Plus className="h-4 w-4" /> Save {doneCount} Style{doneCount !== 1 ? "s" : ""}
+                                        </Button>
+                                    )}
+                                </>
                             )}
                         </div>
                     </div>

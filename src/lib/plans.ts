@@ -20,7 +20,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     starter: {
         label: "Starter",
         price_monthly: 99,
-        articles_per_month: 25,
+        articles_per_month: 200,
         overage_price: 3.5,
         max_seats: 1,
         extra_seat_price: 0,

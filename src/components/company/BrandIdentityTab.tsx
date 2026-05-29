@@ -94,6 +94,42 @@ export function BrandIdentityTab({ company, form, setForm, setField, editing }: 
                             <div className="text-xs text-muted-foreground">{(editing ? form.include_toc : company.include_toc === true) ? "Enabled" : "Disabled"}{editing ? " — click to toggle" : ""}</div>
                         </div>
                     </button>
+                    <div className="space-y-1.5">
+                        <div className="text-sm font-medium">🖼️ Default Image Source</div>
+                        <div className="text-xs text-muted-foreground mb-2">Choose how article images are created by default</div>
+                        {editing ? (
+                            <div className="inline-flex rounded-lg border border-border p-0.5 bg-muted/30">
+                                <button
+                                    type="button"
+                                    onClick={() => setField("default_image_mode", "generate")}
+                                    className={cn(
+                                        "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+                                        form.default_image_mode === "generate"
+                                            ? "bg-background text-foreground shadow-sm"
+                                            : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    🎨 Generate
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setField("default_image_mode", "library")}
+                                    className={cn(
+                                        "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+                                        form.default_image_mode === "library"
+                                            ? "bg-background text-foreground shadow-sm"
+                                            : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    🔍 Match from Library
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="text-xs">
+                                {(company.default_image_mode === "library") ? "🔍 Match from Library" : "🎨 Generate"}
+                            </div>
+                        )}
+                    </div>
                     <Field label="Avoid Phrases" value={editing ? form.avoid_phrases : company.avoid_phrases} editing={editing} onChange={v => setField("avoid_phrases", v)} rows={2} />
                     {editing ? (
                         <div className="space-y-2">

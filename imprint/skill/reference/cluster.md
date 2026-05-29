@@ -47,7 +47,7 @@ Cluster authority compounds. A new article inside a strong cluster ranks faster 
 
 - One per cluster
 - Broad keyword (high volume, high competition)
-- 3,000-5,000 words
+- 2,500-5,000+ words
 - Overview + links to every supporting page
 - Section per major sub-aspect, each linking to the relevant supporting page
 - Goal: rank for the broad keyword AND act as the cluster hub
@@ -56,7 +56,7 @@ Cluster authority compounds. A new article inside a strong cluster ranks faster 
 
 - 4-8 per cluster
 - Narrower keyword (medium volume, medium competition)
-- 1,500-3,000 words
+- 1,200-2,500 words
 - Deep treatment of one specific sub-aspect
 - Links back to pillar + 2-3 related supporting pages
 - Goal: rank for the specific keyword and feed authority to the pillar
@@ -65,10 +65,31 @@ Cluster authority compounds. A new article inside a strong cluster ranks faster 
 
 - 0-12 per cluster
 - Very specific query (low volume, low competition)
-- 800-1,500 words
+- 600-1,200 words
 - Quick, focused answer
 - Links to relevant supporting page
 - Goal: capture long-tail traffic and direct it into the cluster
+
+### Definition / Glossary page (optional, assign as long-tail)
+
+- Captures featured snippets and AI citations
+- 400-800 words
+- Concise, factual, structured for extraction
+- Links to relevant supporting page and pillar
+
+### Comparison article (assign as supporting)
+
+- High-intent commercial traffic
+- 1,500-3,000 words
+- Side-by-side analysis with clear recommendations
+- Links back to pillar + related supporting pages
+
+### How-To Guide (assign as supporting)
+
+- Procedural search intent
+- 1,500-3,500 words
+- Step-by-step with specific details, costs, and timing
+- Links back to pillar + related supporting pages
 
 ## Design steps
 

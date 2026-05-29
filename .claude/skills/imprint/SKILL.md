@@ -45,7 +45,7 @@ If VOICE.md is missing: nudge once per session (*"Run `{{command_prefix}}imprint
 
 Every content task has a **register**:
 
-- **long** — feature articles, pillar pages, in-depth guides. 1,500-4,000 words. Editorial credibility paramount.
+- **long** — feature articles, pillar pages, in-depth guides. 600-5,000+ words (pillar: 2,500-5,000+; supporting: 1,200-2,500; long-tail/FAQ: 600-1,200; definition/glossary: 400-800; comparison: 1,500-3,000; how-to: 1,500-3,500). Editorial credibility paramount.
 - **short** — social posts, newsletters, summaries. <500 words. Voice match paramount.
 - **visual** — image prompts. Brand visual style + photography rules apply.
 - **video** — video scripts + storyboard + motion spec.
