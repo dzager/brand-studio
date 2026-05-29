@@ -41,6 +41,8 @@ type Article = {
     cluster_id: string | null;
     cluster_role: string | null;
     humanized: boolean;
+    featured_video_url: string | null;
+    featured_video_platform: string | null;
     created_at: string;
     updated_at: string;
 };
@@ -187,17 +189,22 @@ export default function ArticlesPage() {
         setNewArticleErr(null);
         try {
             const slug = newTitle.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-            const companyId = newArticleCompanyId === "__none__" ? undefined : newArticleCompanyId;
+            // Auto-assign the only company when the picker is hidden (single-company users)
+            let companyId = newArticleCompanyId === "__none__" ? undefined : newArticleCompanyId;
+            if (!companyId && companyList.length === 1) {
+                companyId = companyList[0].id;
+            }
             const clusterId = newClusterId === "__none__" ? undefined : newClusterId;
             // If a cluster is selected, look up its company_id for auto-association
             const clusterCompany = clusterId ? clusters.find((c) => c.id === clusterId)?.company_id : undefined;
+            const finalCompanyId = companyId || clusterCompany || undefined;
             const r = await fetch("/api/articles", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     title: newTitle.trim(),
                     slug,
-                    company_id: companyId || clusterCompany || undefined,
+                    company_id: finalCompanyId,
                     cluster_id: clusterId || undefined,
                 }),
             });

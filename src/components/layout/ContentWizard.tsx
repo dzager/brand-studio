@@ -76,6 +76,7 @@ interface WizardProps {
   recommendation: { id: string; label: string; reason: string } | null;
   onRecommendStyle: () => void;
   // Actions
+  err?: string | null;
   loading: boolean;
   clusterGenerating: boolean;
   onCreate: () => void;
@@ -88,6 +89,10 @@ interface WizardProps {
   snippetCollections?: { id: string; name: string; snippet_count: number }[];
   selectedCollectionId?: string;
   setSelectedCollectionId?: (id: string) => void;
+  // Cluster assignment (single article)
+  companyClusters?: { id: string; name: string; status: string }[];
+  selectedClusterId?: string;
+  setSelectedClusterId?: (id: string) => void;
 }
 
 const ALL_STEPS = [
@@ -116,7 +121,10 @@ export default function ContentWizard(props: WizardProps) {
     loading, clusterGenerating, onCreate, onCreateCluster,
     onPreviewPrompt, previewing, onBakeoffModelSelected,
     snippetCollections, selectedCollectionId, setSelectedCollectionId,
+    companyClusters, selectedClusterId, setSelectedClusterId,
   } = props;
+
+  const err = props.err;
 
   // When only 1 company, skip the Brand step entirely
   const singleCompany = companies.length === 1;
@@ -465,6 +473,34 @@ export default function ContentWizard(props: WizardProps) {
                   )}
                 </div>
               )}
+
+              {/* Assign to cluster — optional picker */}
+              {companyClusters && companyClusters.length > 0 && setSelectedClusterId && (
+                <div className="mt-4 p-3 rounded-lg border border-border/60 bg-muted/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Network className="h-3.5 w-3.5 text-primary" />
+                    <Label className="text-xs font-medium">Add to cluster</Label>
+                    <span className="text-[10px] text-muted-foreground">optional</span>
+                  </div>
+                  <select
+                    value={selectedClusterId || ""}
+                    onChange={(e) => setSelectedClusterId(e.target.value)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">Standalone (no cluster)</option>
+                    {companyClusters.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}{c.status === "complete" ? " ✓" : c.status === "in_progress" ? " ⏳" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedClusterId && (
+                    <p className="text-[10px] text-muted-foreground mt-1.5">
+                      This article will be added to the selected cluster as a supporting page.
+                    </p>
+                  )}
+                </div>
+              )}
             </>)}
 
             {/* Cluster: topic */}
@@ -686,6 +722,18 @@ export default function ContentWizard(props: WizardProps) {
                   </div>
                 </div>
               )}
+
+              {selectedClusterId && companyClusters && (
+                <div className="wizard-summary-row">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Cluster</span>
+                  <div className="flex items-center gap-1.5">
+                    <Network className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-sm">
+                      {companyClusters.find(c => c.id === selectedClusterId)?.name ?? "Cluster"}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Action */}
@@ -708,6 +756,9 @@ export default function ContentWizard(props: WizardProps) {
                 </Button>
               )}
               <p className="text-xs text-muted-foreground">~2 min · uses 1 credit</p>
+              {err && (
+                <p className="text-sm text-destructive mt-1">{err}</p>
+              )}
             </div>
           </div>
         )}

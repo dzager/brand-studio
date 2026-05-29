@@ -70,6 +70,10 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // Cluster assignment (single article mode)
+  const [companyClusters, setCompanyClusters] = useState<{ id: string; name: string; status: string }[]>([]);
+  const [selectedClusterId, setSelectedClusterId] = useState<string>("");
+
   // Snippet collections
   const [snippetCollections, setSnippetCollections] = useState<{ id: string; name: string; snippet_count: number }[]>([]);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>("");
@@ -173,6 +177,10 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
     fetch(`/api/snippet-collections?company_id=${companyId}`).then(r => r.json()).then(data => {
       if (Array.isArray(data)) setSnippetCollections(data);
     }).catch(() => { setSnippetCollections([]); });
+    // Fetch clusters for this company (for single-article assignment)
+    fetch(`/api/clusters?company_id=${companyId}`).then(r => r.json()).then(data => {
+      if (Array.isArray(data)) setCompanyClusters(data.map((c: any) => ({ id: c.id, name: c.name, status: c.status })));
+    }).catch(() => { setCompanyClusters([]); });
   }, [companyId]);
 
   // Load company prompts
@@ -185,6 +193,10 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
   // ── Handlers ───────────────────────────────────────────────────────
 
   async function onCreate() {
+    if (!companyId) {
+      setErr("Please select a company before creating.");
+      return;
+    }
     setLoading(true); setErr(null);
     // Build the creation prompt — prepend voice prompt if one is active
     let finalPrompt = prompt;
@@ -203,6 +215,7 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
       image_model: defaults.imageGeneration,
       utility_model: defaults.utility,
       snippet_collection_id: selectedCollectionId || undefined,
+      cluster_id: selectedClusterId || undefined,
     };
     if (isCompositeStyle && csProductUrl) {
       payload.composite_product_image_url = csProductUrl;
@@ -288,6 +301,8 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
     setPreviewData(null);
     setSnippetCollections([]);
     setSelectedCollectionId("");
+    setCompanyClusters([]);
+    setSelectedClusterId("");
   }
 
   return (
@@ -347,9 +362,10 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
                   setRecommendation(data); setImageStyle(data.id);
                 } catch (e: any) { setRecommendErr(e.message); } finally { setRecommending(false); }
               }}
+              err={err}
               loading={loading}
               clusterGenerating={clusterGenerating}
-              onCreate={() => { if (!companyId) { return; } onCreate(); }}
+              onCreate={onCreate}
               onCreateCluster={onCreateCluster}
               onPreviewPrompt={onPreviewPrompt}
               previewing={previewing}
@@ -357,6 +373,9 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
               snippetCollections={snippetCollections}
               selectedCollectionId={selectedCollectionId}
               setSelectedCollectionId={setSelectedCollectionId}
+              companyClusters={companyClusters}
+              selectedClusterId={selectedClusterId}
+              setSelectedClusterId={setSelectedClusterId}
             />
           </div>
         </DialogContent>
