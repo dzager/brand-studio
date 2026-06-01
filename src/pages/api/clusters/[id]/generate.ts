@@ -481,8 +481,10 @@ async function runClusterPipeline({
 
         await sb.from("articles").update({ image_base64, image_prompt: finalImagePrompt }).eq("id", articleId);
         console.log(`[cluster-pipeline] Image saved for ${articleId}`);
-    })().catch((imgErr) => {
+    })().catch(async (imgErr) => {
+        const errMsg = imgErr instanceof Error ? imgErr.message : String(imgErr);
         console.error(`[cluster-pipeline] Image failed for ${articleId}:`, imgErr);
+        try { await sb.from("articles").update({ image_prompt: `IMAGE_ERROR: ${errMsg}` }).eq("id", articleId); } catch { /* best-effort */ }
     });
 
     // Build humanization promise

@@ -530,8 +530,11 @@ async function runArticlePipeline({
 
         await sb.from("articles").update({ image_base64, image_prompt: finalImagePrompt }).eq("id", articleId);
         console.log(`[pipeline] Image saved for ${articleId}`);
-    })().catch((imgErr) => {
+    })().catch(async (imgErr) => {
+        const errMsg = imgErr instanceof Error ? imgErr.message : String(imgErr);
         console.error(`[pipeline] Image generation failed for ${articleId}:`, imgErr);
+        // Save error to DB so it's visible in the UI
+        try { await sb.from("articles").update({ image_prompt: `IMAGE_ERROR: ${errMsg}` }).eq("id", articleId); } catch { /* best-effort */ }
     });
 
     // Build humanization promise
