@@ -192,8 +192,14 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
     }, [cluster?.company_id]);
 
     // ── Auto-refresh when articles are still generating ─────────────
+    const PLACEHOLDER_EXCERPTS = new Set(["Generating article…", "Generation failed — please regenerate."]);
+    const isPlaceholderArticle = (a: any) =>
+        PLACEHOLDER_EXCERPTS.has(a.excerpt) || a.status === "generating" || a.status === "failed";
+    const hasRealContent = (a: any) =>
+        a.excerpt && !PLACEHOLDER_EXCERPTS.has(a.excerpt) && a.excerpt.length > 5;
+
     const hasGeneratingArticles = (cluster?.articles ?? []).some(
-        (a) => a.excerpt === "Generating article…" || (a as any).status === "generating"
+        (a) => isPlaceholderArticle(a) && !hasRealContent(a)
     );
     useEffect(() => {
         if (!hasGeneratingArticles) return;
@@ -205,7 +211,7 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                     setCluster(data);
                     // If no more generating articles, parent should refresh too
                     const stillGenerating = (data.articles ?? []).some(
-                        (a: any) => a.excerpt === "Generating article…" || a.status === "generating"
+                        (a: any) => isPlaceholderArticle(a) && !hasRealContent(a)
                     );
                     if (!stillGenerating) onUpdate();
                 }
@@ -551,10 +557,16 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
     }
 
     function isArticleStillGenerating(article: ClusterArticle) {
-        return article.excerpt === "Generating article…" || article.excerpt === "Generation failed — please regenerate." || (article as any).status === "generating" || (article as any).status === "failed";
+        // An article with real content (non-placeholder excerpt) is considered done,
+        // even if the status field hasn't been updated yet from the background pipeline.
+        const hasReal = article.excerpt && !PLACEHOLDER_EXCERPTS.has(article.excerpt) && article.excerpt.length > 5;
+        if (hasReal) return false;
+        return (article.excerpt != null && PLACEHOLDER_EXCERPTS.has(article.excerpt)) || (article as any).status === "generating" || (article as any).status === "failed";
     }
 
     function isArticleFailed(article: ClusterArticle) {
+        const hasReal = article.excerpt && !PLACEHOLDER_EXCERPTS.has(article.excerpt) && article.excerpt.length > 5;
+        if (hasReal) return false;
         return article.excerpt === "Generation failed — please regenerate." || (article as any).status === "failed";
     }
 

@@ -187,10 +187,20 @@ const BASE_COLORS = {
 // Helpers
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ── Company Cache (60s TTL) ──────────────────────────────────────────────
+const companyCache = new Map<string, { data: CompanyRow; ts: number }>();
+const COMPANY_CACHE_TTL_MS = 60_000;
+
 async function fetchCompany(
   supabase: SupabaseClient,
   companyName: string
 ): Promise<CompanyRow | null> {
+  const cacheKey = companyName.toLowerCase();
+  const cached = companyCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < COMPANY_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
   const { data, error } = await supabase
     .from("companies")
     .select(
@@ -201,7 +211,9 @@ async function fetchCompany(
     .single();
 
   if (error || !data) return null;
-  return data as CompanyRow;
+  const row = data as CompanyRow;
+  companyCache.set(cacheKey, { data: row, ts: Date.now() });
+  return row;
 }
 
 async function listCompanies(
@@ -503,55 +515,14 @@ server.tool(
       };
     }
 
-    const parts: string[] = [
-      `You are writing as ${company.name}.${company.tagline ? ` Tagline: "${company.tagline}".` : ""}${company.mission ? ` Mission: ${company.mission}.` : ""}`,
-      "",
-      "WRITING VOICE PROFILE — match this voice closely:",
-      `Voice summary: ${vp.summary}`,
-      `Tone: ${vp.tone_descriptors.join(", ")}.`,
-      `Sentence rhythm: ${vp.sentence_rhythm}`,
-      `Paragraph style: ${vp.paragraph_style}`,
-      `Vocabulary: ${vp.vocabulary_level}`,
-    ];
-
-    if (vp.rhetorical_devices.length) {
-      parts.push(`Rhetorical devices to use: ${vp.rhetorical_devices.join("; ")}.`);
-    }
-    if (vp.structural_patterns.length) {
-      parts.push(`Structural patterns: ${vp.structural_patterns.join("; ")}.`);
-    }
-    if (vp.pov_and_person) {
-      parts.push(`Point of view: ${vp.pov_and_person}`);
-    }
-    if (vp.sample_phrases.length) {
-      parts.push(
-        `Characteristic phrases to emulate: "${vp.sample_phrases.join('"; "')}".`
-      );
-    }
-    if (vp.avoid.length) {
-      parts.push(`Voice patterns to avoid: ${vp.avoid.join("; ")}.`);
-    }
-    if (vp.headline_style) {
-      parts.push(`Headline style: ${vp.headline_style}`);
-    }
-    if (vp.article_blueprint) {
-      parts.push(`Article blueprint: ${vp.article_blueprint}`);
-    }
-    if (vp.target_length) {
-      parts.push(`Target length: ${vp.target_length}`);
-    }
-
-    // Banned phrases
-    const companyAvoid = company.avoid_phrases
-      ? company.avoid_phrases.split(",").map((p) => p.trim()).filter(Boolean)
-      : [];
-    const allBanned = [
-      ...new Set([...BASE_BANNED_PHRASES, ...companyAvoid, ...(vp.banned_phrases ?? [])]),
-    ];
-    parts.push(`\nNever use these phrases: ${allBanned.join(", ")}.`);
+    const brandIntro = `You are writing as ${company.name}.${company.tagline ? ` Tagline: "${company.tagline}".` : ""}${company.mission ? ` Mission: ${company.mission}.` : ""}`;
+    const voiceClause = compileVoiceClause(company);
+    const allBanned = getAllBannedPhrases(company);
+    const bannedClause = `\nNever use these phrases: ${allBanned.join(", ")}.`;
+    const compiled = [brandIntro, voiceClause, bannedClause].filter(Boolean).join("\n");
 
     return {
-      content: [{ type: "text" as const, text: parts.join("\n") }],
+      content: [{ type: "text" as const, text: compiled }],
     };
   }
 );
@@ -879,6 +850,9 @@ server.tool(
       `- Add interpretation, explain WHY things matter, explain HOW decisions actually get made, surface hidden tradeoffs.`,
       `- Every section must answer: What actually matters here? What would an experienced operator know? What nuance is usually missing?`,
       `- Content must feel experienced, specific, credible, nuanced, and human — not assembled from search results.`,
+      `- Demonstrate Experience, Expertise, Authoritativeness, and Trustworthiness (E-E-A-T) in every article.`,
+      `- Use real-world reasoning, specific examples, and operational detail. Show practitioner-level knowledge.`,
+      `- Acknowledge tradeoffs, regional variation, exceptions, and situational context. Avoid unsupported certainty.`,
 
       // Editorial credibility
       `\n\n## Editorial Credibility (HIGHEST PRIORITY)`,
@@ -887,6 +861,7 @@ server.tool(
       `- Do NOT use casual dramatic framing — "brace yourself," "buckle up," etc.`,
       `- Avoid any sentence that sounds like it was written by an AI assistant or LinkedIn influencer.`,
       `- Do not address the reader's emotions. Report facts. Explain processes.`,
+      `- Always preserve specific facts: dates, times, form numbers, dollar amounts. NEVER replace a specific fact with vague language like "many," "recently," or "significant."`,
 
       // Write for humans first
       `\n\n## Write for Humans First`,
@@ -900,11 +875,6 @@ server.tool(
       `- The first sentence MUST be a specific factual statement, concrete scenario, or surprising data point.`,
       `- NEVER open with "When it comes to...", "If you're looking for...", "In today's world...", etc.`,
       `- The first paragraph (2-3 sentences max) should establish what, why now, and what value.`,
-
-      // Specificity
-      `\n\n## Specificity Over Generality`,
-      `- Always preserve specific facts: dates, times, form numbers, dollar amounts.`,
-      `- NEVER replace a specific fact with vague language like "many," "recently," or "significant."`,
 
       // Length & Padding
       `\n\n## Length & Padding`,
@@ -961,7 +931,7 @@ server.tool(
       `- At least one section must contain analysis not found on the primary government/reference source.`,
     );
 
-    // GEO & Answer Engine Optimization
+    // GEO & Answer Engine Optimization (includes Semantic Depth)
     sections.push(
       `\n\n## GEO & Answer Engine Optimization (MANDATORY)`,
       `- Structure content so AI systems can extract answers, quote sections, and attribute expertise.`,
@@ -969,21 +939,8 @@ server.tool(
       `- Use direct definitions, clear topical hierarchy, strong headings, and concise answer-first paragraphs.`,
       `- Assume content may appear in Google AI Overviews, AI Mode, chat-based retrieval systems, voice assistants, and RAG systems.`,
       `- Make sections independently understandable. Maintain factual clarity and strong semantic structure.`,
-    );
-
-    // Semantic Depth & Topical Coverage
-    sections.push(
-      `\n\n## Semantic Depth & Topical Coverage`,
       `- Cover adjacent concepts necessary for topical authority. Demonstrate ecosystem-level understanding.`,
       `- For any core topic, proactively address related subtopics, variations, exceptions, and commonly confused alternatives.`,
-    );
-
-    // E-E-A-T Compliance
-    sections.push(
-      `\n\n## E-E-A-T Compliance (MANDATORY)`,
-      `- Demonstrate Experience, Expertise, Authoritativeness, and Trustworthiness in every article.`,
-      `- Use real-world reasoning, specific examples, and operational detail. Show practitioner-level knowledge.`,
-      `- Acknowledge tradeoffs, regional variation, exceptions, and situational context. Avoid unsupported certainty.`,
     );
 
     // Procedural Depth
@@ -1000,13 +957,7 @@ server.tool(
       `- Visuals should support comprehension, add information value, and increase AI extractability.`,
     );
 
-    // Quality Self-Check
-    sections.push(
-      `\n\n## Quality Self-Check (MANDATORY)`,
-      `- Before finalizing, verify: Does this contain original insight? Does this sound human? Is there strategic depth?`,
-      `- Is procedural detail sufficient? Is the article extractable by AI systems? Would a domain expert respect this?`,
-      `- Does this avoid commodity content? Does it answer the "why" and "how"? Is it more useful than top-ranking competitors?`,
-    );
+
 
     // Company SEO guidelines
     if (company.seo_content_guidelines) {
@@ -1595,6 +1546,7 @@ server.tool(
       ...seo,
       faq: faq ?? [],
       key_takeaways: key_takeaways ?? [],
+      how_to_steps: how_to_steps ?? [],
       content_type: content_type ?? "article",
     };
 

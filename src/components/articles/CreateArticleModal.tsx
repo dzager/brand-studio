@@ -193,7 +193,9 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
   // ── Handlers ───────────────────────────────────────────────────────
 
   async function onCreate() {
+    console.log("[CreateArticleModal] onCreate called", { companyId, prompt: prompt.slice(0, 50), mode });
     if (!companyId) {
+      console.error("[CreateArticleModal] BLOCKED: companyId is empty");
       setErr("Please select a company before creating.");
       return;
     }
@@ -222,11 +224,13 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
       if (csBgImageUrl.trim()) payload.composite_bg_image_url = csBgImageUrl.trim();
       if (csBgPrompt.trim()) payload.composite_bg_prompt = csBgPrompt.trim();
     }
+    console.log("[CreateArticleModal] Payload built, closing modal...", { endpoint: "/api/create", promptLen: finalPrompt.length });
     // Close the modal immediately — the activity panel will track progress
     onOpenChange(false);
     resetState();
     setLoading(false);
 
+    console.log("[CreateArticleModal] Calling runTask...");
     runTask({
       type: "article",
       label: prompt.trim().slice(0, 60) || "New article",
@@ -234,10 +238,11 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
       body: payload,
       meta: { companyId },
       onSuccess: () => {
+        console.log("[CreateArticleModal] runTask onSuccess fired");
         window.dispatchEvent(new Event("article-created"));
         onCreated?.();
       },
-      onError: () => { /* handled by task panel */ },
+      onError: (errMsg) => { console.error("[CreateArticleModal] runTask onError:", errMsg); },
     });
   }
 

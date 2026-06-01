@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import ArticleEditor, { type ArticleEditorHandle } from "@/components/articles/ArticleEditor";
 
 import { useTaskRunner } from "@/hooks/useTaskRunner";
+import { useTaskStore } from "@/lib/taskStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -72,6 +73,8 @@ type Article = {
     cluster_id: string | null;
     cluster_role: string | null;
     humanized: boolean;
+    featured_video_url: string | null;
+    featured_video_platform: string | null;
     created_at: string;
     updated_at: string;
 };
@@ -94,6 +97,12 @@ type Props = {
 
 export default function PanelView({ article, companies, onUpdate, onDelete, onSelectArticle }: Props) {
     const { runTask } = useTaskRunner();
+    const { tasks } = useTaskStore();
+
+    // Derive image-generating state from the global task store so it persists across article navigation
+    const hasRunningImageTask = tasks.some(
+        (t) => t.meta?.articleId === article.id && t.type === "image-regen" && (t.status === "running" || t.status === "queued")
+    );
     const [editing, setEditing] = useState(false);
     const [editTitle, setEditTitle] = useState("");
     const [editExcerpt, setEditExcerpt] = useState("");
@@ -143,7 +152,9 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     const [applyingBatch, setApplyingBatch] = useState(false);
     const [consulCollapsed, setConsulCollapsed] = useState(true);
 
-    const [refreshingImage, setRefreshingImage] = useState(false);
+    // refreshingImage is now derived from the global task store (see hasRunningImageTask above)
+    // Local state kept only for backward-compat with inline error handling
+    const refreshingImage = hasRunningImageTask;
     const [imagePromptInput, setImagePromptInput] = useState("");
     const [imageStyles, setImageStyles] = useState<{ id: string; label: string; narrative?: string; type?: string; composite_bg_prompt?: string; composite_product_query?: string; composite_bg_image_url?: string }[]>([]);
     const [selectedStyle, setSelectedStyle] = useState(article.image_style ?? "default");
@@ -164,7 +175,7 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
 
     const [showInsertModal, setShowInsertModal] = useState(false);
     const [insertMode, setInsertMode] = useState<"inline" | "featured" | "editInline">("inline");
-    const [insertTab, setInsertTab] = useState<"search" | "generate" | "composite" | "upload">("search");
+    const [insertTab, setInsertTab] = useState<"search" | "generate" | "composite" | "upload" | "video">("search");
     const [insertSearchQuery, setInsertSearchQuery] = useState("");
     const [insertSearchResults, setInsertSearchResults] = useState<SearchImage[]>([]);
     const [insertSearching, setInsertSearching] = useState(false);
@@ -210,12 +221,14 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     const compositeBgFileRef = useRef<HTMLInputElement>(null);
     // savedRangeRef removed — Tiptap manages cursor/selection state internally
 
-    // YouTube search & embed state
-    const [showYouTubeModal, setShowYouTubeModal] = useState(false);
+    // Video search & embed state
+    const [showVideoModal, setShowVideoModal] = useState(false);
     const [ytQuery, setYtQuery] = useState("");
     const [ytResults, setYtResults] = useState<SearchVideo[]>([]);
     const [ytSearching, setYtSearching] = useState(false);
     const [ytErr, setYtErr] = useState<string | null>(null);
+    const [pasteVideoUrl, setPasteVideoUrl] = useState("");
+    const [pasteVideoErr, setPasteVideoErr] = useState<string | null>(null);
 
     // Compare article state
     const [showCompareModal, setShowCompareModal] = useState(false);
@@ -243,10 +256,7 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     const [loadingFull, setLoadingFull] = useState(false);
 
     useEffect(() => {
-        if (article.html !== null && article.html !== undefined) {
-            setFullArticle(article);
-            return;
-        }
+        // Always re-fetch from DB on article switch to pick up images generated while viewing other articles
         setLoadingFull(true);
         fetch(`/api/articles/${article.id}`)
             .then((r) => r.json())
@@ -256,9 +266,33 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                     onUpdate({ ...article, ...data });
                 }
             })
-            .catch(() => {})
+            .catch(() => {
+                // Fallback: use prop data if fetch fails
+                if (article.html !== null && article.html !== undefined) {
+                    setFullArticle(article);
+                }
+            })
             .finally(() => setLoadingFull(false));
     }, [article.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Auto-refresh when an image task for this article completes in the background
+    const prevHasRunningImageTaskRef = useRef(hasRunningImageTask);
+    useEffect(() => {
+        // Detect transition from running→not running (task just completed)
+        if (prevHasRunningImageTaskRef.current && !hasRunningImageTask) {
+            // Re-fetch article data to pick up the newly generated image
+            fetch(`/api/articles/${article.id}`)
+                .then((r) => r.json())
+                .then((data) => {
+                    if (data && !data.error) {
+                        setFullArticle(data);
+                        onUpdate({ ...article, ...data });
+                    }
+                })
+                .catch(() => {});
+        }
+        prevHasRunningImageTaskRef.current = hasRunningImageTask;
+    }, [hasRunningImageTask]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Sync fullArticle when the parent article prop updates (e.g. after image regeneration or edits)
     useEffect(() => {
@@ -708,47 +742,52 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     }
 
     async function refreshImage() {
-        setRefreshingImage(true); setRefreshErr(null);
+        setRefreshErr(null);
         // Close the modal immediately — generation moves to activity viewer
         setShowInsertModal(false);
+        // Capture article data for the closure — the user may navigate to another article
+        const capturedArticle = { ...article };
+        const capturedSelectedStyle = selectedStyle;
         // Use article title/excerpt as clean context — do NOT send old image_prompt
         // which contains baked-in style directives from previous generations
-        const cleanBase = `Hero image for article: ${article.title}${article.excerpt ? `. ${article.excerpt}` : ""}`;
+        const cleanBase = `Hero image for article: ${capturedArticle.title}${capturedArticle.excerpt ? `. ${capturedArticle.excerpt}` : ""}`;
         const payload: Record<string, unknown> = {
             base_prompt: cleanBase,
             custom_prompt: imagePromptInput.trim() || undefined,
-            image_style: selectedStyle,
-            company_id: article.company_id ?? undefined,
+            image_style: capturedSelectedStyle,
+            company_id: capturedArticle.company_id ?? undefined,
         };
         // Add composite params if applicable
         if (pvIsCompositeStyle && pvCsProductUrl) {
             payload.composite_product_image_url = pvCsProductUrl;
-            payload.article_title = article.title;
-            payload.article_excerpt = article.excerpt;
+            payload.article_title = capturedArticle.title;
+            payload.article_excerpt = capturedArticle.excerpt;
             if (pvCsBgImageUrl.trim()) payload.composite_bg_image_url = pvCsBgImageUrl.trim();
             if (pvCsBgPrompt.trim()) payload.composite_bg_prompt = pvCsBgPrompt.trim();
         }
-        await runTask({
+        // runTask is fire-and-forget — the task runs in the background even if the user
+        // navigates to a different article. refreshingImage is derived from the task store.
+        runTask({
             type: "image-regen",
-            label: `Hero: ${article.title.slice(0, 50)}`,
+            label: `Hero: ${capturedArticle.title.slice(0, 50)}`,
             endpoint: "/api/regenerate-image",
             body: payload,
-            meta: { articleId: article.id, companyId: article.company_id, imageTask: true },
+            meta: { articleId: capturedArticle.id, companyId: capturedArticle.company_id, imageTask: true },
             onSuccess: async (data: any) => {
                 try {
-                    const saveResp = await fetch(`/api/articles/${article.id}`, {
+                    const saveResp = await fetch(`/api/articles/${capturedArticle.id}`, {
                         method: "PUT",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ image_base64: data.image_base64, image_prompt: data.final_prompt, image_style: selectedStyle }),
+                        body: JSON.stringify({ image_base64: data.image_base64, image_prompt: data.final_prompt, image_style: capturedSelectedStyle }),
                     });
                     const saveData = await saveResp.json();
                     if (!saveResp.ok) throw new Error(saveData.error || "Failed to save");
-                    onUpdate({ ...article, image_base64: data.image_base64, image_prompt: data.final_prompt, image_style: selectedStyle });
+                    // Try to propagate to parent — will work if this article is still displayed
+                    try { onUpdate({ ...capturedArticle, image_base64: data.image_base64, image_prompt: data.final_prompt, image_style: capturedSelectedStyle }); } catch {}
                     setImagePromptInput("");
                 } catch (e: any) { setRefreshErr(e.message); }
-                setRefreshingImage(false);
             },
-            onError: (errMsg) => { setRefreshErr(errMsg); setRefreshingImage(false); },
+            onError: (errMsg) => { setRefreshErr(errMsg); },
         });
     }
 
@@ -804,11 +843,78 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
         return null;
     }
 
+    /** Extract Vimeo video ID from a URL (supports vimeo.com/ID, player.vimeo.com/video/ID) */
+    function extractVimeoId(url: string): string | null {
+        const m = url.match(/(?:vimeo\.com\/)(?:video\/)?(?:channels\/[^/]+\/)?(?:groups\/[^/]+\/videos\/)?(?:manage\/videos\/)?(?:album\/\d+\/video\/)?(\d+)/);
+        return m ? m[1] : null;
+    }
+
+    /** Detect video platform from URL and return type + id */
+    function detectVideoUrl(url: string): { platform: "youtube" | "vimeo"; id: string } | null {
+        const ytId = extractYouTubeId(url);
+        if (ytId) return { platform: "youtube", id: ytId };
+        const vimeoId = extractVimeoId(url);
+        if (vimeoId) return { platform: "vimeo", id: vimeoId };
+        return null;
+    }
+
     function insertYouTubeVideo(vid: SearchVideo) {
         const videoId = extractYouTubeId(vid.link);
         if (!videoId || !editorRef.current) return;
         editorRef.current.insertYouTube(videoId, vid.title);
-        setShowYouTubeModal(false);
+        setShowVideoModal(false);
+    }
+
+    function insertVideoFromUrl() {
+        const url = pasteVideoUrl.trim();
+        if (!url || !editorRef.current) return;
+        const detected = detectVideoUrl(url);
+        if (!detected) {
+            setPasteVideoErr("Could not detect a YouTube or Vimeo video from this URL. Please check the link and try again.");
+            return;
+        }
+        setPasteVideoErr(null);
+        if (detected.platform === "youtube") {
+            editorRef.current.insertYouTube(detected.id);
+        } else {
+            editorRef.current.insertVimeo(detected.id);
+        }
+        setPasteVideoUrl("");
+        setShowVideoModal(false);
+    }
+
+    /** Save a video as the article's featured media (replaces featured image) */
+    async function saveFeaturedVideo(videoUrl: string, platform: "youtube" | "vimeo", videoId: string) {
+        setInsertSaving(true); setInsertErr(null);
+        const embedUrl = platform === "youtube"
+            ? `https://www.youtube.com/embed/${videoId}`
+            : `https://player.vimeo.com/video/${videoId}`;
+        try {
+            const r = await fetch(`/api/articles/${article.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ featured_video_url: embedUrl, featured_video_platform: platform }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || "Save failed");
+            onUpdate({ ...article, ...data });
+            setShowInsertModal(false);
+        } catch (e: any) { setInsertErr(e.message); }
+        finally { setInsertSaving(false); }
+    }
+
+    /** Remove the featured video (does not restore an image — user can pick a new one) */
+    async function removeFeaturedVideo() {
+        try {
+            const r = await fetch(`/api/articles/${article.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ featured_video_url: null }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || "Save failed");
+            onUpdate({ ...article, ...data });
+        } catch (e: any) { alert(`Remove video failed: ${e.message}`); }
     }
 
     async function onCompositeSearch() {
@@ -918,25 +1024,26 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
         setInsertGenerating(true); setInsertErr(null); setInsertPreview(null);
         // Close the modal — generation moves to activity viewer
         const capturedInsertMode = insertMode;
+        const capturedArticle = { ...article };
         setShowInsertModal(false);
-        await runTask({
+        runTask({
             type: "image-regen",
-            label: `Image: ${article.title.slice(0, 50)}`,
+            label: `Image: ${capturedArticle.title.slice(0, 50)}`,
             endpoint: "/api/regenerate-image",
-            body: { base_prompt: cleanBase, custom_prompt: customPrompt, image_style: selectedStyle, company_id: article.company_id ?? undefined },
-            meta: { articleId: article.id, companyId: article.company_id, imageTask: true, insertMode: capturedInsertMode },
+            body: { base_prompt: cleanBase, custom_prompt: customPrompt, image_style: selectedStyle, company_id: capturedArticle.company_id ?? undefined },
+            meta: { articleId: capturedArticle.id, companyId: capturedArticle.company_id, imageTask: true, insertMode: capturedInsertMode },
             onSuccess: async (data: any) => {
                 setInsertPreview({ src: data.image_base64, type: "base64" });
                 // If it was a featured image request, auto-save
                 if (capturedInsertMode === "featured") {
                     try {
-                        const r = await fetch(`/api/articles/${article.id}`, {
+                        const r = await fetch(`/api/articles/${capturedArticle.id}`, {
                             method: "PUT",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ image_base64: data.image_base64 }),
                         });
                         const saveData = await r.json();
-                        if (r.ok) onUpdate({ ...article, ...saveData });
+                        if (r.ok) try { onUpdate({ ...capturedArticle, ...saveData }); } catch {}
                     } catch {}
                 }
                 setInsertGenerating(false);
@@ -1056,17 +1163,20 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
             <DialogContent className="max-w-7xl w-[95vw] max-h-[95vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <ImageIcon className="h-5 w-5" />
-                        {insertMode === "featured" ? "Change Featured Image" : "Insert Image"}
+                        {insertMode === "featured" && insertTab === "video" ? <Video className="h-5 w-5 text-red-500" /> : <ImageIcon className="h-5 w-5" />}
+                        {insertMode === "featured" ? "Change Featured Media" : "Insert Image"}
                     </DialogTitle>
                 </DialogHeader>
 
                 <Tabs value={insertTab} onValueChange={(v) => { setInsertTab(v as any); setInsertPreview(null); setInsertErr(null); if (v === "composite") resetComposite(); }}>
-                    <TabsList className="grid w-full grid-cols-4">
+                    <TabsList className={cn("grid w-full", insertMode === "featured" ? "grid-cols-5" : "grid-cols-4")}>
                         <TabsTrigger value="search" className="gap-1.5"><Search className="h-3.5 w-3.5" />Search</TabsTrigger>
                         <TabsTrigger value="generate" className="gap-1.5"><Sparkles className="h-3.5 w-3.5" />Generate</TabsTrigger>
                         <TabsTrigger value="composite" className="gap-1.5"><Layers className="h-3.5 w-3.5" />Composite</TabsTrigger>
                         <TabsTrigger value="upload" className="gap-1.5"><Upload className="h-3.5 w-3.5" />Upload</TabsTrigger>
+                        {insertMode === "featured" && (
+                            <TabsTrigger value="video" className="gap-1.5"><Video className="h-3.5 w-3.5" />Video</TabsTrigger>
+                        )}
                     </TabsList>
 
                     <TabsContent value="search" className="space-y-3">
@@ -1388,6 +1498,153 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                             <div className="text-sm font-medium">Click to browse or drag & drop</div>
                         </div>
                     </TabsContent>
+
+                    {/* ── Video tab (featured mode only) ── */}
+                    {insertMode === "featured" && (
+                        <TabsContent value="video" className="space-y-4">
+                            {/* Paste URL section */}
+                            <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+                                <div className="text-sm font-medium flex items-center gap-2">
+                                    <ExternalLink className="h-4 w-4 text-muted-foreground" /> Paste a video URL
+                                </div>
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="Paste a YouTube or Vimeo URL…"
+                                        value={pasteVideoUrl}
+                                        onChange={(e) => { setPasteVideoUrl(e.target.value); setPasteVideoErr(null); }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter") {
+                                                const url = pasteVideoUrl.trim();
+                                                if (!url) return;
+                                                const detected = detectVideoUrl(url);
+                                                if (!detected) { setPasteVideoErr("Could not detect a YouTube or Vimeo video from this URL."); return; }
+                                                setPasteVideoErr(null);
+                                                saveFeaturedVideo(url, detected.platform, detected.id);
+                                            }
+                                        }}
+                                    />
+                                    <Button
+                                        onClick={() => {
+                                            const url = pasteVideoUrl.trim();
+                                            if (!url) return;
+                                            const detected = detectVideoUrl(url);
+                                            if (!detected) { setPasteVideoErr("Could not detect a YouTube or Vimeo video from this URL."); return; }
+                                            setPasteVideoErr(null);
+                                            saveFeaturedVideo(url, detected.platform, detected.id);
+                                        }}
+                                        disabled={!pasteVideoUrl.trim() || insertSaving}
+                                        className="gap-1.5 whitespace-nowrap"
+                                    >
+                                        <Video className="h-4 w-4" />
+                                        {insertSaving ? "Saving…" : "Set as Featured"}
+                                    </Button>
+                                </div>
+                                {pasteVideoErr && (
+                                    <p className="text-xs text-destructive">{pasteVideoErr}</p>
+                                )}
+                                <p className="text-xs text-muted-foreground">
+                                    Supports YouTube (youtube.com, youtu.be) and Vimeo (vimeo.com) links
+                                </p>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <Separator className="flex-1" />
+                                <span className="text-xs text-muted-foreground">or search YouTube</span>
+                                <Separator className="flex-1" />
+                            </div>
+
+                            {/* YouTube Search */}
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="Search YouTube for videos…"
+                                    value={ytQuery}
+                                    onChange={(e) => setYtQuery(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === "Enter") onYouTubeSearch(); }}
+                                />
+                                <Button onClick={onYouTubeSearch} disabled={ytSearching || !ytQuery.trim()} className="gap-1.5 whitespace-nowrap">
+                                    <Play className="h-4 w-4" />
+                                    {ytSearching ? "Searching…" : "Search"}
+                                </Button>
+                            </div>
+
+                            {ytErr && (
+                                <Alert variant="destructive">
+                                    <AlertCircle className="h-4 w-4" />
+                                    <AlertDescription>{ytErr}</AlertDescription>
+                                </Alert>
+                            )}
+
+                            {/* Results grid */}
+                            {ytResults.length > 0 && (
+                                <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3 max-h-[60vh] overflow-y-auto">
+                                    {ytResults.map((vid, i) => {
+                                        const videoId = extractYouTubeId(vid.link);
+                                        return (
+                                            <Card key={i} className="overflow-hidden hover:shadow-lg transition-shadow group">
+                                                <div className="relative bg-black aspect-video overflow-hidden">
+                                                    {vid.imageUrl && (
+                                                        <img
+                                                            src={vid.imageUrl}
+                                                            alt={vid.title}
+                                                            loading="lazy"
+                                                            className="w-full h-full object-cover"
+                                                            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                                                        />
+                                                    )}
+                                                    {vid.duration && (
+                                                        <span className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-[11px] font-semibold px-1.5 py-0.5 rounded">
+                                                            {vid.duration}
+                                                        </span>
+                                                    )}
+                                                    <div className="absolute inset-0 flex items-center justify-center opacity-70 pointer-events-none">
+                                                        <svg width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="rgba(0,0,0,0.5)"/><polygon points="18,14 36,24 18,34" fill="#fff"/></svg>
+                                                    </div>
+                                                </div>
+                                                <CardContent className="p-2.5 space-y-1.5">
+                                                    <div className="text-sm font-semibold line-clamp-2 leading-tight">{vid.title}</div>
+                                                    {vid.channel && <div className="text-xs text-muted-foreground font-medium">{vid.channel}</div>}
+                                                    <div className="flex items-center gap-2">
+                                                        {vid.date && <span className="text-[11px] text-muted-foreground">{vid.date}</span>}
+                                                    </div>
+                                                    <div className="flex gap-1.5 pt-1">
+                                                        {videoId && (
+                                                            <Button
+                                                                size="sm"
+                                                                className="gap-1 flex-1 text-xs"
+                                                                disabled={insertSaving}
+                                                                onClick={() => saveFeaturedVideo(vid.link, "youtube", videoId)}
+                                                            >
+                                                                <Video className="h-3 w-3" />
+                                                                {insertSaving ? "Saving…" : "Set as Featured"}
+                                                            </Button>
+                                                        )}
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="gap-1 text-xs"
+                                                            asChild
+                                                        >
+                                                            <a href={vid.link} target="_blank" rel="noopener noreferrer">
+                                                                <ExternalLink className="h-3 w-3" /> Watch
+                                                            </a>
+                                                        </Button>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            {ytResults.length === 0 && !ytSearching && !ytErr && (
+                                <div className="py-12 text-center text-muted-foreground">
+                                    <Video className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                                    <p className="text-sm">Search YouTube or paste a video URL above to set as the featured media.</p>
+                                    <p className="text-xs mt-1">The video will replace the featured image and display as an embedded player.</p>
+                                </div>
+                            )}
+                        </TabsContent>
+                    )}
                 </Tabs>
 
                 {(insertErr || compositeErr) && (
@@ -1514,18 +1771,48 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
         </Dialog>
     );
 
-    // ======= INSERT YOUTUBE MODAL =======
-    const insertYouTubeModal = (
-        <Dialog open={showYouTubeModal} onOpenChange={setShowYouTubeModal}>
+    // ======= INSERT VIDEO MODAL =======
+    const insertVideoModal = (
+        <Dialog open={showVideoModal} onOpenChange={setShowVideoModal}>
             <DialogContent className="max-w-4xl w-[90vw] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Video className="h-5 w-5 text-red-500" /> Insert YouTube Video
+                        <Video className="h-5 w-5 text-red-500" /> Insert Video
                     </DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-4">
-                    {/* Search bar */}
+                    {/* Paste URL section */}
+                    <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+                        <div className="text-sm font-medium flex items-center gap-2">
+                            <ExternalLink className="h-4 w-4 text-muted-foreground" /> Paste a video URL
+                        </div>
+                        <div className="flex gap-2">
+                            <Input
+                                placeholder="Paste a YouTube or Vimeo URL…"
+                                value={pasteVideoUrl}
+                                onChange={(e) => { setPasteVideoUrl(e.target.value); setPasteVideoErr(null); }}
+                                onKeyDown={(e) => { if (e.key === "Enter") insertVideoFromUrl(); }}
+                            />
+                            <Button onClick={insertVideoFromUrl} disabled={!pasteVideoUrl.trim()} className="gap-1.5 whitespace-nowrap">
+                                <Video className="h-4 w-4" /> Embed
+                            </Button>
+                        </div>
+                        {pasteVideoErr && (
+                            <p className="text-xs text-destructive">{pasteVideoErr}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                            Supports YouTube (youtube.com, youtu.be) and Vimeo (vimeo.com) links
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <Separator className="flex-1" />
+                        <span className="text-xs text-muted-foreground">or search YouTube</span>
+                        <Separator className="flex-1" />
+                    </div>
+
+                    {/* YouTube Search bar */}
                     <div className="flex gap-2">
                         <Input
                             placeholder="Search YouTube for videos to embed…"
@@ -1609,8 +1896,8 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                     {ytResults.length === 0 && !ytSearching && !ytErr && (
                         <div className="py-12 text-center text-muted-foreground">
                             <Video className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                            <p className="text-sm">Search for YouTube videos to embed in your article.</p>
-                            <p className="text-xs mt-1">Videos will be embedded as responsive iframes at the cursor position.</p>
+                            <p className="text-sm">Search YouTube or paste a video URL above to embed in your article.</p>
+                            <p className="text-xs mt-1">Supports YouTube and Vimeo — videos will be embedded as responsive iframes at the cursor position.</p>
                         </div>
                     )}
                 </div>
@@ -1698,10 +1985,10 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                                 initialContent={editHtml}
                                 onChange={(html) => setEditHtml(html)}
                                 onImageButtonClick={() => {
-                                    setInsertMode("editInline"); setInsertPreview(null); setInsertErr(null); setShowInsertModal(true);
+                                    setInsertMode("editInline"); setInsertPreview(null); setInsertErr(null); setInsertGenerating(false); setShowInsertModal(true);
                                 }}
-                                onYouTubeButtonClick={() => {
-                                    setYtResults([]); setYtErr(null); setShowYouTubeModal(true);
+                                onVideoButtonClick={() => {
+                                    setYtResults([]); setYtErr(null); setPasteVideoUrl(""); setPasteVideoErr(null); setShowVideoModal(true);
                                 }}
                                 className="fullscreen-editor"
                             />
@@ -1710,7 +1997,7 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                 </div>
             </div>
             {insertImageModal}
-            {insertYouTubeModal}
+            {insertVideoModal}
             </>
         );
     }
@@ -2569,17 +2856,41 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                 </details>
             )}
 
-            {/* Featured Image */}
-            {displayArticle.image_base64 && (
+            {/* Featured Image or Video */}
+            {displayArticle.featured_video_url ? (
+                <div id="featured-video" className="relative group">
+                    <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, overflow: "hidden", maxWidth: "100%", borderRadius: "12px" }}>
+                        <iframe
+                            src={displayArticle.featured_video_url}
+                            title={article.title}
+                            style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: 0, borderRadius: "12px" }}
+                            allow={displayArticle.featured_video_platform === "vimeo"
+                                ? "autoplay; fullscreen; picture-in-picture"
+                                : "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"}
+                            allowFullScreen
+                        />
+                    </div>
+                    <div className="absolute bottom-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="secondary" size="sm" onClick={() => { setShowInsertModal(true); setInsertMode("featured"); setInsertGenPrompt(""); setInsertPreview(null); setInsertErr(null); setInsertGenerating(false); setInsertTab("video"); }}
+                            className="gap-1.5 shadow-lg backdrop-blur-sm">
+                            <Video className="h-3.5 w-3.5" /> Change
+                        </Button>
+                        <Button variant="secondary" size="sm" onClick={removeFeaturedVideo}
+                            className="gap-1.5 shadow-lg backdrop-blur-sm">
+                            <Trash2 className="h-3.5 w-3.5" /> Remove
+                        </Button>
+                    </div>
+                </div>
+            ) : displayArticle.image_base64 ? (
                 <div id="featured-image" className="relative group">
                     <img src={`data:image/png;base64,${displayArticle.image_base64}`} alt={article.title}
                         className="w-full rounded-xl" />
-                    <Button variant="secondary" size="sm" onClick={() => { setShowInsertModal(true); setInsertMode("featured"); setInsertGenPrompt(""); setInsertPreview(null); setInsertErr(null); setInsertTab("generate"); }}
+                    <Button variant="secondary" size="sm" onClick={() => { setShowInsertModal(true); setInsertMode("featured"); setInsertGenPrompt(""); setInsertPreview(null); setInsertErr(null); setInsertGenerating(false); setInsertTab("generate"); }}
                         className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity gap-1.5 shadow-lg backdrop-blur-sm">
                         <ImageIcon className="h-3.5 w-3.5" /> Change
                     </Button>
                 </div>
-            )}
+            ) : null}
 
 
 

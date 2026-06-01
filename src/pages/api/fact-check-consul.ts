@@ -20,6 +20,7 @@ import {
     type ConsulResult,
     type ConsulClaimReview,
 } from "@/lib/consulPrompts";
+import { extractJSON } from "@/lib/parse-utils";
 
 // ── Constants ───────────────────────────────────────────────────────────
 
@@ -30,62 +31,6 @@ const CLAUDE_MODEL = "claude-sonnet-4-20250514";
 type ModelName = "gemini" | "grok" | "claude";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
-
-/**
- * Robustly extract a JSON object from text that may contain markdown fences,
- * preamble, or trailing content. Uses balanced-brace counting so it won't
- * break on nested objects/arrays.
- */
-function extractJSON(raw: string): any {
-    // Strip markdown code fences
-    let text = raw.trim()
-        .replace(/^```(?:json)?\s*/i, "")
-        .replace(/\s*```$/i, "")
-        .trim();
-
-    // Find the first '{' character
-    const start = text.indexOf("{");
-    if (start < 0) throw new Error("No JSON object found in model response.");
-
-    // Walk forward with balanced brace counting, respecting strings
-    let depth = 0;
-    let inString = false;
-    let escaped = false;
-    let end = -1;
-
-    for (let i = start; i < text.length; i++) {
-        const ch = text[i];
-
-        if (escaped) { escaped = false; continue; }
-        if (ch === "\\") { escaped = true; continue; }
-
-        if (ch === '"' && !escaped) {
-            inString = !inString;
-            continue;
-        }
-
-        if (inString) continue;
-
-        if (ch === "{") depth++;
-        else if (ch === "}") {
-            depth--;
-            if (depth === 0) { end = i; break; }
-        }
-    }
-
-    if (end < 0) throw new Error("Unterminated JSON object in model response.");
-
-    const jsonStr = text.slice(start, end + 1);
-
-    try {
-        return JSON.parse(jsonStr);
-    } catch {
-        // Attempt repair: trailing commas before ] or }
-        const repaired = jsonStr
-            .replace(/,\s*([}\]])/g, "$1");
-        return JSON.parse(repaired);
-    }
-}
 
 /**
  * Run fact-check via Gemini with Google Search grounding.

@@ -157,6 +157,8 @@ export default async function handler(
             creation_prompt: rawCreationPrompt, image_style, model: requestedModel, word_count, company_id,
             // Snippet collection for research context injection
             snippet_collection_id,
+            // Optional cluster assignment for single articles
+            cluster_id,
             // Composite-specific fields (when style type is "composite")
             composite_product_image_url,
             composite_bg_image_url,
@@ -178,14 +180,14 @@ export default async function handler(
         const authUser = await requireAuth(req, res);
         if (!authUser) return;
 
-        // Determine account_id from the company
-        const { data: companyAccountData } = await getSupabase()
+        // Fetch company data (reused by pipeline to avoid duplicate fetch)
+        const { data: companyData } = await getSupabase()
             .from("companies")
-            .select("account_id")
+            .select("*")
             .eq("id", company_id)
             .single();
 
-        let accountId = companyAccountData?.account_id;
+        let accountId = companyData?.account_id;
         if (!accountId) {
             // Fall back to user's first account
             const accounts = await getUserAccounts(authUser.id);
@@ -226,6 +228,8 @@ export default async function handler(
                 company_id: company_id || null,
                 account_id: accountId || null,
                 status: "generating",
+                cluster_id: cluster_id || null,
+                cluster_role: cluster_id ? "supporting" : null,
             }).select("id").single();
             savedArticleId = savedArticle?.id ?? null;
         } catch (saveErr) {
@@ -261,6 +265,7 @@ export default async function handler(
                 composite_bg_image_url,
                 compositeOverrideBgPrompt,
                 accountId,
+                companyData,
             })
                 .then(async () => {
                     console.log(`[create] Pipeline completed for ${savedArticleId}`);
@@ -318,6 +323,7 @@ async function runArticlePipeline({
     composite_bg_image_url,
     compositeOverrideBgPrompt,
     accountId,
+    companyData: passedCompanyData,
 }: {
     articleId: string;
     rawCreationPrompt: string;
@@ -330,6 +336,7 @@ async function runArticlePipeline({
     composite_bg_image_url?: string;
     compositeOverrideBgPrompt?: string;
     accountId?: string;
+    companyData?: any;
 }) {
     const sb = getSupabase();
     const selectedModel = resolveModelId(requestedModel);
@@ -337,17 +344,18 @@ async function runArticlePipeline({
     const rawStyle = image_style;
 
     // ── Build brand engine ──────────────────────────────────────────
-    const { data: companyData, error: companyErr } = await sb
-        .from("companies")
-        .select("*")
-        .eq("id", company_id)
-        .single();
-
-    if (companyErr || !companyData) {
-        throw new Error("Company not found");
+    let company = passedCompanyData;
+    if (!company) {
+        const { data, error } = await sb
+            .from("companies")
+            .select("*")
+            .eq("id", company_id)
+            .single();
+        if (error || !data) throw new Error("Company not found");
+        company = data;
     }
 
-    const brand = buildBrandEngine(companyData as CompanyRecord);
+    const brand = buildBrandEngine(company as CompanyRecord);
     const brandCategories = getImageStyleCategories(brand);
 
     // Resolve image style
@@ -375,58 +383,52 @@ async function runArticlePipeline({
         }
     }
 
-    // Fetch account-level base prompt overrides
+    // Fetch reference articles, snippet collection, and account prompt in parallel
+    const [accountPromptResult, refArticlesResult, snippetResult] = await Promise.allSettled([
+        // Account-level base prompt override
+        accountId
+            ? sb.from("accounts").select("base_system_prompt").eq("id", accountId).single()
+                .then(({ data }) => data?.base_system_prompt as string | undefined)
+            : Promise.resolve(undefined),
+        // Reference articles
+        (brand.reference_articles && brand.reference_articles.length > 0)
+            ? compileReferenceArticles(brand.reference_articles)
+            : Promise.resolve(null),
+        // Snippet collection
+        (typeof snippet_collection_id === "string" && snippet_collection_id)
+            ? sb.from("snippet_collections").select("name, snippets").eq("id", snippet_collection_id).single()
+                .then(({ data }) => data)
+            : Promise.resolve(null),
+    ]);
+
     let baseSystemPromptOverride: string | undefined;
-    if (accountId) {
-        try {
-            const { data: acctData } = await sb
-                .from("accounts")
-                .select("base_system_prompt")
-                .eq("id", accountId)
-                .single();
-            if (acctData?.base_system_prompt) {
-                baseSystemPromptOverride = acctData.base_system_prompt;
-            }
-        } catch { /* Non-blocking */ }
+    if (accountPromptResult.status === "fulfilled" && accountPromptResult.value) {
+        baseSystemPromptOverride = accountPromptResult.value;
     }
 
     let system = compileBlogSystemPrompt(brand, { baseOverride: baseSystemPromptOverride });
 
-    // Fetch and inject reference articles
-    if (brand.reference_articles && brand.reference_articles.length > 0) {
-        const refSection = await compileReferenceArticles(brand.reference_articles);
-        if (refSection) {
-            system += refSection;
-        }
+    // Inject reference articles
+    if (refArticlesResult.status === "fulfilled" && refArticlesResult.value) {
+        system += refArticlesResult.value;
     }
 
     // Inject snippet collection context
     let creation_prompt = rawCreationPrompt.trim();
-    if (typeof snippet_collection_id === "string" && snippet_collection_id) {
-        try {
-            const { data: collection } = await sb
-                .from("snippet_collections")
-                .select("name, snippets")
-                .eq("id", snippet_collection_id)
-                .single();
-
-            if (collection && Array.isArray(collection.snippets) && collection.snippets.length > 0) {
-                let researchContext = `\n\n## Research Context\n`;
-                researchContext += `This article should incorporate findings from the research collection "${collection.name}".\n\n`;
-                researchContext += `### Research Snippets\n`;
-                for (const snippet of collection.snippets) {
-                    researchContext += `- ${snippet.text}`;
-                    if (snippet.note) researchContext += ` (Note: ${snippet.note})`;
-                    if (snippet.source_title) researchContext += ` [Source: ${snippet.source_title}]`;
-                    researchContext += `\n`;
-                }
-                researchContext += `\nUse these research snippets as factual grounding. Cite specific data points and weave them naturally into the article.\n`;
-                creation_prompt = `${creation_prompt}\n${researchContext}`;
-                console.log(`[pipeline] Injected ${collection.snippets.length} snippets from collection "${collection.name}"`);
-            }
-        } catch (collErr) {
-            console.warn("[pipeline] Failed to fetch snippet collection (non-blocking):", collErr);
+    const snippetData = snippetResult.status === "fulfilled" ? snippetResult.value : null;
+    if (snippetData && Array.isArray(snippetData.snippets) && snippetData.snippets.length > 0) {
+        let researchContext = `\n\n## Research Context\n`;
+        researchContext += `This article should incorporate findings from the research collection "${snippetData.name}".\n\n`;
+        researchContext += `### Research Snippets\n`;
+        for (const snippet of snippetData.snippets) {
+            researchContext += `- ${snippet.text}`;
+            if (snippet.note) researchContext += ` (Note: ${snippet.note})`;
+            if (snippet.source_title) researchContext += ` [Source: ${snippet.source_title}]`;
+            researchContext += `\n`;
         }
+        researchContext += `\nUse these research snippets as factual grounding. Cite specific data points and weave them naturally into the article.\n`;
+        creation_prompt = `${creation_prompt}\n${researchContext}`;
+        console.log(`[pipeline] Injected ${snippetData.snippets.length} snippets from collection "${snippetData.name}"`);
     }
 
     const user = compileUserPrompt({
@@ -476,6 +478,9 @@ async function runArticlePipeline({
     }).eq("id", articleId);
     console.log(`[pipeline] Blog content saved for ${articleId}`);
 
+    // Pre-check for existing image (in parallel with humanization)
+    const existingImagePromise = sb.from("articles").select("image_base64").eq("id", articleId).single();
+
     // ── Step 2: Humanize ────────────────────────────────────────────
     let currentTitle = blog.title;
     let currentExcerpt = blog.excerpt;
@@ -513,7 +518,7 @@ async function runArticlePipeline({
 
     // ── Step 3: Generate image ──────────────────────────────────────
     // Skip if the article already has an uploaded/existing image
-    const { data: existingArticle } = await sb.from("articles").select("image_base64").eq("id", articleId).single();
+    const { data: existingArticle } = await existingImagePromise;
     if (existingArticle?.image_base64) {
         console.log(`[pipeline] Article ${articleId} already has an image — skipping image generation`);
     } else try {

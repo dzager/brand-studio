@@ -2,6 +2,7 @@
 // Company → Cluster → Article (flat, with role indicators)
 
 import { useState, useMemo, useEffect } from "react";
+import { useTaskStore } from "@/lib/taskStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -97,6 +98,18 @@ export default function OutlineView({
     onCreateAiCluster, onCreateManualCluster, onAutoCluster,
     onNewArticle,
 }: Props) {
+    const { tasks } = useTaskStore();
+
+    // Derive set of article IDs with running image generation tasks
+    const imageGeneratingIds = useMemo(() => {
+        const ids = new Set<string>();
+        for (const t of tasks) {
+            if (t.type === "image-regen" && (t.status === "running" || t.status === "queued") && t.meta?.articleId) {
+                ids.add(t.meta.articleId as string);
+            }
+        }
+        return ids;
+    }, [tasks]);
     const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
     const [editingClusterId, setEditingClusterId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState("");
@@ -384,6 +397,7 @@ export default function OutlineView({
                                                         const roleColor = ROLE_COLORS[page.role] || "bg-muted-foreground";
                                                         const isStillGenerating = page.excerpt ? PLACEHOLDER_EXCERPTS.has(page.excerpt) : false;
                                                         const hasFailed = page.excerpt === "Generation failed \u2014 please regenerate.";
+                                                        const isGeneratingImage = imageGeneratingIds.has(page.articleId || "");
                                                         return (
                                                             <button
                                                                 key={page.articleId}
@@ -409,6 +423,9 @@ export default function OutlineView({
                                                                 <span className="truncate">{page.title}</span>
                                                                 {isStillGenerating && !hasFailed && (
                                                                     <span className="ml-auto text-[10px] text-amber-500 shrink-0">\u27F3</span>
+                                                                )}
+                                                                {!isStillGenerating && isGeneratingImage && (
+                                                                    <span className="ml-auto text-[10px] text-blue-500 shrink-0 animate-pulse" title="Generating image…">🖼</span>
                                                                 )}
                                                             </button>
                                                         );
@@ -437,7 +454,9 @@ export default function OutlineView({
 
                                         {!collapsed[`unclustered-${company.companyId}`] && (
                                             <div className="pl-5 mt-0.5 space-y-px">
-                                                {company.unclustered.map((article) => (
+                                                {company.unclustered.map((article) => {
+                                                    const isGeneratingImage = imageGeneratingIds.has(article.id);
+                                                    return (
                                                     <button
                                                         key={article.id}
                                                         onClick={() => onSelectArticle(article.id)}
@@ -450,8 +469,12 @@ export default function OutlineView({
                                                     >
                                                         <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-muted-foreground/40" />
                                                         <span className="truncate">{article.title}</span>
+                                                        {isGeneratingImage && (
+                                                            <span className="ml-auto text-[10px] text-blue-500 shrink-0 animate-pulse" title="Generating image…">🖼</span>
+                                                        )}
                                                     </button>
-                                                ))}
+                                                    );
+                                                })}
                                             </div>
                                         )}
                                     </div>

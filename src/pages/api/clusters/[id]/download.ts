@@ -2,6 +2,7 @@
 // GET: Download all articles in a cluster as a ZIP file
 // Each article gets its own subfolder containing:
 //   - article.html       (full styled HTML document)
+//   - article.md         (Markdown version with YAML frontmatter)
 //   - seo-geo.json       (SEO + GEO/AEO metadata: meta tags, keywords, FAQ, key
 //                         takeaways, HowTo steps, and Schema.org JSON-LD blocks)
 //   - featured-image.png (if available)
@@ -10,7 +11,76 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getSupabase } from "@/lib/supabase";
 import JSZip from "jszip";
+import TurndownService from "turndown";
 import { buildAllJsonLd } from "@/lib/jsonld";
+
+/**
+ * Convert HTML body to Markdown using Turndown (same config as the editor).
+ * Runs server-side for the download ZIP.
+ */
+function htmlToMarkdown(html: string): string {
+    const td = new TurndownService({
+        headingStyle: "atx",
+        hr: "---",
+        bulletListMarker: "-",
+        codeBlockStyle: "fenced",
+        emDelimiter: "*",
+        strongDelimiter: "**",
+    });
+    td.addRule("image", {
+        filter: "img",
+        replacement: (_content: string, node: TurndownService.Node) => {
+            const el = node as unknown as { getAttribute(name: string): string | null };
+            const alt = el.getAttribute("alt") || "";
+            const src = el.getAttribute("src") || "";
+            return `![${alt}](${src})`;
+        },
+    });
+    return td.turndown(html);
+}
+
+/**
+ * Build a Markdown document for an article, with YAML-style frontmatter.
+ */
+function buildArticleMarkdown(article: {
+    title: string;
+    slug: string;
+    excerpt: string | null;
+    html: string | null;
+    cluster_role: string | null;
+    created_at: string;
+}): string {
+    const lines: string[] = [
+        "---",
+        `title: "${article.title.replace(/"/g, '\\"')}"`,
+        `slug: "${article.slug}"`,
+    ];
+    if (article.excerpt) {
+        lines.push(`excerpt: "${article.excerpt.replace(/"/g, '\\"')}"`);
+    }
+    if (article.cluster_role) {
+        lines.push(`role: ${article.cluster_role}`);
+    }
+    if (article.created_at) {
+        lines.push(`date: ${article.created_at}`);
+    }
+    lines.push("---", "");
+
+    // Title as H1
+    lines.push(`# ${article.title}`, "");
+
+    // Excerpt as italicised intro
+    if (article.excerpt) {
+        lines.push(`*${article.excerpt}*`, "");
+    }
+
+    // Convert body HTML to Markdown
+    if (article.html) {
+        lines.push(htmlToMarkdown(article.html));
+    }
+
+    return lines.join("\n");
+}
 
 export const config = {
     api: {
@@ -306,6 +376,13 @@ export default async function handler(
                 html: processedHtml,
             });
             zip.file(`${folderPath}/article.html`, standaloneHtml);
+
+            // Build Markdown version of the article
+            const articleMd = buildArticleMarkdown({
+                ...article,
+                html: processedHtml,
+            });
+            zip.file(`${folderPath}/article.md`, articleMd);
 
             // ── SEO + GEO metadata file ──────────────────────────────────
             // Combines all signals that search crawlers and AI answer engines

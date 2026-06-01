@@ -11,8 +11,9 @@
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import { getStructuredResponse, getTextResponse } from "@/lib/ai-client";
-import { generateEmbedding, cosineSimilarity } from "@/lib/embeddings";
+import { generateEmbeddings, cosineSimilarity } from "@/lib/embeddings";
 import type { CrawledFactPage, DeepCrawlResult } from "@/lib/freshnessCrawler";
+import { extractJSON } from "@/lib/parse-utils";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -218,42 +219,6 @@ ${pageText.slice(0, 10000)}`;
 
 // ── External Verification (Gemini + Google Search Grounding) ─────────────
 
-/**
- * Robustly extract a JSON object from text that may contain markdown fences.
- */
-function extractJSON(raw: string): any {
-    let text = raw.trim()
-        .replace(/^```(?:json)?\s*/i, "")
-        .replace(/\s*```$/i, "")
-        .trim();
-
-    const start = text.indexOf("{");
-    if (start < 0) throw new Error("No JSON object found");
-
-    let depth = 0;
-    let inString = false;
-    let escaped = false;
-    let end = -1;
-
-    for (let i = start; i < text.length; i++) {
-        const ch = text[i];
-        if (escaped) { escaped = false; continue; }
-        if (ch === "\\") { escaped = true; continue; }
-        if (ch === '"' && !escaped) { inString = !inString; continue; }
-        if (inString) continue;
-        if (ch === "{") depth++;
-        else if (ch === "}") {
-            depth--;
-            if (depth === 0) { end = i; break; }
-        }
-    }
-
-    if (end < 0) throw new Error("Unterminated JSON");
-    const jsonStr = text.slice(start, end + 1);
-    try { return JSON.parse(jsonStr); }
-    catch { return JSON.parse(jsonStr.replace(/,\s*([}\]])/g, "$1")); }
-}
-
 const VERIFICATION_SCHEMA = JSON.stringify({
     type: "object",
     required: ["status", "confidence", "explanation", "sources"],
@@ -366,10 +331,10 @@ export async function findInternalConflicts(
     console.log(`[freshness] Generating embeddings for ${factsToCheck.length} facts...`);
     const embeddingTexts = factsToCheck.map(f => `${f.claim} ${f.context}`);
 
-    // Batch embeddings (up to 100 at a time)
+    // Batch embeddings — single API call per batch of 100 (vs 100 individual calls)
     for (let i = 0; i < factsToCheck.length; i += 100) {
         const batch = embeddingTexts.slice(i, i + 100);
-        const embeddings = await Promise.all(batch.map(t => generateEmbedding(t)));
+        const embeddings = await generateEmbeddings(batch);
         for (let j = 0; j < embeddings.length; j++) {
             factsToCheck[i + j].embedding = embeddings[j];
         }
@@ -560,35 +525,45 @@ export async function runAudit(
     console.log(`[freshness] Extracting facts from ${crawlResult.pages.length} pages...`);
     onProgress?.("extracting", `Extracting facts from ${crawlResult.pages.length} pages`, 10);
 
-    for (let i = 0; i < crawlResult.pages.length; i++) {
-        const page = crawlResult.pages[i];
-        onProgress?.(
-            "extracting",
-            `Extracting facts: ${page.title || page.url} (${i + 1}/${crawlResult.pages.length})`,
-            10 + (i / crawlResult.pages.length) * 20
+    // Process pages in parallel with controlled concurrency
+    const EXTRACTION_CONCURRENCY = 8;
+    for (let i = 0; i < crawlResult.pages.length; i += EXTRACTION_CONCURRENCY) {
+        const batch = crawlResult.pages.slice(i, i + EXTRACTION_CONCURRENCY);
+        const batchResults = await Promise.allSettled(
+            batch.map((page) => extractFacts(page.text, page.url, page.title))
         );
 
-        const facts = await extractFacts(page.text, page.url, page.title);
+        for (let j = 0; j < batch.length; j++) {
+            const page = batch[j];
+            const idx = i + j;
+            onProgress?.(
+                "extracting",
+                `Extracting facts: ${page.title || page.url} (${idx + 1}/${crawlResult.pages.length})`,
+                10 + (idx / crawlResult.pages.length) * 20
+            );
 
-        for (const fact of facts) {
-            allSiteFacts.push({
-                ...fact,
-                page_url: page.url,
-                page_title: page.title,
+            const result = batchResults[j];
+            const facts = result.status === "fulfilled" ? result.value : [];
+
+            for (const fact of facts) {
+                allSiteFacts.push({
+                    ...fact,
+                    page_url: page.url,
+                    page_title: page.title,
+                });
+            }
+
+            pageReports.push({
+                url: page.url,
+                title: page.title,
+                page_type: page.page_type,
+                published_date: page.published_date,
+                total_facts: facts.length,
+                facts_verified: 0,
+                issues: [],
+                health_score: 100,
             });
         }
-
-        // Seed the page report (issues populated in verification phase)
-        pageReports.push({
-            url: page.url,
-            title: page.title,
-            page_type: page.page_type,
-            published_date: page.published_date,
-            total_facts: facts.length,
-            facts_verified: 0,
-            issues: [],
-            health_score: 100,
-        });
 
         await firePartialReport();
     }
@@ -605,35 +580,51 @@ export async function runAudit(
         factsByPage.set(fact.page_url, arr);
     }
 
+    const VERIFICATION_CONCURRENCY = 4;
     for (const [pageUrl, pageFacts] of factsByPage) {
         const prioritized = prioritizeFacts(pageFacts);
         const toVerify = prioritized.slice(0, MAX_FACTS_TO_VERIFY_PER_PAGE);
         const pageReport = pageReports.find(r => r.url === pageUrl);
         if (!pageReport) continue;
 
-        for (const fact of toVerify) {
-            if (totalVerifications >= MAX_TOTAL_VERIFICATIONS) break;
+        // Determine how many we can still verify globally
+        const remaining = MAX_TOTAL_VERIFICATIONS - totalVerifications;
+        if (remaining <= 0) break;
+        const factsForThisPage = toVerify.slice(0, remaining);
+
+        // Verify in parallel batches with controlled concurrency
+        for (let i = 0; i < factsForThisPage.length; i += VERIFICATION_CONCURRENCY) {
+            const batch = factsForThisPage.slice(i, i + VERIFICATION_CONCURRENCY);
 
             onProgress?.(
                 "verifying",
-                `Checking: "${fact.claim.slice(0, 60)}..."`,
+                `Verifying ${batch.length} claims from: ${pageUrl.split('/').pop() || pageUrl}`,
                 30 + (totalVerifications / Math.min(allSiteFacts.length, MAX_TOTAL_VERIFICATIONS)) * 40
             );
 
-            const result = await verifyFactExternal(fact, pageUrl);
-            totalVerifications++;
-            pageReport.facts_verified++;
+            const results = await Promise.allSettled(
+                batch.map((fact) => verifyFactExternal(fact, pageUrl))
+            );
 
-            // Only create issues for non-current facts
-            if (result.status !== "current") {
-                pageReport.issues.push({
-                    fact,
-                    status: result.status,
-                    severity: issueSeverity(result.status, fact),
-                    sources: result.sources,
-                    summary: result.explanation,
-                    suggested_correction: result.suggested_correction,
-                });
+            for (let j = 0; j < batch.length; j++) {
+                totalVerifications++;
+                pageReport.facts_verified++;
+
+                const settled = results[j];
+                const result = settled.status === "fulfilled"
+                    ? settled.value
+                    : { status: "unverifiable" as const, confidence: 0, sources: [] as VerificationSource[], explanation: "Verification failed" };
+
+                if (result.status !== "current") {
+                    pageReport.issues.push({
+                        fact: batch[j],
+                        status: result.status,
+                        severity: issueSeverity(result.status, batch[j]),
+                        sources: result.sources,
+                        summary: result.explanation,
+                        suggested_correction: result.suggested_correction,
+                    });
+                }
             }
         }
 

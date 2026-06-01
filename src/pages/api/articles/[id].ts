@@ -38,14 +38,30 @@ export default async function handler(
         }
 
         if (req.method === "PUT") {
-            const { title, excerpt, html, image_base64, image_prompt } = req.body;
+            const { title, excerpt, html, image_base64, image_prompt, featured_video_url, featured_video_platform } = req.body;
 
             const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
             if (typeof title === "string") updates.title = title;
             if (typeof excerpt === "string") updates.excerpt = excerpt;
             if (typeof html === "string") updates.html = html;
-            if (typeof image_base64 === "string") updates.image_base64 = image_base64;
+            if (typeof image_base64 === "string") {
+                updates.image_base64 = image_base64;
+                // Mutual exclusion: setting an image clears the video
+                updates.featured_video_url = null;
+                updates.featured_video_platform = null;
+            }
             if (typeof image_prompt === "string") updates.image_prompt = image_prompt;
+            if (typeof featured_video_url === "string") {
+                updates.featured_video_url = featured_video_url;
+                updates.featured_video_platform = featured_video_platform ?? "youtube";
+                // Mutual exclusion: setting a video clears the image
+                updates.image_base64 = null;
+            }
+            // Allow explicitly clearing video (e.g. when switching back to image via other flows)
+            if (featured_video_url === null) {
+                updates.featured_video_url = null;
+                updates.featured_video_platform = null;
+            }
 
             const { data, error } = await supabase
                 .from("articles")

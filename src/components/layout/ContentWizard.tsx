@@ -739,7 +739,7 @@ export default function ContentWizard(props: WizardProps) {
             {/* Action */}
             <div className="flex flex-col gap-3 items-center">
               <Button
-                onClick={() => mode === "single" ? onCreate() : onCreateCluster()}
+                onClick={() => { console.log("[ContentWizard] Create button clicked", { mode, isWorking }); mode === "single" ? onCreate() : onCreateCluster(); }}
                 disabled={isWorking}
                 size="lg"
                 className="w-full max-w-xs gap-2"

@@ -410,10 +410,11 @@ async function runClusterPipeline({
         content_type: blog.content_type,
     };
 
-    // Save raw blog content
+    // Save raw blog content — also set status to "ready" now that we have real content
     await sb.from("articles").update({
         title: blog.title, slug, excerpt: blog.excerpt, html: blog.html,
         seo: seoWithAeo, outline: blog.outline, model_used: selectedModel, image_style: styleId,
+        status: "ready",
     }).eq("id", articleId);
     console.log(`[cluster-pipeline] Blog saved for ${articleId}`);
 

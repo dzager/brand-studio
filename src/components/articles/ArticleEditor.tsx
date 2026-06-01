@@ -8,6 +8,7 @@ import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import CharacterCount from "@tiptap/extension-character-count";
 import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table";
+import VideoEmbed from "@/components/articles/VideoEmbed";
 import TurndownService from "turndown";
 import { marked } from "marked";
 import { useState, useCallback, useEffect, useImperativeHandle, forwardRef, useMemo } from "react";
@@ -30,6 +31,8 @@ export type ArticleEditorHandle = {
     insertImage: (src: string, alt?: string) => void;
     /** Insert a YouTube embed (responsive iframe) at the current cursor position */
     insertYouTube: (videoId: string, title?: string) => void;
+    /** Insert a Vimeo embed (responsive iframe) at the current cursor position */
+    insertVimeo: (videoId: string, title?: string) => void;
     /** Get the Tiptap editor instance */
     getEditor: () => ReturnType<typeof useEditor> | null;
 };
@@ -40,13 +43,13 @@ type Props = {
     onChange?: (html: string) => void;
     /** Triggered when the user clicks the image button in the toolbar */
     onImageButtonClick?: () => void;
-    /** Triggered when the user clicks the YouTube button in the toolbar */
-    onYouTubeButtonClick?: () => void;
+    /** Triggered when the user clicks the Video button in the toolbar */
+    onVideoButtonClick?: () => void;
     className?: string;
 };
 
 const ArticleEditor = forwardRef<ArticleEditorHandle, Props>(
-    ({ initialContent, onChange, onImageButtonClick, onYouTubeButtonClick, className }, ref) => {
+    ({ initialContent, onChange, onImageButtonClick, onVideoButtonClick, className }, ref) => {
         const [viewMode, setViewMode] = useState<"visual" | "html" | "markdown">("visual");
         const [htmlSource, setHtmlSource] = useState(initialContent);
         const [markdownSource, setMarkdownSource] = useState("");
@@ -117,6 +120,7 @@ const ArticleEditor = forwardRef<ArticleEditorHandle, Props>(
                 TableRow,
                 TableHeader,
                 TableCell,
+                VideoEmbed,
             ],
             content: initialContent,
             editorProps: {
@@ -153,8 +157,20 @@ const ArticleEditor = forwardRef<ArticleEditorHandle, Props>(
             },
             insertYouTube: (videoId: string, title?: string) => {
                 if (editor) {
-                    const iframeHtml = `<div class="youtube-embed" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;margin:24px 0;border-radius:12px"><iframe src="https://www.youtube.com/embed/${videoId}" title="${(title ?? "").replace(/"/g, "&quot;")}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:12px" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`;
-                    editor.chain().focus().insertContent(iframeHtml).run();
+                    editor.chain().focus().setVideoEmbed({
+                        src: `https://www.youtube.com/embed/${videoId}`,
+                        title: title ?? "",
+                        platform: "youtube",
+                    }).run();
+                }
+            },
+            insertVimeo: (videoId: string, title?: string) => {
+                if (editor) {
+                    editor.chain().focus().setVideoEmbed({
+                        src: `https://player.vimeo.com/video/${videoId}`,
+                        title: title ?? "",
+                        platform: "vimeo",
+                    }).run();
                 }
             },
             getEditor: () => editor,
@@ -362,12 +378,12 @@ const ArticleEditor = forwardRef<ArticleEditorHandle, Props>(
                                 />
                             )}
 
-                            {/* YouTube (fires parent callback) */}
-                            {onYouTubeButtonClick && (
+                            {/* Video embed (fires parent callback) */}
+                            {onVideoButtonClick && (
                                 <ToolbarButton
                                     icon={<Video className="h-3.5 w-3.5" />}
-                                    tooltip="Insert YouTube Video"
-                                    onClick={onYouTubeButtonClick}
+                                    tooltip="Insert Video"
+                                    onClick={onVideoButtonClick}
                                 />
                             )}
 

@@ -69,7 +69,7 @@ type ImageStyleAnalysis = {
 };
 
 export function VisualStyleTab({ company, form, setForm, setField, editing }: TabProps) {
-    const { runTask } = useTaskRunner();
+    const { runTask, runBatchTask } = useTaskRunner();
     const [expandedStyles, setExpandedStyles] = useState<Set<number>>(new Set());
     const [showImageExtract, setShowImageExtract] = useState(false);
     const [extractPreviewUrl, setExtractPreviewUrl] = useState<string | null>(null);
@@ -99,9 +99,9 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
     };
     const [batchItems, setBatchItems] = useState<BatchImageItem[]>([]);
     const [batchAnalyzing, setBatchAnalyzing] = useState(false);
-    const [batchAutoSaved, setBatchAutoSaved] = useState(false);
     const [batchErr, setBatchErr] = useState<string | null>(null);
     const batchInputRef = useRef<HTMLInputElement>(null);
+    const batchRunningRef = useRef(false);
 
     /** Persist image_style_categories to the database immediately */
     async function autoSaveStyles(newCategories: import("@/brand/engine").ImageStyleCategory[]) {
@@ -118,17 +118,16 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
 
     function openBatchUpload() {
         setShowBatchUpload(true);
-        setBatchItems([]);
-        setBatchAnalyzing(false);
-        setBatchAutoSaved(false);
-        setBatchErr(null);
+        // Don't reset items if a batch is currently running
+        if (!batchRunningRef.current) {
+            setBatchItems([]);
+            setBatchAnalyzing(false);
+            setBatchErr(null);
+        }
     }
     function closeBatchUpload() {
+        // Just hide the dialog — processing continues in background
         setShowBatchUpload(false);
-        setBatchItems([]);
-        setBatchAnalyzing(false);
-        setBatchAutoSaved(false);
-        setBatchErr(null);
     }
 
     /** Resize an image data URI to ~128px thumbnail using canvas */
@@ -155,7 +154,7 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
     async function handleBatchFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
         const files = e.target.files;
         if (!files || files.length === 0) return;
-        const maxFiles = 10;
+        const maxFiles = 20;
         const selected = Array.from(files).slice(0, maxFiles);
         const invalid = selected.filter(f => !f.type.startsWith("image/") || f.size > 10 * 1024 * 1024);
         if (invalid.length > 0) {
@@ -185,98 +184,135 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
                 };
             })
         );
+
+        // Append new items to existing batch
         setBatchItems(prev => [...prev, ...newItems].slice(0, maxFiles));
         // Reset the input so re-selecting the same files works
         if (batchInputRef.current) batchInputRef.current.value = "";
+
+        // Auto-start processing the queue
+        startBatchQueue(newItems);
     }
 
     function removeBatchItem(idx: number) {
         setBatchItems(prev => prev.filter((_, i) => i !== idx));
     }
 
-    async function analyzeBatchItems() {
-        if (batchItems.length === 0) return;
+    /**
+     * Auto-save a single analyzed style to the database immediately.
+     * This runs in the background as each item completes — no manual "Save" step.
+     */
+    async function autoSaveSingleStyle(result: ImageStyleAnalysis, thumbnailDataUri: string | null) {
+        const name = result.style_name || "Extracted Style";
+        const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+        const newStyle: import("@/brand/engine").ImageStyleCategory = {
+            id,
+            label: name,
+            narrative: result.narrative,
+            storytelling_cues: result.storytelling_cues,
+            image_prompt_style: result.image_prompt_style,
+            thumbnail_url: thumbnailDataUri ?? undefined,
+        };
+
+        // Update form state atomically
+        let merged: import("@/brand/engine").ImageStyleCategory[] = [];
+        setForm(prev => {
+            merged = [...prev.image_style_categories, newStyle];
+            return { ...prev, useCustomStyles: true, image_style_categories: merged };
+        });
+        // Auto-expand
+        setExpandedStyles(prev => {
+            const next = new Set(prev);
+            next.add(merged.length - 1);
+            return next;
+        });
+
+        // Persist to DB
+        await autoSaveStyles(merged);
+    }
+
+    /**
+     * Background queue processor: analyzes each queued image and auto-saves results.
+     * Uses runBatchTask for task panel tracking. Safe to close the dialog while running.
+     */
+    async function startBatchQueue(newItems: BatchImageItem[]) {
+        // If already running, the new items will be picked up via state — skip re-entry
+        if (batchRunningRef.current) return;
+        batchRunningRef.current = true;
         setBatchAnalyzing(true);
         setBatchErr(null);
 
-        // Process sequentially with concurrency=2 using manual fetch
-        const queue = batchItems.map((_, i) => i).filter(i => batchItems[i].status === "queued");
-        const concurrency = 2;
-        const running = new Set<Promise<void>>();
+        // Capture base64 data eagerly to avoid stale closure issues
+        const itemPayloads = newItems.map((item, originalIdx) => ({
+            base64: item.base64,
+            thumbnailDataUri: item.thumbnailDataUri,
+            fileName: item.file.name,
+        }));
 
-        const processOne = async (idx: number) => {
-            setBatchItems(prev => prev.map((item, i) => i === idx ? { ...item, status: "analyzing" as const } : item));
-            try {
-                const res = await fetch("/api/analyze-image-style", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ image_base64: batchItems[idx].base64 }),
+        // Use runBatchTask for background task panel integration
+        await runBatchTask<{ style: ImageStyleAnalysis }>({
+            type: "style-extract",
+            label: `Batch style extraction (${itemPayloads.length} images)`,
+            concurrency: 2,
+            meta: { link: `/company?id=${company.id}&tab=visual`, linkLabel: "View in Visual" },
+            items: itemPayloads.map((payload, i) => ({
+                endpoint: "/api/analyze-image-style",
+                body: { image_base64: payload.base64 },
+                label: `Analyzing: ${payload.fileName}`,
+            })),
+            onItemComplete: async (index, data) => {
+                const payload = itemPayloads[index];
+                // Update the batch item status in UI
+                setBatchItems(prev => {
+                    // Find the matching queued/analyzing item by base64 (stable identity)
+                    let found = false;
+                    return prev.map(item => {
+                        if (!found && item.base64 === payload.base64 && (item.status === "queued" || item.status === "analyzing")) {
+                            found = true;
+                            return {
+                                ...item,
+                                status: "done" as const,
+                                result: data.style,
+                                styleName: data.style.style_name || "",
+                            };
+                        }
+                        return item;
+                    });
                 });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data?.error || "Analysis failed");
-                setBatchItems(prev => prev.map((item, i) =>
-                    i === idx ? {
-                        ...item,
-                        status: "done" as const,
-                        result: data.style,
-                        styleName: item.styleName || data.style.style_name || "",
-                    } : item
-                ));
-            } catch (err: any) {
-                setBatchItems(prev => prev.map((item, i) =>
-                    i === idx ? { ...item, status: "error" as const, error: err.message || "Unknown error" } : item
-                ));
-            }
-        };
 
-        while (queue.length > 0 || running.size > 0) {
-            while (running.size < concurrency && queue.length > 0) {
-                const idx = queue.shift()!;
-                const p = processOne(idx).finally(() => running.delete(p));
-                running.add(p);
-            }
-            if (running.size > 0) await Promise.race(running);
-        }
+                // Auto-save this style immediately
+                try {
+                    await autoSaveSingleStyle(data.style, payload.thumbnailDataUri);
+                } catch (e: any) {
+                    console.error("Auto-save failed for batch item:", e);
+                    // Don't fail the whole batch — just log it
+                }
+            },
+            onItemError: (index, error) => {
+                const payload = itemPayloads[index];
+                setBatchItems(prev => {
+                    let found = false;
+                    return prev.map(item => {
+                        if (!found && item.base64 === payload.base64 && (item.status === "queued" || item.status === "analyzing")) {
+                            found = true;
+                            return { ...item, status: "error" as const, error };
+                        }
+                        return item;
+                    });
+                });
+            },
+            onError: (error) => {
+                setBatchErr(error);
+            },
+        });
+
+        // Mark items as analyzing as they start (update UI for in-progress items)
+        setBatchItems(prev => prev.map(item =>
+            item.status === "queued" ? { ...item, status: "queued" as const } : item
+        ));
 
         setBatchAnalyzing(false);
-    }
-
-    async function saveBatchStyles() {
-        const newStyles: import("@/brand/engine").ImageStyleCategory[] = batchItems
-            .filter(item => item.status === "done" && item.result)
-            .map(item => {
-                const name = item.styleName.trim() || item.result!.style_name;
-                const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
-                return {
-                    id,
-                    label: name,
-                    narrative: item.result!.narrative,
-                    storytelling_cues: item.result!.storytelling_cues,
-                    image_prompt_style: item.result!.image_prompt_style,
-                    thumbnail_url: item.thumbnailDataUri ?? undefined,
-                };
-            });
-        if (newStyles.length === 0) return;
-        const merged = [...form.image_style_categories, ...newStyles];
-        setForm(prev => ({
-            ...prev,
-            useCustomStyles: true,
-            image_style_categories: merged,
-        }));
-        // Auto-expand the newly added styles
-        setExpandedStyles(prev => {
-            const next = new Set(prev);
-            const startIdx = form.image_style_categories.length;
-            newStyles.forEach((_, i) => next.add(startIdx + i));
-            return next;
-        });
-        // Auto-save to database
-        try {
-            await autoSaveStyles(merged);
-            setBatchAutoSaved(true);
-        } catch (e: any) {
-            setBatchErr(e.message || "Auto-save failed");
-        }
+        batchRunningRef.current = false;
     }
 
     function openImageExtract() {
@@ -536,14 +572,11 @@ export function VisualStyleTab({ company, form, setForm, setField, editing }: Ta
                 batchInputRef={batchInputRef}
                 items={batchItems}
                 analyzing={batchAnalyzing}
-                autoSaved={batchAutoSaved}
                 error={batchErr}
                 onFileSelect={handleBatchFileSelect}
                 onRemoveItem={removeBatchItem}
                 onUpdateName={(idx, name) => setBatchItems(prev => prev.map((item, i) => i === idx ? { ...item, styleName: name } : item))}
-                onAnalyze={analyzeBatchItems}
-                onSave={saveBatchStyles}
-                onUploadMore={() => { setBatchItems([]); setBatchAutoSaved(false); setBatchErr(null); }}
+                onUploadMore={() => { setBatchItems([]); setBatchErr(null); }}
             />
         </div>
     );
@@ -678,19 +711,16 @@ type BatchImageItem = {
     error: string | null;
 };
 
-function BatchImageUploadDialog({ show, onClose, batchInputRef, items, analyzing, autoSaved, error, onFileSelect, onRemoveItem, onUpdateName, onAnalyze, onSave, onUploadMore }: {
+function BatchImageUploadDialog({ show, onClose, batchInputRef, items, analyzing, error, onFileSelect, onRemoveItem, onUpdateName, onUploadMore }: {
     show: boolean;
     onClose: () => void;
     batchInputRef: React.RefObject<HTMLInputElement | null>;
     items: BatchImageItem[];
     analyzing: boolean;
-    autoSaved: boolean;
     error: string | null;
     onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
     onRemoveItem: (idx: number) => void;
     onUpdateName: (idx: number, name: string) => void;
-    onAnalyze: () => void;
-    onSave: () => void;
     onUploadMore: () => void;
 }) {
     const doneCount = items.filter(i => i.status === "done").length;
@@ -698,7 +728,6 @@ function BatchImageUploadDialog({ show, onClose, batchInputRef, items, analyzing
     const analyzingCount = items.filter(i => i.status === "analyzing").length;
     const queuedCount = items.filter(i => i.status === "queued").length;
     const allDone = items.length > 0 && queuedCount === 0 && analyzingCount === 0;
-    const hasQueued = queuedCount > 0;
 
     return (
         <Dialog open={show} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -713,7 +742,7 @@ function BatchImageUploadDialog({ show, onClose, batchInputRef, items, analyzing
                     </DialogTitle>
                 </DialogHeader>
                 <p className="text-sm text-muted-foreground mt-1">
-                    Upload multiple reference images at once. Each image will be analyzed by our AI art director to extract a reusable style prompt.
+                    Upload reference images — they&apos;ll be analyzed and saved automatically in the background. You can close this dialog while processing continues.
                 </p>
 
                 {/* Upload zone */}
@@ -729,15 +758,14 @@ function BatchImageUploadDialog({ show, onClose, batchInputRef, items, analyzing
                     <button
                         type="button"
                         onClick={() => batchInputRef.current?.click()}
-                        disabled={analyzing}
-                        className="w-full rounded-xl border-2 border-dashed border-border hover:border-primary/50 bg-muted/20 hover:bg-muted/40 transition-all p-6 flex flex-col items-center gap-2 cursor-pointer group disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full rounded-xl border-2 border-dashed border-border hover:border-primary/50 bg-muted/20 hover:bg-muted/40 transition-all p-6 flex flex-col items-center gap-2 cursor-pointer group"
                     >
                         <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
                             <ImagePlus className="h-6 w-6 text-primary" />
                         </div>
                         <div className="text-center">
                             <p className="text-sm font-medium">{items.length > 0 ? "Add more images" : "Click to select images"}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">JPEG, PNG, or WebP — up to 10 images, 10MB each</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">JPEG, PNG, or WebP — up to 20 images, 10MB each. Processing starts automatically.</p>
                         </div>
                     </button>
                 </div>
@@ -753,30 +781,37 @@ function BatchImageUploadDialog({ show, onClose, batchInputRef, items, analyzing
                 {items.length > 0 && (
                     <div className="mt-4 space-y-4">
                         {/* Progress bar */}
-                        {(analyzing || allDone) && (
-                            <div className="space-y-1.5">
-                                <div className="flex items-center justify-between text-xs">
-                                    <span className="text-muted-foreground">
-                                        {analyzing
-                                            ? `Analyzing… ${doneCount + errorCount} of ${items.length}`
-                                            : `${doneCount} analyzed${errorCount > 0 ? `, ${errorCount} failed` : ""}`}
-                                    </span>
-                                    {analyzing && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
-                                    {allDone && doneCount > 0 && <CheckCircle2 className="h-3.5 w-3.5 text-success" />}
-                                </div>
-                                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                                    <div
-                                        className="h-full rounded-full bg-primary transition-all duration-500"
-                                        style={{ width: `${items.length > 0 ? Math.round(((doneCount + errorCount) / items.length) * 100) : 0}%` }}
-                                    />
-                                </div>
+                        <div className="space-y-1.5">
+                            <div className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground">
+                                    {analyzing
+                                        ? `Processing… ${doneCount} of ${items.length} done${errorCount > 0 ? ` (${errorCount} failed)` : ""}${queuedCount > 0 ? ` · ${queuedCount} queued` : ""}`
+                                        : allDone
+                                            ? `All ${doneCount} style${doneCount !== 1 ? "s" : ""} saved${errorCount > 0 ? ` · ${errorCount} failed` : ""}`
+                                            : `${items.length} image${items.length !== 1 ? "s" : ""} ready`}
+                                </span>
+                                {analyzing && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
+                                {allDone && doneCount > 0 && <CheckCircle2 className="h-3.5 w-3.5 text-success" />}
                             </div>
-                        )}
+                            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                                <div
+                                    className="h-full rounded-full bg-primary transition-all duration-500"
+                                    style={{ width: `${items.length > 0 ? Math.round(((doneCount + errorCount) / items.length) * 100) : 0}%` }}
+                                />
+                            </div>
+                            {analyzing && (
+                                <p className="text-[11px] text-muted-foreground italic">
+                                    Each style is auto-saved as it completes. You can close this dialog — processing continues in the background.
+                                </p>
+                            )}
+                        </div>
 
                         {/* Grid of image cards */}
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                             {items.map((item, idx) => (
-                                <div key={idx} className="relative group rounded-xl border border-border bg-card overflow-hidden">
+                                <div key={idx} className={`relative group rounded-xl border bg-card overflow-hidden transition-all ${
+                                    item.status === "done" ? "border-success/40" : item.status === "error" ? "border-destructive/40" : "border-border"
+                                }`}>
                                     {/* Image preview */}
                                     <div className="aspect-square relative bg-muted/30">
                                         <img src={item.previewUrl} alt={item.styleName || `Image ${idx + 1}`} className="w-full h-full object-cover" />
@@ -787,6 +822,11 @@ function BatchImageUploadDialog({ show, onClose, batchInputRef, items, analyzing
                                                     <Loader2 className="h-6 w-6 animate-spin text-white" />
                                                     <span className="text-[10px] text-white/80">Analyzing…</span>
                                                 </div>
+                                            </div>
+                                        )}
+                                        {item.status === "queued" && analyzing && (
+                                            <div className="absolute bottom-1.5 right-1.5">
+                                                <Badge variant="secondary" className="text-[9px] h-4 bg-black/50 text-white border-0">Queued</Badge>
                                             </div>
                                         )}
                                         {item.status === "done" && (
@@ -804,8 +844,8 @@ function BatchImageUploadDialog({ show, onClose, batchInputRef, items, analyzing
                                                 </div>
                                             </div>
                                         )}
-                                        {/* Remove button */}
-                                        {!analyzing && (
+                                        {/* Remove button — only when not processing */}
+                                        {item.status !== "analyzing" && (
                                             <button
                                                 type="button"
                                                 onClick={() => onRemoveItem(idx)}
@@ -815,16 +855,21 @@ function BatchImageUploadDialog({ show, onClose, batchInputRef, items, analyzing
                                             </button>
                                         )}
                                     </div>
-                                    {/* Style name */}
+                                    {/* Style name / status */}
                                     <div className="p-2">
                                         {item.status === "done" ? (
-                                            <input
-                                                type="text"
-                                                value={item.styleName}
-                                                onChange={(e) => onUpdateName(idx, e.target.value)}
-                                                placeholder="Style name"
-                                                className="w-full text-xs bg-transparent border-0 border-b border-border/50 focus:border-primary focus:outline-none pb-0.5 placeholder:text-muted-foreground"
-                                            />
+                                            <div className="space-y-0.5">
+                                                <input
+                                                    type="text"
+                                                    value={item.styleName}
+                                                    onChange={(e) => onUpdateName(idx, e.target.value)}
+                                                    placeholder="Style name"
+                                                    className="w-full text-xs bg-transparent border-0 border-b border-border/50 focus:border-primary focus:outline-none pb-0.5 placeholder:text-muted-foreground"
+                                                />
+                                                <span className="text-[9px] text-success flex items-center gap-0.5">
+                                                    <CheckCircle2 className="h-2.5 w-2.5" /> Saved
+                                                </span>
+                                            </div>
                                         ) : (
                                             <span className="text-[11px] text-muted-foreground truncate block">
                                                 {item.status === "analyzing" ? "Analyzing…" : item.status === "error" ? "Failed" : item.file.name}
@@ -837,34 +882,20 @@ function BatchImageUploadDialog({ show, onClose, batchInputRef, items, analyzing
 
                         {/* Action buttons */}
                         <div className="flex justify-end gap-2 pt-2">
-                            {autoSaved ? (
-                                <>
-                                    <Button variant="outline" className="gap-1.5" onClick={onUploadMore}>
-                                        <ImagePlus className="h-4 w-4" /> Upload More
-                                    </Button>
-                                    <Button onClick={onClose} className="gap-1.5">
-                                        <CheckCircle2 className="h-4 w-4" /> Done
-                                    </Button>
-                                </>
-                            ) : (
-                                <>
-                                    <Button variant="outline" onClick={onClose}>Cancel</Button>
-                                    {hasQueued && (
-                                        <Button onClick={onAnalyze} disabled={analyzing} className="gap-1.5">
-                                            {analyzing ? (
-                                                <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing…</>
-                                            ) : (
-                                                <><Sparkles className="h-4 w-4" /> Analyze {queuedCount} Image{queuedCount !== 1 ? "s" : ""}</>
-                                            )}
-                                        </Button>
-                                    )}
-                                    {allDone && doneCount > 0 && !autoSaved && (
-                                        <Button onClick={onSave} className="gap-1.5">
-                                            <Plus className="h-4 w-4" /> Save {doneCount} Style{doneCount !== 1 ? "s" : ""}
-                                        </Button>
-                                    )}
-                                </>
+                            {allDone && doneCount > 0 && (
+                                <Button variant="outline" className="gap-1.5" onClick={onUploadMore}>
+                                    <ImagePlus className="h-4 w-4" /> Upload More
+                                </Button>
                             )}
+                            <Button onClick={onClose} variant={analyzing ? "outline" : "default"} className="gap-1.5">
+                                {analyzing ? (
+                                    <><Loader2 className="h-4 w-4 animate-spin" /> Close &amp; Continue in Background</>
+                                ) : allDone ? (
+                                    <><CheckCircle2 className="h-4 w-4" /> Done</>
+                                ) : (
+                                    "Close"
+                                )}
+                            </Button>
                         </div>
                     </div>
                 )}
