@@ -147,13 +147,13 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
             return;
         }
         if (!imagePollStartRef.current) imagePollStartRef.current = Date.now();
-        // Stop polling after 90 seconds
+        // Stop polling after 150 seconds (image generation takes ~106s)
         const elapsed = Date.now() - imagePollStartRef.current;
-        if (elapsed > 90_000) return;
+        if (elapsed > 150_000) return;
 
         const interval = setInterval(async () => {
             // Stop if we've been polling too long
-            if (imagePollStartRef.current && Date.now() - imagePollStartRef.current > 90_000) {
+            if (imagePollStartRef.current && Date.now() - imagePollStartRef.current > 150_000) {
                 clearInterval(interval);
                 return;
             }
@@ -481,11 +481,12 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
             const tempArticleId = createData.id;
             if (!tempArticleId) throw new Error("No article ID returned");
 
-            // Step 2: Poll until content + image are ready (up to 5 min)
-            // Content arrives first (blog generation), then image arrives
-            // shortly after (runs in parallel with humanization).
+            // Step 2: Poll until content + image are ready
+            // Blog content arrives first (~60-120s), then image arrives after
+            // (~106s from when it starts, which is when blog finishes).
+            // We wait up to 150s after content for the image.
             const maxWait = 300_000;
-            const imageExtraWait = 90_000; // wait up to 90s more for image after content
+            const imageExtraWait = 150_000;
             const pollInterval = 5_000;
             const startTime = Date.now();
             let tempArticle: any = null;
@@ -507,15 +508,21 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                     // Content is ready — track when we first saw it
                     if (!contentReadyTime) contentReadyTime = Date.now();
 
-                    // If image is also ready, we're done
+                    // If image is ready, we're done
                     if (data.image_base64) {
+                        tempArticle = data;
+                        break;
+                    }
+
+                    // If image generation failed (error saved to DB), stop waiting
+                    if (data.image_prompt && typeof data.image_prompt === "string" && data.image_prompt.startsWith("IMAGE_ERROR:")) {
+                        console.warn("Image generation failed:", data.image_prompt);
                         tempArticle = data;
                         break;
                     }
 
                     // Wait up to imageExtraWait for the image to appear
                     if (Date.now() - contentReadyTime > imageExtraWait) {
-                        // Image didn't arrive in time — use content without image
                         tempArticle = data;
                         break;
                     }
