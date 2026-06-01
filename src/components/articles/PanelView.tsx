@@ -127,11 +127,49 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                 // Check if real content has arrived
                 if (updated.excerpt && updated.excerpt !== "Generating article…") {
                     onUpdate(updated);
+                    setFullArticle(updated);
                 }
             } catch { /* silent */ }
         }, 5000);
         return () => clearInterval(interval);
     }, [article.id, isGenerating, onUpdate]);
+
+    // ── Auto-refresh for missing image after content arrives ─────────
+    // Image generation runs in parallel with humanization, so the image
+    // may arrive shortly after the text content. Poll until it appears.
+    const hasContent = article.excerpt && article.excerpt !== "Generating article…" && article.excerpt !== "Generation failed — please regenerate.";
+    const missingImage = !article.image_base64 && !article.featured_video_url;
+    const needsImagePoll = hasContent && missingImage && (article as any).status !== "failed";
+    const imagePollStartRef = useRef<number | null>(null);
+    useEffect(() => {
+        if (!needsImagePoll) {
+            imagePollStartRef.current = null;
+            return;
+        }
+        if (!imagePollStartRef.current) imagePollStartRef.current = Date.now();
+        // Stop polling after 90 seconds
+        const elapsed = Date.now() - imagePollStartRef.current;
+        if (elapsed > 90_000) return;
+
+        const interval = setInterval(async () => {
+            // Stop if we've been polling too long
+            if (imagePollStartRef.current && Date.now() - imagePollStartRef.current > 90_000) {
+                clearInterval(interval);
+                return;
+            }
+            try {
+                const r = await fetch(`/api/articles/${article.id}`);
+                if (!r.ok) return;
+                const updated = await r.json();
+                if (updated.image_base64 || updated.featured_video_url) {
+                    setFullArticle(updated);
+                    onUpdate({ ...article, ...updated });
+                    clearInterval(interval);
+                }
+            } catch { /* silent */ }
+        }, 6000);
+        return () => clearInterval(interval);
+    }, [article.id, needsImagePoll]); // eslint-disable-line react-hooks/exhaustive-deps
     const [copied, setCopied] = useState<false | "rich" | "plain">(false);
     const [regenerating, setRegenerating] = useState(false);
     const [regenErr, setRegenErr] = useState<string | null>(null);
