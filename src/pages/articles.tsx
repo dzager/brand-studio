@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/router";
 
 import type { GetServerSideProps } from "next";
@@ -64,6 +64,39 @@ export default function ArticlesPage() {
     const [companyList, setCompanyList] = useState<{ id: string; name: string }[]>([]);
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState<string | null>(null);
+
+    // Draggable sidebar width
+    const [sidebarWidth, setSidebarWidth] = useState(320);
+    const isDragging = useRef(false);
+    const startX = useRef(0);
+    const startWidth = useRef(320);
+
+    const handleMouseDown = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        isDragging.current = true;
+        startX.current = e.clientX;
+        startWidth.current = sidebarWidth;
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+
+        const handleMouseMove = (ev: MouseEvent) => {
+            if (!isDragging.current) return;
+            const delta = ev.clientX - startX.current;
+            const newWidth = Math.min(600, Math.max(200, startWidth.current + delta));
+            setSidebarWidth(newWidth);
+        };
+
+        const handleMouseUp = () => {
+            isDragging.current = false;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    }, [sidebarWidth]);
 
     const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
     const [selectedClusterId, setSelectedClusterId] = useState<string | null>(null);
@@ -278,7 +311,7 @@ export default function ArticlesPage() {
                         {(
                             <div className="flex h-full gap-0">
                                 {/* Sidebar tree */}
-                                <div className="w-80 shrink-0 border-r border-border overflow-y-auto pr-1">
+                                <div className="shrink-0 overflow-y-auto pr-1" style={{ width: sidebarWidth }}>
                                     <OutlineView
                                         articles={articles}
                                         clusters={clusters}
@@ -294,6 +327,17 @@ export default function ArticlesPage() {
                                         onAutoCluster={() => setShowAutoCluster(true)}
                                         onNewArticle={() => setShowNewArticle(true)}
                                     />
+                                </div>
+
+                                {/* Draggable resize handle */}
+                                <div
+                                    onMouseDown={handleMouseDown}
+                                    className="shrink-0 cursor-col-resize group relative"
+                                    style={{ width: 4 }}
+                                    title="Drag to resize"
+                                >
+                                    <div className="absolute inset-y-0 -left-1 -right-1 z-10" />
+                                    <div className="h-full w-full bg-border transition-colors group-hover:bg-primary/40 group-active:bg-primary/60" />
                                 </div>
 
                                 {/* Detail pane */}
