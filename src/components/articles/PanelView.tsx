@@ -465,34 +465,64 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
 
     async function handleRegenerate() {
         setRegenerating(true); setRegenErr(null);
-        await runTask({
-            type: "article",
-            label: `Regenerate: ${article.title.slice(0, 40)}`,
-            endpoint: "/api/create",
-            body: {
-                creation_prompt: article.title,
-                image_style: article.image_style ?? "default",
-                company_id: article.company_id ?? undefined,
-            },
-            meta: { articleId: article.id },
-            onSuccess: async (data: any) => {
+        try {
+            // Step 1: Create a new article via the background pipeline
+            const createResp = await fetch("/api/create", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    creation_prompt: article.title,
+                    image_style: article.image_style ?? "default",
+                    company_id: article.company_id ?? undefined,
+                }),
+            });
+            const createData = await createResp.json();
+            if (!createResp.ok) throw new Error(createData.error || "Failed to start regeneration");
+            const tempArticleId = createData.id;
+            if (!tempArticleId) throw new Error("No article ID returned");
+
+            // Step 2: Poll the temp article until content is ready (up to 5 min)
+            const maxWait = 300_000;
+            const pollInterval = 5_000;
+            const startTime = Date.now();
+            let tempArticle: any = null;
+
+            while (Date.now() - startTime < maxWait) {
+                await new Promise((r) => setTimeout(r, pollInterval));
                 try {
-                    const saveResp = await fetch(`/api/articles/${article.id}`, {
-                        method: "PUT",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            html: data.html, excerpt: data.excerpt, image_base64: data.image_base64,
-                            image_prompt: data.image_prompt, seo: data.seo, outline: data.outline, model_used: data.model_used,
-                        }),
-                    });
-                    const saveData = await saveResp.json();
-                    if (!saveResp.ok) throw new Error(saveData.error || "Failed to save");
-                    onUpdate({ ...article, ...saveData });
-                } catch (e: any) { setRegenErr(e.message); }
-                setRegenerating(false);
-            },
-            onError: (errMsg) => { setRegenErr(errMsg); setRegenerating(false); },
-        });
+                    const r = await fetch(`/api/articles/${tempArticleId}`);
+                    if (!r.ok) continue;
+                    const data = await r.json();
+                    // Check if real content has arrived (not just the placeholder)
+                    if (data.html && data.excerpt && data.excerpt !== "Generating article…" && data.excerpt !== "Generation failed — please regenerate.") {
+                        tempArticle = data;
+                        break;
+                    }
+                } catch { /* keep polling */ }
+            }
+
+            if (!tempArticle) throw new Error("Regeneration timed out — the new article is still generating. Check the activity log.");
+
+            // Step 3: Copy the new content to the current article
+            const saveResp = await fetch(`/api/articles/${article.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title: tempArticle.title,
+                    html: tempArticle.html,
+                    excerpt: tempArticle.excerpt,
+                    image_base64: tempArticle.image_base64 ?? undefined,
+                }),
+            });
+            const saveData = await saveResp.json();
+            if (!saveResp.ok) throw new Error(saveData.error || "Failed to save regenerated content");
+            onUpdate({ ...article, ...saveData });
+            setFullArticle({ ...article, ...saveData });
+
+            // Step 4: Delete the temporary article (best-effort)
+            try { await fetch(`/api/articles/${tempArticleId}`, { method: "DELETE" }); } catch { /* best-effort */ }
+        } catch (e: any) { setRegenErr(e.message); }
+        finally { setRegenerating(false); }
     }
 
     async function handleShorten(targetWords: number) {
