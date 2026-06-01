@@ -418,45 +418,24 @@ async function runClusterPipeline({
     }).eq("id", articleId);
     console.log(`[cluster-pipeline] Blog saved for ${articleId}`);
 
-    // ── Step 2: Humanize ────────────────────────────────────────────
+    // ── Steps 2 & 3: Humanize + Image (in parallel) ──────────────────
+    // Image generation only needs the raw blog title/excerpt, so we can
+    // run it concurrently with humanization to stay within Vercel's
+    // maxDuration limit.
     let currentTitle = blog.title;
     let currentExcerpt = blog.excerpt;
     let currentHtml = blog.html;
     const shouldHumanize = (brand as any).auto_humanize !== false;
 
-    if (shouldHumanize) {
-        try {
-            console.log(`[cluster-pipeline] Humanizing ${articleId}...`);
-            const bodyPrompt = buildBlogHumanizePrompt(currentHtml, currentTitle, brand);
-            const humanizedHtml = await getTextResponse("gpt-5.4", "", bodyPrompt, { temperature: 0.5 });
-            if (humanizedHtml && humanizedHtml.length > 100) currentHtml = humanizedHtml;
-
-            const [humanizedTitle, humanizedExcerpt] = await Promise.all([
-                getTextResponse("gpt-5.4", "", buildShortContentHumanizePrompt(
-                    currentTitle, "This is a blog post title. Keep it concise, specific, and punchy.", brand
-                ), { temperature: 0.5 }),
-                getTextResponse("gpt-5.4", "", buildShortContentHumanizePrompt(
-                    currentExcerpt, "This is a blog post excerpt. Keep it to 1-2 sentences, factual and direct.", brand
-                ), { temperature: 0.5 }),
-            ]);
-            if (humanizedTitle && humanizedTitle.length > 5) currentTitle = humanizedTitle;
-            if (humanizedExcerpt && humanizedExcerpt.length > 10) currentExcerpt = humanizedExcerpt;
-
-            await sb.from("articles").update({
-                title: currentTitle, excerpt: currentExcerpt, html: currentHtml, humanized: true,
-            }).eq("id", articleId);
-            console.log(`[cluster-pipeline] Humanization saved for ${articleId}`);
-        } catch (humErr) {
-            console.error(`[cluster-pipeline] Humanization failed for ${articleId}:`, humErr);
+    // Build image generation promise
+    const imagePromise = (async () => {
+        // Skip if the article already has an uploaded/existing image
+        const { data: existingRow } = await sb.from("articles").select("image_base64").eq("id", articleId).single();
+        if (existingRow?.image_base64) {
+            console.log(`[cluster-pipeline] Article ${articleId} already has an image — skipping image generation`);
+            return;
         }
-    }
 
-    // ── Step 3: Image ───────────────────────────────────────────────
-    // Skip if the article already has an uploaded/existing image
-    const { data: existingRow } = await sb.from("articles").select("image_base64").eq("id", articleId).single();
-    if (existingRow?.image_base64) {
-        console.log(`[cluster-pipeline] Article ${articleId} already has an image — skipping image generation`);
-    } else try {
         let finalImagePrompt = "";
         let image_base64: string | null = null;
 
@@ -495,16 +474,48 @@ async function runClusterPipeline({
         if (!image_base64) {
             console.log(`[cluster-pipeline] Generating AI image for ${articleId}...`);
             const imgSystem = compileImageSystemPrompt(brand);
-            const imgUser = compileImageUserPrompt({ title: currentTitle, excerpt: currentExcerpt, brand, styleId });
+            const imgUser = compileImageUserPrompt({ title: blog.title, excerpt: blog.excerpt, brand, styleId });
             finalImagePrompt = await getTextResponse("gpt-4.1-mini", imgSystem, imgUser);
-            image_base64 = await generateImageBase64(finalImagePrompt || `Editorial photo for: ${currentTitle}`);
+            image_base64 = await generateImageBase64(finalImagePrompt || `Editorial photo for: ${blog.title}`);
         }
 
         await sb.from("articles").update({ image_base64, image_prompt: finalImagePrompt }).eq("id", articleId);
         console.log(`[cluster-pipeline] Image saved for ${articleId}`);
-    } catch (imgErr) {
+    })().catch((imgErr) => {
         console.error(`[cluster-pipeline] Image failed for ${articleId}:`, imgErr);
-    }
+    });
+
+    // Build humanization promise
+    const humanizePromise = (async () => {
+        if (!shouldHumanize) return;
+        try {
+            console.log(`[cluster-pipeline] Humanizing ${articleId}...`);
+            const bodyPrompt = buildBlogHumanizePrompt(currentHtml, currentTitle, brand);
+            const humanizedHtml = await getTextResponse("gpt-5.4", "", bodyPrompt, { temperature: 0.5 });
+            if (humanizedHtml && humanizedHtml.length > 100) currentHtml = humanizedHtml;
+
+            const [humanizedTitle, humanizedExcerpt] = await Promise.all([
+                getTextResponse("gpt-5.4", "", buildShortContentHumanizePrompt(
+                    currentTitle, "This is a blog post title. Keep it concise, specific, and punchy.", brand
+                ), { temperature: 0.5 }),
+                getTextResponse("gpt-5.4", "", buildShortContentHumanizePrompt(
+                    currentExcerpt, "This is a blog post excerpt. Keep it to 1-2 sentences, factual and direct.", brand
+                ), { temperature: 0.5 }),
+            ]);
+            if (humanizedTitle && humanizedTitle.length > 5) currentTitle = humanizedTitle;
+            if (humanizedExcerpt && humanizedExcerpt.length > 10) currentExcerpt = humanizedExcerpt;
+
+            await sb.from("articles").update({
+                title: currentTitle, excerpt: currentExcerpt, html: currentHtml, humanized: true,
+            }).eq("id", articleId);
+            console.log(`[cluster-pipeline] Humanization saved for ${articleId}`);
+        } catch (humErr) {
+            console.error(`[cluster-pipeline] Humanization failed for ${articleId}:`, humErr);
+        }
+    })();
+
+    // Wait for both to complete
+    await Promise.allSettled([humanizePromise, imagePromise]);
 
     // ── Step 4: Embedding ───────────────────────────────────────────
     try {

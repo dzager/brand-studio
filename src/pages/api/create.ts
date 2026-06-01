@@ -465,7 +465,7 @@ async function runArticlePipeline({
         how_to_steps: blog.how_to_steps,
     });
 
-    // Save raw blog content immediately
+    // Save raw blog content immediately — also set status to "ready" now that we have real content
     await sb.from("articles").update({
         title: blog.title,
         slug,
@@ -475,19 +475,68 @@ async function runArticlePipeline({
         outline: blog.outline,
         model_used: selectedModel,
         image_style: styleId,
+        status: "ready",
     }).eq("id", articleId);
     console.log(`[pipeline] Blog content saved for ${articleId}`);
 
-    // Pre-check for existing image (in parallel with humanization)
-    const existingImagePromise = sb.from("articles").select("image_base64").eq("id", articleId).single();
-
-    // ── Step 2: Humanize ────────────────────────────────────────────
+    // ── Steps 2 & 3: Humanize + Image (in parallel) ────────────────
+    // Image generation only needs the raw blog title/excerpt, so we can
+    // run it concurrently with humanization to stay within Vercel's
+    // maxDuration limit.
     let currentTitle = blog.title;
     let currentExcerpt = blog.excerpt;
     let currentHtml = blog.html;
     const shouldHumanize = (brand as any).auto_humanize !== false;
 
-    if (shouldHumanize) {
+    // Build image generation promise
+    const imagePromise = (async () => {
+        // Pre-check for existing image
+        const { data: existingArticle } = await sb.from("articles").select("image_base64").eq("id", articleId).single();
+        if (existingArticle?.image_base64) {
+            console.log(`[pipeline] Article ${articleId} already has an image — skipping image generation`);
+            return;
+        }
+
+        const resolvedStyle = brandCategories.find((c) => c.id === styleId);
+        const isCompositeStyle = resolvedStyle?.type === "composite";
+        const hasCompositeProduct = composite_product_image_url && typeof composite_product_image_url === "string";
+        let finalImagePrompt = "";
+        let image_base64: string | null = null;
+
+        if (isCompositeStyle && hasCompositeProduct) {
+            console.log(`[pipeline] Composite image for ${articleId}...`);
+            const photo = brand.photography_style;
+            let brandDirective = resolvedStyle?.image_prompt_style
+                ? `Visual style: ${resolvedStyle.image_prompt_style}\n` : "";
+            brandDirective += [`Lighting: ${photo.lighting}`, `Mood: ${photo.mood}`, `Feel: ${photo.global_feel.join(", ")}`].join(". ") + ".";
+            const bgPrompt = (typeof compositeOverrideBgPrompt === "string" && compositeOverrideBgPrompt.trim())
+                ? compositeOverrideBgPrompt.trim() : resolvedStyle?.composite_bg_prompt || undefined;
+            const bgImageUrl = (typeof composite_bg_image_url === "string" && composite_bg_image_url.trim())
+                ? composite_bg_image_url.trim() : resolvedStyle?.composite_bg_image_url || undefined;
+            const compositeResult = await generateCompositeImage({
+                productImageUrl: composite_product_image_url,
+                backgroundImageUrl: bgImageUrl, backgroundPrompt: bgPrompt,
+                articleTitle: blog.title, articleExcerpt: blog.excerpt, brandStyleDirective: brandDirective,
+            });
+            image_base64 = compositeResult.image_base64;
+            finalImagePrompt = `Composite: ${compositeResult.background_prompt}`;
+        } else {
+            console.log(`[pipeline] Generating image for ${articleId}...`);
+            const imgSystem = compileImageSystemPrompt(brand);
+            const imgUser = compileImageUserPrompt({ title: blog.title, excerpt: blog.excerpt, brand, styleId });
+            finalImagePrompt = await getTextResponse("gpt-4.1-mini", imgSystem, imgUser);
+            image_base64 = await generateImageBase64(finalImagePrompt || `Editorial photo for: ${blog.title}`);
+        }
+
+        await sb.from("articles").update({ image_base64, image_prompt: finalImagePrompt }).eq("id", articleId);
+        console.log(`[pipeline] Image saved for ${articleId}`);
+    })().catch((imgErr) => {
+        console.error(`[pipeline] Image generation failed for ${articleId}:`, imgErr);
+    });
+
+    // Build humanization promise
+    const humanizePromise = (async () => {
+        if (!shouldHumanize) return;
         try {
             console.log(`[pipeline] Humanizing article ${articleId}...`);
             const bodyPrompt = buildBlogHumanizePrompt(currentHtml, currentTitle, brand);
@@ -514,50 +563,10 @@ async function runArticlePipeline({
         } catch (humErr) {
             console.error(`[pipeline] Humanization failed for ${articleId}:`, humErr);
         }
-    }
+    })();
 
-    // ── Step 3: Generate image ──────────────────────────────────────
-    // Skip if the article already has an uploaded/existing image
-    const { data: existingArticle } = await existingImagePromise;
-    if (existingArticle?.image_base64) {
-        console.log(`[pipeline] Article ${articleId} already has an image — skipping image generation`);
-    } else try {
-        const resolvedStyle = brandCategories.find((c) => c.id === styleId);
-        const isCompositeStyle = resolvedStyle?.type === "composite";
-        const hasCompositeProduct = composite_product_image_url && typeof composite_product_image_url === "string";
-        let finalImagePrompt = "";
-        let image_base64: string | null = null;
-
-        if (isCompositeStyle && hasCompositeProduct) {
-            console.log(`[pipeline] Composite image for ${articleId}...`);
-            const photo = brand.photography_style;
-            let brandDirective = resolvedStyle?.image_prompt_style
-                ? `Visual style: ${resolvedStyle.image_prompt_style}\n` : "";
-            brandDirective += [`Lighting: ${photo.lighting}`, `Mood: ${photo.mood}`, `Feel: ${photo.global_feel.join(", ")}`].join(". ") + ".";
-            const bgPrompt = (typeof compositeOverrideBgPrompt === "string" && compositeOverrideBgPrompt.trim())
-                ? compositeOverrideBgPrompt.trim() : resolvedStyle?.composite_bg_prompt || undefined;
-            const bgImageUrl = (typeof composite_bg_image_url === "string" && composite_bg_image_url.trim())
-                ? composite_bg_image_url.trim() : resolvedStyle?.composite_bg_image_url || undefined;
-            const compositeResult = await generateCompositeImage({
-                productImageUrl: composite_product_image_url,
-                backgroundImageUrl: bgImageUrl, backgroundPrompt: bgPrompt,
-                articleTitle: currentTitle, articleExcerpt: currentExcerpt, brandStyleDirective: brandDirective,
-            });
-            image_base64 = compositeResult.image_base64;
-            finalImagePrompt = `Composite: ${compositeResult.background_prompt}`;
-        } else {
-            console.log(`[pipeline] Generating image for ${articleId}...`);
-            const imgSystem = compileImageSystemPrompt(brand);
-            const imgUser = compileImageUserPrompt({ title: currentTitle, excerpt: currentExcerpt, brand, styleId });
-            finalImagePrompt = await getTextResponse("gpt-4.1-mini", imgSystem, imgUser);
-            image_base64 = await generateImageBase64(finalImagePrompt || `Editorial photo for: ${currentTitle}`);
-        }
-
-        await sb.from("articles").update({ image_base64, image_prompt: finalImagePrompt }).eq("id", articleId);
-        console.log(`[pipeline] Image saved for ${articleId}`);
-    } catch (imgErr) {
-        console.error(`[pipeline] Image generation failed for ${articleId}:`, imgErr);
-    }
+    // Wait for both to complete
+    await Promise.allSettled([humanizePromise, imagePromise]);
 
     // ── Step 4: Embedding ───────────────────────────────────────────
     try {
