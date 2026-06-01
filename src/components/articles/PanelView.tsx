@@ -481,11 +481,15 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
             const tempArticleId = createData.id;
             if (!tempArticleId) throw new Error("No article ID returned");
 
-            // Step 2: Poll the temp article until content is ready (up to 5 min)
+            // Step 2: Poll until content + image are ready (up to 5 min)
+            // Content arrives first (blog generation), then image arrives
+            // shortly after (runs in parallel with humanization).
             const maxWait = 300_000;
+            const imageExtraWait = 90_000; // wait up to 90s more for image after content
             const pollInterval = 5_000;
             const startTime = Date.now();
             let tempArticle: any = null;
+            let contentReadyTime: number | null = null;
 
             while (Date.now() - startTime < maxWait) {
                 await new Promise((r) => setTimeout(r, pollInterval));
@@ -493,8 +497,25 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                     const r = await fetch(`/api/articles/${tempArticleId}`);
                     if (!r.ok) continue;
                     const data = await r.json();
-                    // Check if real content has arrived (not just the placeholder)
-                    if (data.html && data.excerpt && data.excerpt !== "Generating article…" && data.excerpt !== "Generation failed — please regenerate.") {
+
+                    const hasContent = data.html && data.excerpt
+                        && data.excerpt !== "Generating article…"
+                        && data.excerpt !== "Generation failed — please regenerate.";
+
+                    if (!hasContent) continue;
+
+                    // Content is ready — track when we first saw it
+                    if (!contentReadyTime) contentReadyTime = Date.now();
+
+                    // If image is also ready, we're done
+                    if (data.image_base64) {
+                        tempArticle = data;
+                        break;
+                    }
+
+                    // Wait up to imageExtraWait for the image to appear
+                    if (Date.now() - contentReadyTime > imageExtraWait) {
+                        // Image didn't arrive in time — use content without image
                         tempArticle = data;
                         break;
                     }
@@ -511,7 +532,7 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                     title: tempArticle.title,
                     html: tempArticle.html,
                     excerpt: tempArticle.excerpt,
-                    image_base64: tempArticle.image_base64 ?? undefined,
+                    ...(tempArticle.image_base64 ? { image_base64: tempArticle.image_base64 } : {}),
                 }),
             });
             const saveData = await saveResp.json();
