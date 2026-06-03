@@ -1102,7 +1102,7 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                                     ) : (
                                         <div className="text-[13px] font-medium truncate">{page.title}</div>
                                     )}
-                                    <div className="text-[11px] text-muted-foreground truncate">{page.keyword}</div>
+
                                     {page.description && !articleIsGenerating && !articleHasFailed && (
                                         <div className="text-[11px] text-muted-foreground/70 mt-0.5 line-clamp-2 leading-relaxed">{page.description}</div>
                                     )}

@@ -360,8 +360,17 @@ export default async function handler(
                         targetSlug = href.replace(/\/+$/, "");
                     }
 
-                    if (targetSlug && slugToFolder.has(targetSlug)) {
-                        const targetFolder = slugToFolder.get(targetSlug)!;
+                    // Try exact match first, then fall back to last path segment
+                    // (handles /blog/slug, /resources/slug, etc.)
+                    const lastSegment = targetSlug?.split("/").filter(Boolean).pop() ?? null;
+                    const matchedSlug = targetSlug && slugToFolder.has(targetSlug)
+                        ? targetSlug
+                        : lastSegment && slugToFolder.has(lastSegment)
+                        ? lastSegment
+                        : null;
+
+                    if (matchedSlug) {
+                        const targetFolder = slugToFolder.get(matchedSlug)!;
                         return `href="../${targetFolder}/article.html"`;
                     }
 

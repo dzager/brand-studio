@@ -95,9 +95,11 @@ type Props = {
     onUpdate: (updated: Article) => void;
     onDelete: (id: string) => void;
     onSelectArticle: (id: string) => void;
+    /** Map of slug → article id for in-app navigation of internal links */
+    slugToArticleId?: Record<string, string>;
 };
 
-export default function PanelView({ article, companies, onUpdate, onDelete, onSelectArticle }: Props) {
+export default function PanelView({ article, companies, onUpdate, onDelete, onSelectArticle, slugToArticleId }: Props) {
     const { runTask } = useTaskRunner();
     const { tasks } = useTaskStore();
 
@@ -3148,6 +3150,26 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
 
             {/* Article Content */}
             <div dangerouslySetInnerHTML={{ __html: displayArticle.html ?? "" }}
+                onClick={(e) => {
+                    // Intercept clicks on internal links to navigate within the app
+                    if (!slugToArticleId) return;
+                    const anchor = (e.target as HTMLElement).closest("a");
+                    if (!anchor) return;
+                    const href = anchor.getAttribute("href");
+                    if (!href) return;
+                    // Skip external links
+                    if (href.startsWith("http://") || href.startsWith("https://")) return;
+                    // Extract slug from href like "/slug", "/blog/slug", or bare "slug"
+                    const segments = href.replace(/^\/+/, "").replace(/\/+$/, "").split("/").filter(Boolean);
+                    // Try full path first, then last segment
+                    const fullPath = segments.join("/");
+                    const lastSegment = segments[segments.length - 1] ?? "";
+                    const targetId = slugToArticleId[fullPath] || slugToArticleId[lastSegment];
+                    if (targetId) {
+                        e.preventDefault();
+                        onSelectArticle(targetId);
+                    }
+                }}
                 className="prose prose-sm dark:prose-invert max-w-none leading-relaxed article-content" />
 
             {/* Image Prompt */}

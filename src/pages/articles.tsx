@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/router";
 
 import type { GetServerSideProps } from "next";
@@ -260,6 +260,15 @@ export default function ArticlesPage() {
 
     const selectedArticle = articles.find((a) => a.id === selectedArticleId) || null;
 
+    // Build slug → article id lookup for in-app navigation of interlinked articles
+    const slugToArticleId = useMemo(() => {
+        const map: Record<string, string> = {};
+        for (const a of articles) {
+            if (a.slug) map[a.slug] = a.id;
+        }
+        return map;
+    }, [articles]);
+
     return (
         <AppLayout fullWidth>
             <div className="flex flex-col h-[calc(100vh-7rem)]">
@@ -357,6 +366,7 @@ export default function ArticlesPage() {
                                             onUpdate={handleUpdateArticle}
                                             onDelete={handleDeleteArticle}
                                             onSelectArticle={handleSelectArticle}
+                                            slugToArticleId={slugToArticleId}
                                         />
                                     ) : (
                                         <div className="flex items-center justify-center h-full text-muted-foreground">
