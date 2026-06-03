@@ -64,7 +64,7 @@ const NAV_ITEMS = [
 const COMPANY_SUB_NAV = [
   { tab: "brand", label: "Brand", icon: Eye },
   { tab: "visual", label: "Visual", icon: Palette },
-  { tab: "prompts", label: "Prompts", icon: FileText },
+  { tab: "prompts", label: "Personas", icon: FileText },
 ];
 
 function ThemeToggle() {

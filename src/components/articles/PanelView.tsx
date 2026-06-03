@@ -31,7 +31,9 @@ import {
     Scale, ExternalLink, ShieldCheck, Wand2, ChevronRight,
     X, Maximize2, Video, Play, ArrowLeftRight, ListChecks,
     Star, Award, TrendingUp, Target, Shield, Brain, Lightbulb, AlertTriangle,
+    Camera,
 } from "lucide-react";
+import type { ImageStyleCategory } from "@/brand/engine";
 import type { ConsulResult, ConsulClaimReview } from "@/lib/consulPrompts";
 import type { CompareResult } from "@/pages/api/compare-article";
 import type { QualityRatingResult } from "@/pages/api/rate-quality";
@@ -198,6 +200,26 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
     const [selectedStyle, setSelectedStyle] = useState(article.image_style ?? "default");
     const [refreshErr, setRefreshErr] = useState<string | null>(null);
 
+    // ── Add Image Style state ──────────────────────────────────────────
+    type AddStyleAnalysis = {
+        style_name: string;
+        image_prompt_style: string;
+        narrative: string;
+        storytelling_cues: string[];
+        analysis: Record<string, unknown>;
+    };
+    const [showAddStyle, setShowAddStyle] = useState(false);
+    const [addStylePreview, setAddStylePreview] = useState<string | null>(null);
+    const [addStyleBase64, setAddStyleBase64] = useState<string | null>(null);
+    const [addStyleAnalyzing, setAddStyleAnalyzing] = useState(false);
+    const [addStyleErr, setAddStyleErr] = useState<string | null>(null);
+    const [addStyleResult, setAddStyleResult] = useState<AddStyleAnalysis | null>(null);
+    const [addStyleName, setAddStyleName] = useState("");
+    const [addStyleThumbnail, setAddStyleThumbnail] = useState<string | null>(null);
+    const [addStyleGenThumb, setAddStyleGenThumb] = useState(false);
+    const [addStyleSaving, setAddStyleSaving] = useState(false);
+    const addStyleFileRef = useRef<HTMLInputElement>(null);
+
     // Composite style state for PanelView image refresh
     const [pvCsProductUrl, setPvCsProductUrl] = useState<string | null>(null);
     const [pvCsProductThumb, setPvCsProductThumb] = useState<string | null>(null);
@@ -354,6 +376,118 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
             })
             .catch(() => setImageStyles([]));
     }, [article.company_id]);
+
+    // ── Add Image Style handlers ──────────────────────────────────────
+    function openAddStyleModal() {
+        setShowAddStyle(true);
+        setAddStylePreview(null);
+        setAddStyleBase64(null);
+        setAddStyleAnalyzing(false);
+        setAddStyleErr(null);
+        setAddStyleResult(null);
+        setAddStyleName("");
+        setAddStyleThumbnail(null);
+        setAddStyleGenThumb(false);
+        setAddStyleSaving(false);
+    }
+    function closeAddStyleModal() {
+        setShowAddStyle(false);
+        setAddStylePreview(null);
+        setAddStyleBase64(null);
+        setAddStyleAnalyzing(false);
+        setAddStyleErr(null);
+        setAddStyleResult(null);
+        setAddStyleName("");
+        setAddStyleThumbnail(null);
+        setAddStyleGenThumb(false);
+        setAddStyleSaving(false);
+    }
+
+    function handleAddStyleFile(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith("image/")) { setAddStyleErr("Please select an image file."); return; }
+        if (file.size > 10 * 1024 * 1024) { setAddStyleErr("Image must be under 10MB."); return; }
+        setAddStyleErr(null);
+        setAddStyleResult(null);
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const dataUrl = ev.target?.result as string;
+            setAddStylePreview(dataUrl);
+            setAddStyleBase64(dataUrl);
+        };
+        reader.readAsDataURL(file);
+    }
+
+    async function handleAddStyleAnalyze() {
+        if (!addStyleBase64) return;
+        setAddStyleAnalyzing(true);
+        setAddStyleErr(null);
+        setAddStyleThumbnail(null);
+        await runTask<{ style: AddStyleAnalysis }>({
+            type: "style-extract",
+            label: "Extracting image style",
+            endpoint: "/api/analyze-image-style",
+            body: { image_base64: addStyleBase64 },
+            onSuccess: (data) => {
+                setAddStyleResult(data.style);
+                setAddStyleName(data.style.style_name || "");
+                // Auto-generate thumbnail
+                if (data.style.image_prompt_style) {
+                    setAddStyleGenThumb(true);
+                    runTask<{ thumbnail_base64: string }>({
+                        type: "thumbnail",
+                        label: `Thumbnail: ${data.style.style_name || "style"}`,
+                        endpoint: "/api/generate-style-thumbnail",
+                        body: { image_prompt_style: data.style.image_prompt_style, style_name: data.style.style_name },
+                        onSuccess: (d2) => { if (d2.thumbnail_base64) setAddStyleThumbnail(`data:image/jpeg;base64,${d2.thumbnail_base64}`); },
+                    }).finally(() => setAddStyleGenThumb(false));
+                }
+            },
+            onError: (err) => { setAddStyleErr(err); },
+        });
+        setAddStyleAnalyzing(false);
+    }
+
+    async function handleAddStyleSave() {
+        if (!addStyleResult || !article.company_id) return;
+        const name = addStyleName.trim() || addStyleResult.style_name;
+        const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+        const newStyle: ImageStyleCategory = {
+            id,
+            label: name,
+            narrative: addStyleResult.narrative,
+            storytelling_cues: addStyleResult.storytelling_cues,
+            image_prompt_style: addStyleResult.image_prompt_style,
+            thumbnail_url: addStyleThumbnail ?? undefined,
+        };
+        setAddStyleSaving(true);
+        try {
+            // Fetch current company styles
+            const compResp = await fetch(`/api/companies/${article.company_id}`);
+            const compData = await compResp.json();
+            if (!compResp.ok) throw new Error(compData.error || "Failed to fetch company");
+            const existingStyles: ImageStyleCategory[] = Array.isArray(compData.image_style_categories) ? compData.image_style_categories : [];
+            const updatedStyles = [...existingStyles, newStyle];
+            // Save updated styles
+            const r = await fetch(`/api/companies/${article.company_id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image_style_categories: updatedStyles }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || "Save failed");
+            // Update local imageStyles state so the dropdown reflects the new style immediately
+            setImageStyles(updatedStyles);
+            // Auto-select the newly added style
+            setSelectedStyle(id);
+            closeAddStyleModal();
+        } catch (e: any) {
+            setAddStyleErr(e.message);
+        } finally {
+            setAddStyleSaving(false);
+        }
+    }
 
     const displayArticle = fullArticle || article;
 
@@ -1300,13 +1434,28 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                     <TabsContent value="generate" className="space-y-3">
                         {imageStyles.length > 0 && (
                             <div>
-                                <Label className="text-xs">Hero style</Label>
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-xs">Hero style</Label>
+                                    {article.company_id && (
+                                        <Button variant="ghost" size="sm" className="h-6 gap-1 text-xs text-muted-foreground hover:text-foreground" onClick={openAddStyleModal}>
+                                            <Camera className="h-3 w-3" /> Add Style
+                                        </Button>
+                                    )}
+                                </div>
                                 <select value={selectedStyle} onChange={(e) => { setSelectedStyle(e.target.value); setImagePromptInput(""); setInsertGenPrompt(""); setInsertPreview(null); setRefreshErr(null); setPvCsProductUrl(null); setPvCsProductThumb(null); setPvCsProductResults([]); setPvCsProductQuery(""); setPvCsBgPrompt(""); setPvCsBgImageUrl(""); resetComposite(); }}
                                     className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm">
                                     {imageStyles.map((s) => (
                                         <option key={s.id} value={s.id}>{s.label}{s.narrative ? ` — ${s.narrative.slice(0, 60)}…` : ""}</option>
                                     ))}
                                 </select>
+                            </div>
+                        )}
+                        {imageStyles.length === 0 && article.company_id && (
+                            <div className="flex items-center gap-2">
+                                <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={openAddStyleModal}>
+                                    <Camera className="h-3.5 w-3.5" /> Add Image Style
+                                </Button>
+                                <span className="text-xs text-muted-foreground">Upload a reference image to create a reusable style</span>
                             </div>
                         )}
                         <div className="flex gap-2">
@@ -1436,7 +1585,14 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                                     <div className="space-y-3">
                                         {imageStyles.length > 0 && (
                                             <div>
-                                                <Label className="text-xs">Hero style</Label>
+                                                <div className="flex items-center justify-between">
+                                                    <Label className="text-xs">Hero style</Label>
+                                                    {article.company_id && (
+                                                        <Button variant="ghost" size="sm" className="h-6 gap-1 text-xs text-muted-foreground hover:text-foreground" onClick={openAddStyleModal}>
+                                                            <Camera className="h-3 w-3" /> Add Style
+                                                        </Button>
+                                                    )}
+                                                </div>
                                                 <select value={selectedStyle} onChange={(e) => { setSelectedStyle(e.target.value); setImagePromptInput(""); setInsertGenPrompt(""); setInsertPreview(null); setRefreshErr(null); setPvCsProductUrl(null); setPvCsProductThumb(null); setPvCsProductResults([]); setPvCsProductQuery(""); setPvCsBgPrompt(""); setPvCsBgImageUrl(""); resetComposite(); }}
                                                     className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm">
                                                     {imageStyles.map((s) => (
@@ -3032,6 +3188,120 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                             <ArrowLeftRight className="h-4 w-4" />
                             {comparing ? "Comparing…" : "Run Comparison"}
                         </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Add Image Style Modal */}
+            <Dialog open={showAddStyle} onOpenChange={(open) => { if (!open) closeAddStyleModal(); }}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Camera className="h-5 w-5" />
+                            Add Image Style
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <p className="text-sm text-muted-foreground">
+                            Upload a reference image and we&apos;ll analyze its visual style to create a reusable style for {article.company_id && companies[article.company_id] ? companies[article.company_id] : "this company"}.
+                        </p>
+
+                        {/* Upload area */}
+                        <input ref={addStyleFileRef} type="file" accept="image/*" className="hidden" onChange={handleAddStyleFile} />
+                        {!addStylePreview ? (
+                            <button
+                                type="button"
+                                onClick={() => addStyleFileRef.current?.click()}
+                                className="w-full rounded-lg border-2 border-dashed border-border hover:border-primary/50 transition-colors p-8 flex flex-col items-center gap-2 text-muted-foreground hover:text-foreground"
+                            >
+                                <Upload className="h-8 w-8 opacity-40" />
+                                <span className="text-sm font-medium">Click to upload a reference image</span>
+                                <span className="text-xs">JPEG, PNG, or WebP — max 10MB</span>
+                            </button>
+                        ) : (
+                            <div className="relative">
+                                <img src={addStylePreview} alt="Reference" className="w-full max-h-48 object-contain rounded-lg border" />
+                                <Button
+                                    variant="secondary"
+                                    size="icon"
+                                    className="absolute top-2 right-2 h-6 w-6 shadow-sm"
+                                    onClick={() => { setAddStylePreview(null); setAddStyleBase64(null); setAddStyleResult(null); setAddStyleErr(null); }}
+                                >
+                                    <X className="h-3 w-3" />
+                                </Button>
+                            </div>
+                        )}
+
+                        {/* Analyze button */}
+                        {addStylePreview && !addStyleResult && (
+                            <Button onClick={handleAddStyleAnalyze} disabled={addStyleAnalyzing} className="w-full gap-1.5">
+                                <Sparkles className="h-4 w-4" />
+                                {addStyleAnalyzing ? "Analyzing style…" : "Analyze Style"}
+                            </Button>
+                        )}
+
+                        {/* Error */}
+                        {addStyleErr && (
+                            <Alert variant="destructive">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription>{addStyleErr}</AlertDescription>
+                            </Alert>
+                        )}
+
+                        {/* Analysis result */}
+                        {addStyleResult && (
+                            <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
+                                <div className="flex items-start gap-3">
+                                    {addStyleGenThumb ? (
+                                        <Skeleton className="h-16 w-16 rounded-md shrink-0" />
+                                    ) : addStyleThumbnail ? (
+                                        <img src={addStyleThumbnail} alt="Style preview" className="h-16 w-16 rounded-md object-cover shrink-0" />
+                                    ) : null}
+                                    <div className="flex-1 min-w-0 space-y-1.5">
+                                        <Label className="text-xs">Style Name</Label>
+                                        <Input
+                                            value={addStyleName}
+                                            onChange={(e) => setAddStyleName(e.target.value)}
+                                            placeholder="e.g. Warm Editorial"
+                                            className="h-8 text-sm"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <Label className="text-xs text-muted-foreground">Narrative</Label>
+                                    <p className="text-sm mt-0.5">{addStyleResult.narrative}</p>
+                                </div>
+                                {addStyleResult.storytelling_cues.length > 0 && (
+                                    <div>
+                                        <Label className="text-xs text-muted-foreground">Storytelling Cues</Label>
+                                        <div className="flex flex-wrap gap-1.5 mt-1">
+                                            {addStyleResult.storytelling_cues.map((cue, i) => (
+                                                <Badge key={i} variant="secondary" className="text-xs">{cue}</Badge>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                <details className="group">
+                                    <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors">
+                                        View full prompt style
+                                    </summary>
+                                    <pre className="whitespace-pre-wrap text-xs text-muted-foreground mt-1 p-2 bg-background rounded-md max-h-32 overflow-y-auto">
+                                        {addStyleResult.image_prompt_style}
+                                    </pre>
+                                </details>
+                            </div>
+                        )}
+
+                        {/* Save / Cancel */}
+                        {addStyleResult && (
+                            <div className="flex gap-2 justify-end">
+                                <Button variant="outline" onClick={closeAddStyleModal}>Cancel</Button>
+                                <Button onClick={handleAddStyleSave} disabled={addStyleSaving} className="gap-1.5">
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    {addStyleSaving ? "Saving…" : "Save to Library"}
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 </DialogContent>
             </Dialog>

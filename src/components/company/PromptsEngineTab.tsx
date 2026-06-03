@@ -1,6 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { VoiceProfile } from "@/brand/engine";
-import type { CompanyData, CompanyPrompt, CompanyForm } from "./types";
+import type { CompanyData, CompanyPrompt, CompanyForm, CompanyFeedback } from "./types";
 import { Section, useCopyToClipboard, CopyButton } from "./shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +12,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
     FileText, Cpu, AlertCircle, Loader2, Plus, X, Pencil, Trash2,
     Copy as CopyIcon, CheckCircle2, ChevronDown, ChevronRight, Save,
-    Mic, Globe, Link2,
+    Mic, Globe, Link2, MessageSquare, UserCircle, Zap,
 } from "lucide-react";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 /* ── Voice profile → prompt compiler ──────────────────────────────── */
@@ -59,6 +65,61 @@ export function PromptsEngineTab({
 }) {
     const { copiedId, copyToClipboard } = useCopyToClipboard();
     const [prompts, setPrompts] = useState<CompanyPrompt[]>(company.prompts ?? []);
+
+    // Feedback state
+    const [feedback, setFeedback] = useState<CompanyFeedback[]>([]);
+    const [feedbackLoading, setFeedbackLoading] = useState(false);
+    const [feedbackErr, setFeedbackErr] = useState<string | null>(null);
+    const [togglingModel, setTogglingModel] = useState<string | null>(null);
+    const [applyingPersona, setApplyingPersona] = useState<string | null>(null);
+    const [deletingFeedback, setDeletingFeedback] = useState<string | null>(null);
+
+    // Fetch feedback on mount
+    useEffect(() => {
+        setFeedbackLoading(true);
+        fetch(`/api/feedback?company_id=${company.id}`)
+            .then((r) => r.json())
+            .then((data) => { if (Array.isArray(data)) setFeedback(data); })
+            .catch(() => setFeedbackErr("Failed to load feedback"))
+            .finally(() => setFeedbackLoading(false));
+    }, [company.id]);
+
+    async function handleToggleFeedbackModel(item: CompanyFeedback) {
+        setTogglingModel(item.id);
+        try {
+            const r = await fetch("/api/feedback/apply-to-model", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: item.id, active: !item.applied_to_model }),
+            });
+            if (!r.ok) throw new Error();
+            setFeedback((prev) => prev.map((f) => (f.id === item.id ? { ...f, applied_to_model: !item.applied_to_model } : f)));
+        } catch { setFeedbackErr("Failed to update"); }
+        finally { setTogglingModel(null); }
+    }
+
+    async function handleApplyFeedbackToPersona(feedbackId: string, personaId: string) {
+        setApplyingPersona(feedbackId);
+        try {
+            const r = await fetch("/api/feedback/apply-to-persona", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: feedbackId, persona_id: personaId }),
+            });
+            if (!r.ok) throw new Error();
+            setFeedback((prev) => prev.map((f) => (f.id === feedbackId ? { ...f, applied_to_persona_id: personaId } : f)));
+        } catch { setFeedbackErr("Failed to apply"); }
+        finally { setApplyingPersona(null); }
+    }
+
+    async function handleDeleteFeedback(id: string) {
+        setDeletingFeedback(id);
+        try {
+            await fetch(`/api/feedback/${id}`, { method: "DELETE" });
+            setFeedback((prev) => prev.filter((f) => f.id !== id));
+        } catch { setFeedbackErr("Failed to delete"); }
+        finally { setDeletingFeedback(null); }
+    }
 
     // Create / Edit state
     const [showForm, setShowForm] = useState(false);
@@ -234,9 +295,9 @@ export function PromptsEngineTab({
 
     return (
         <div className="space-y-3">
-            {/* Prompt Templates */}
+            {/* Persona Templates */}
             <Section
-                title="Prompt Templates"
+                title="Persona Templates"
                 icon={FileText}
                 defaultOpen
                 badge={prompts.length > 0 ? <Badge variant="secondary" className="text-[10px] ml-1">{prompts.length}</Badge> : <Badge variant="outline" className="text-[10px] ml-1 text-muted-foreground">Default</Badge>}
@@ -248,7 +309,7 @@ export function PromptsEngineTab({
                             <CardContent className="p-4 space-y-3">
                                 <div className="flex items-center justify-between">
                                     <span className="text-sm font-semibold flex items-center gap-1.5">
-                                        {editingId ? <><Pencil className="h-3.5 w-3.5" /> Edit Prompt</> : <><Plus className="h-3.5 w-3.5" /> New Prompt Template</>}
+                                        {editingId ? <><Pencil className="h-3.5 w-3.5" /> Edit Persona</> : <><Plus className="h-3.5 w-3.5" /> New Persona Template</>}
                                     </span>
                                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={closeForm}>
                                         <X className="h-3.5 w-3.5" />
@@ -344,13 +405,13 @@ export function PromptsEngineTab({
                         </Card>
                     ) : (
                         <Button variant="outline" size="sm" className="gap-1.5 border-dashed" onClick={openCreate}>
-                            <Plus className="h-3.5 w-3.5" /> New Prompt Template
+                            <Plus className="h-3.5 w-3.5" /> New Persona Template
                         </Button>
                     )}
 
                     {/* Existing prompts */}
                     {prompts.length === 0 && !showForm && (
-                        <p className="text-sm text-muted-foreground italic">No prompt templates configured. Create one to get started.</p>
+                        <p className="text-sm text-muted-foreground italic">No persona templates configured. Create one to get started.</p>
                     )}
                     {prompts.map((p) => (
                         <PromptCard
@@ -365,6 +426,20 @@ export function PromptsEngineTab({
                     ))}
                 </div>
             </Section>
+
+            {/* Feedback Log */}
+            <FeedbackLogSection
+                feedback={feedback}
+                feedbackLoading={feedbackLoading}
+                feedbackErr={feedbackErr}
+                personas={prompts}
+                togglingModel={togglingModel}
+                applyingPersona={applyingPersona}
+                deletingFeedback={deletingFeedback}
+                onToggleModel={handleToggleFeedbackModel}
+                onApplyToPersona={handleApplyFeedbackToPersona}
+                onDelete={handleDeleteFeedback}
+            />
 
             {/* Prompt Engine */}
             <PromptEngineSection companyId={company.id} />
@@ -509,6 +584,214 @@ function PromptEngineSection({ companyId }: { companyId: string }) {
                     </div>
                 </CardContent>
             )}
+        </Card>
+    );
+}
+
+/* ── Feedback Log Section ────────────────────────────────────────── */
+function timeAgo(dateStr: string): string {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    if (days < 30) return `${days}d ago`;
+    return new Date(dateStr).toLocaleDateString();
+}
+
+function FeedbackLogSection({
+    feedback,
+    feedbackLoading,
+    feedbackErr,
+    personas,
+    togglingModel,
+    applyingPersona,
+    deletingFeedback,
+    onToggleModel,
+    onApplyToPersona,
+    onDelete,
+}: {
+    feedback: CompanyFeedback[];
+    feedbackLoading: boolean;
+    feedbackErr: string | null;
+    personas: CompanyPrompt[];
+    togglingModel: string | null;
+    applyingPersona: string | null;
+    deletingFeedback: string | null;
+    onToggleModel: (item: CompanyFeedback) => void;
+    onApplyToPersona: (feedbackId: string, personaId: string) => void;
+    onDelete: (id: string) => void;
+}) {
+    const appliedCount = feedback.filter((f) => f.applied_to_model).length;
+
+    return (
+        <Section
+            title="Feedback Log"
+            icon={MessageSquare}
+            defaultOpen={feedback.length > 0}
+            badge={
+                feedback.length > 0 ? (
+                    <div className="flex items-center gap-1 ml-1">
+                        <Badge variant="secondary" className="text-[10px]">{feedback.length}</Badge>
+                        {appliedCount > 0 && (
+                            <Badge variant="default" className="text-[10px] gap-0.5 bg-emerald-600">
+                                <Cpu className="h-2 w-2" /> {appliedCount} active
+                            </Badge>
+                        )}
+                    </div>
+                ) : (
+                    <Badge variant="outline" className="text-[10px] ml-1 text-muted-foreground">None</Badge>
+                )
+            }
+        >
+            <div className="space-y-2.5 pt-3">
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                    Feedback submitted by team members to improve content quality. Use <strong>Add to Model</strong> to include in all content generation, or <strong>Add to Persona</strong> to apply to a specific persona only.
+                </p>
+
+                {feedbackLoading && (
+                    <div className="flex items-center gap-2 justify-center py-6">
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">Loading feedback…</span>
+                    </div>
+                )}
+
+                {feedbackErr && (
+                    <p className="text-xs text-destructive flex items-center gap-1.5">
+                        <AlertCircle className="h-3 w-3 shrink-0" /> {feedbackErr}
+                    </p>
+                )}
+
+                {!feedbackLoading && feedback.length === 0 && (
+                    <p className="text-sm text-muted-foreground italic py-2">
+                        No feedback yet. Use the Feedback button above to submit quality notes.
+                    </p>
+                )}
+
+                {feedback.map((item) => (
+                    <FeedbackItem
+                        key={item.id}
+                        item={item}
+                        personas={personas}
+                        togglingModel={togglingModel === item.id}
+                        applyingPersona={applyingPersona === item.id}
+                        deleting={deletingFeedback === item.id}
+                        onToggleModel={() => onToggleModel(item)}
+                        onApplyToPersona={(pid) => onApplyToPersona(item.id, pid)}
+                        onDelete={() => onDelete(item.id)}
+                    />
+                ))}
+            </div>
+        </Section>
+    );
+}
+
+/* ── Individual Feedback Item ────────────────────────────────────── */
+function FeedbackItem({
+    item,
+    personas,
+    togglingModel,
+    applyingPersona,
+    deleting,
+    onToggleModel,
+    onApplyToPersona,
+    onDelete,
+}: {
+    item: CompanyFeedback;
+    personas: CompanyPrompt[];
+    togglingModel: boolean;
+    applyingPersona: boolean;
+    deleting: boolean;
+    onToggleModel: () => void;
+    onApplyToPersona: (personaId: string) => void;
+    onDelete: () => void;
+}) {
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const personaName = personas.find((p) => p.id === item.applied_to_persona_id)?.name;
+
+    return (
+        <Card className="bg-muted/30">
+            <CardContent className="p-3">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <UserCircle className="h-3.5 w-3.5 text-primary/60" />
+                        <span className="font-medium text-foreground/70">
+                            {item.user_email?.split("@")[0] || "User"}
+                        </span>
+                        <span>·</span>
+                        <span>{timeAgo(item.created_at)}</span>
+                    </div>
+                    {confirmDelete ? (
+                        <div className="flex items-center gap-1">
+                            <Button variant="destructive" size="sm" className="h-5 text-[10px] px-1.5" onClick={() => { onDelete(); setConfirmDelete(false); }} disabled={deleting}>
+                                {deleting ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : "Delete"}
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-5 text-[10px] px-1.5" onClick={() => setConfirmDelete(false)}>Cancel</Button>
+                        </div>
+                    ) : (
+                        <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-destructive" onClick={() => setConfirmDelete(true)}>
+                            <Trash2 className="h-2.5 w-2.5" />
+                        </Button>
+                    )}
+                </div>
+
+                {/* Body */}
+                <p className="text-sm leading-relaxed whitespace-pre-wrap mb-2">{item.body}</p>
+
+                {/* Status + Actions */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                    <Button
+                        variant={item.applied_to_model ? "default" : "outline"}
+                        size="sm"
+                        className={cn(
+                            "h-6 text-[11px] gap-1 px-2",
+                            item.applied_to_model && "bg-emerald-600 hover:bg-emerald-700"
+                        )}
+                        onClick={onToggleModel}
+                        disabled={togglingModel}
+                    >
+                        {togglingModel ? (
+                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                        ) : item.applied_to_model ? (
+                            <><CheckCircle2 className="h-2.5 w-2.5" /> In Model</>
+                        ) : (
+                            <><Cpu className="h-2.5 w-2.5" /> Add to Model</>
+                        )}
+                    </Button>
+
+                    {personas.length > 0 && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-6 text-[11px] gap-1 px-2" disabled={applyingPersona}>
+                                    {applyingPersona ? (
+                                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                    ) : (
+                                        <><Zap className="h-2.5 w-2.5" /> Add to Persona</>
+                                    )}
+                                    <ChevronDown className="h-2.5 w-2.5" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start">
+                                {personas.map((p) => (
+                                    <DropdownMenuItem key={p.id} onClick={() => onApplyToPersona(p.id)} className="text-xs">
+                                        {p.name}
+                                        {item.applied_to_persona_id === p.id && <CheckCircle2 className="h-3 w-3 ml-auto text-primary" />}
+                                    </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    )}
+
+                    {personaName && (
+                        <Badge variant="secondary" className="text-[10px] gap-0.5">
+                            <Zap className="h-2 w-2" /> {personaName}
+                        </Badge>
+                    )}
+                </div>
+            </CardContent>
         </Card>
     );
 }

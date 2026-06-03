@@ -8,9 +8,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-    AlertCircle, Save, X, CheckCircle2,
+    AlertCircle, Save, X, CheckCircle2, MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FeedbackDialog } from "@/components/company/FeedbackDialog";
 
 import type { CompanyData, CompanyForm } from "@/components/company/types";
 import { getInitialBrandColors } from "@/components/company/types";
@@ -30,6 +31,7 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
     const [saving, setSaving] = useState(false);
     const [saveErr, setSaveErr] = useState<string | null>(null);
     const [saved, setSaved] = useState(false);
+    const [feedbackOpen, setFeedbackOpen] = useState(false);
     const hasCustomStyles = Array.isArray(company.image_style_categories) && company.image_style_categories.length > 0;
 
     const [form, setForm] = useState<CompanyForm>(() => ({
@@ -107,16 +109,31 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
 
     return (
         <div className="space-y-4">
-            {/* Save bar */}
-            <div className="flex items-center gap-2">
-                <Button size="sm" className="gap-1.5" onClick={handleSave} disabled={saving}>
-                    <Save className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Save Changes"}
-                </Button>
-                <Button variant="ghost" size="sm" className="gap-1.5" onClick={cancelEdit} disabled={saving}>
-                    <X className="h-3.5 w-3.5" /> Reset
-                </Button>
-                {saved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Saved</span>}
-                {saveErr && <span className="text-xs text-destructive">{saveErr}</span>}
+            {/* Sticky title + save bar */}
+            <div className="sticky top-0 z-20 -mx-6 -mt-6 px-6 pt-6 pb-4 bg-background/95 backdrop-blur-sm border-b border-border">
+                <div className="flex items-center gap-4">
+                    <div
+                        className="w-10 h-10 rounded-lg shrink-0 border border-border shadow-sm"
+                        style={{ backgroundColor: company.color_primary ?? "#000" }}
+                    />
+                    <div className="flex-1 min-w-0">
+                        <h2 className="text-lg font-semibold tracking-tight">{company.name}</h2>
+                        {company.tagline && <p className="text-xs text-muted-foreground italic truncate">{company.tagline}</p>}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <Button size="sm" className="gap-1.5" onClick={handleSave} disabled={saving}>
+                            <Save className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Save Changes"}
+                        </Button>
+                        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setFeedbackOpen(true)}>
+                            <MessageSquare className="h-3.5 w-3.5" /> Feedback
+                        </Button>
+                        <Button variant="ghost" size="sm" className="gap-1.5" onClick={cancelEdit} disabled={saving}>
+                            <X className="h-3.5 w-3.5" /> Reset
+                        </Button>
+                        {saved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Saved</span>}
+                        {saveErr && <span className="text-xs text-destructive">{saveErr}</span>}
+                    </div>
+                </div>
             </div>
 
             {/* Tab content driven by sidebar navigation */}
@@ -125,6 +142,15 @@ function CompanyBrand({ company, onSaved }: { company: CompanyData; onSaved?: (c
                 {activeTab === "visual" && <VisualStyleTab {...tabProps} />}
                 {activeTab === "prompts" && <PromptsEngineTab company={company} form={form} setForm={setForm} />}
             </div>
+
+            {/* Feedback Dialog */}
+            <FeedbackDialog
+                open={feedbackOpen}
+                onOpenChange={setFeedbackOpen}
+                companyId={company.id}
+                companyName={company.name}
+                personas={company.prompts ?? []}
+            />
         </div>
     );
 }
@@ -188,19 +214,6 @@ export default function CompanyPage() {
     return (
         <AppLayout>
             <div className="space-y-6">
-                {/* Header */}
-                {activeCompany && (
-                    <div className="flex items-center gap-4">
-                        <div
-                            className="w-12 h-12 rounded-lg shrink-0 border border-border shadow-sm"
-                            style={{ backgroundColor: activeCompany.color_primary ?? "#000" }}
-                        />
-                        <div>
-                            <h2 className="text-xl font-semibold tracking-tight">{activeCompany.name}</h2>
-                            {activeCompany.tagline && <p className="text-sm text-muted-foreground italic">{activeCompany.tagline}</p>}
-                        </div>
-                    </div>
-                )}
 
                 {/* Multi-company selector */}
                 {mode === "multi" && companies.length > 1 && (

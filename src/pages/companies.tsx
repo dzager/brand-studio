@@ -713,7 +713,13 @@ export default function CompaniesPage() {
                 {showForm && (
                     <Card>
                         <CardContent className="p-6 space-y-4">
-                            <h2 className="text-lg font-semibold">{editingId ? "Edit Company" : "New Company"}</h2>
+                            <div className="sticky top-0 z-20 -mx-6 -mt-6 px-6 pt-6 pb-4 bg-card/95 backdrop-blur-sm border-b border-border flex items-center justify-between">
+                                <h2 className="text-lg font-semibold">{editingId ? "Edit Company" : "New Company"}</h2>
+                                <div className="flex gap-2">
+                                    <Button variant="outline" size="sm" onClick={closeForm} disabled={saving}>Cancel</Button>
+                                    <Button size="sm" onClick={handleSubmit} disabled={saving}>{saving ? "Saving…" : editingId ? "Update Company" : "Create Company"}</Button>
+                                </div>
+                            </div>
 
                             {/* URL Import Section — only for new companies */}
                             {!editingId && (
@@ -805,7 +811,7 @@ export default function CompaniesPage() {
                                 <div className="space-y-1.5"><Label>Tone (comma-separated)</Label><Input value={form.tone} onChange={(e) => setField("tone", e.target.value)} placeholder="empathetic, confident, modern" /></div>
                             </div>
 
-                            <div className="space-y-1.5"><Label>Target Audiences (comma-separated)</Label><Input value={form.target_audiences} onChange={(e) => setField("target_audiences", e.target.value)} placeholder="developers, startups, enterprises" /></div>
+                            <div className="space-y-1.5"><Label>Target Audiences (comma-separated)</Label><Textarea value={form.target_audiences} onChange={(e) => setField("target_audiences", e.target.value)} placeholder="developers, startups, enterprises" rows={3} /></div>
                             <div className="space-y-1.5"><Label>Photography / Image Style</Label><Textarea value={form.photography_style} onChange={(e) => setField("photography_style", e.target.value)} placeholder="Clean, minimal tech photography..." rows={2} /></div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1042,11 +1048,6 @@ export default function CompaniesPage() {
                                 )}
                             </div>
 
-                            {/* Form Actions */}
-                            <div className="flex gap-2 justify-end pt-2">
-                                <Button variant="outline" onClick={closeForm} disabled={saving}>Cancel</Button>
-                                <Button onClick={handleSubmit} disabled={saving}>{saving ? "Saving…" : editingId ? "Update Company" : "Create Company"}</Button>
-                            </div>
                         </CardContent>
                     </Card>
                 )}

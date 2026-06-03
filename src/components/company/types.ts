@@ -10,6 +10,17 @@ export type CompanyPrompt = {
     created_at: string;
 };
 
+export type CompanyFeedback = {
+    id: string;
+    company_id: string;
+    user_id?: string;
+    user_email?: string;
+    body: string;
+    applied_to_model: boolean;
+    applied_to_persona_id?: string | null;
+    created_at: string;
+};
+
 export type CompanyData = {
     id: string;
     name: string;

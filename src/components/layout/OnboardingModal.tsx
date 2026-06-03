@@ -115,6 +115,32 @@ export default function OnboardingModal() {
     }, 200);
   }, []);
 
+  // Dismiss on first user scroll (overlay should not persist)
+  useEffect(() => {
+    if (!visible || exiting) return;
+
+    const handleScroll = () => {
+      dismiss();
+    };
+
+    // The overlay intercepts pointer events, so the underlying <main>
+    // won't fire its own scroll event while the modal is up.  Listen for
+    // wheel / touchmove on the document (these fire regardless of the
+    // overlay) plus scroll on <main> and window as a fallback.
+    const mainEl = document.querySelector("main");
+    document.addEventListener("wheel", handleScroll, { once: true, passive: true });
+    document.addEventListener("touchmove", handleScroll, { once: true, passive: true });
+    mainEl?.addEventListener("scroll", handleScroll, { once: true, passive: true });
+    window.addEventListener("scroll", handleScroll, { once: true, passive: true });
+
+    return () => {
+      document.removeEventListener("wheel", handleScroll);
+      document.removeEventListener("touchmove", handleScroll);
+      mainEl?.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [visible, exiting, dismiss]);
+
   const goNext = useCallback(() => {
     if (step < STEPS.length - 1) {
       setDirection("next");

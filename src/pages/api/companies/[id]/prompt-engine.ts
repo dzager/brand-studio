@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth";
 import { buildBrandEngine, type CompanyRecord } from "@/lib/buildBrandEngine";
 import { compileBlogSystemPrompt } from "@/brand/engine";
 import { compileUserPrompt } from "@/lib/compileUserPrompt";
+import { compileGlobalFeedback } from "@/lib/compileGlobalFeedback";
 
 type PromptEngineResponse = {
     system_prompt: string;
@@ -71,6 +72,9 @@ export default async function handler(
 
         const system_prompt = compileBlogSystemPrompt(brand, { baseOverride: baseSystemPromptOverride });
 
+        // Append globally-active user feedback
+        const feedbackSection = await compileGlobalFeedback(id);
+
         // Build the user prompt template with a placeholder topic
         const user_prompt_template = compileUserPrompt({
             creation_prompt: "{{ARTICLE_TOPIC}}",
@@ -79,7 +83,7 @@ export default async function handler(
         });
 
         return res.status(200).json({
-            system_prompt,
+            system_prompt: system_prompt + feedbackSection,
             user_prompt_template,
             has_account_override: hasAccountOverride,
         });

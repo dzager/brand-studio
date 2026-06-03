@@ -43,35 +43,35 @@
     button { font: inherit; color: inherit; background: none; border: none; }
     a { color: inherit; }
 
-    /* ─── Tokens (muted eco-industrial palette) ─── */
+    /* ─── Tokens (black & white palette, yellow accents) ─── */
     :root {
       --paper:        #ffffff;
-      --paper-deep:   #f7f6f6;
+      --paper-deep:   #f5f5f5;
 
-      --ink:          #2c2c2c;
-      --ink-soft:     #3D3B32;
-      --muted:        #A9A296;
+      --ink:          #1a1a1a;
+      --ink-soft:     #4a4a4a;
+      --muted:        #999999;
 
-      --moss:         #314235;
-      --moss-light:   #3F5645;
-      --moss-deep:    #243125;
+      --moss:         #1a1a1a;
+      --moss-light:   #333333;
+      --moss-deep:    #0d0d0d;
 
       --mustard:      #fdfe52;
       --mustard-soft:  #eaeb3c;
 
-      --olive-brown:  #7C7446;
-      --sage:         #8F9878;
-      --wood:         #8B684B;
+      --olive-brown:  #777777;
+      --sage:         #999999;
+      --wood:         #666666;
 
-      --earth:        #2c2c2c;
+      --earth:        #1a1a1a;
 
       --accent:         var(--moss);
       --accent-light:   var(--moss-light);
       --accent-deep:    var(--moss-deep);
       --accent-on-ink:  var(--mustard);
 
-      --border:       #2c2c2c1A;
-      --border-strong: #2c2c2c38;
+      --border:       #1a1a1a1A;
+      --border-strong: #1a1a1a38;
 
       --font-display: 'ArizonaSerif', Georgia, serif;
       --font-body:    'ArizonaSans', system-ui, -apple-system, sans-serif;
@@ -109,7 +109,7 @@
 
     body {
       background-color: var(--paper);
-      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.06  0 0 0 0 0.05  0 0 0 0 0.04  0 0 0 0.04 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.05  0 0 0 0 0.05  0 0 0 0 0.05  0 0 0 0.03 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
       color: var(--ink);
       font-family: var(--font-body);
       font-size: var(--text-md);
@@ -137,7 +137,7 @@
     .btn--paper   { background: var(--paper); color: var(--ink); }
     .btn--paper:hover   { opacity: 0.9; }
     .btn--ghost   { background: transparent; color: var(--ink); border: 1px solid var(--border-strong); }
-    .btn--ghost:hover { border-color: var(--ink); background: #2c2c2c0D; }
+    .btn--ghost:hover { border-color: var(--ink); background: #1a1a1a0D; }
     .btn--moss    { background: var(--moss); color: var(--paper); }
     .btn--moss:hover { background: var(--moss-light); }
     .btn-arrow {
@@ -176,7 +176,13 @@
 
     /* ─── Hero ─── */
     .hero { padding: 80px 0 100px; }
-    .hero-inner { max-width: 900px; }
+    .hero-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(40px, 5vw, 80px);
+      align-items: center;
+    }
+    .hero-copy { max-width: 560px; }
     .hero-eyebrow {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
@@ -193,7 +199,7 @@
     .hero-headline {
       font-family: var(--font-display);
       font-weight: 100;
-      font-size: clamp(48px, 5.5vw, 80px);
+      font-size: clamp(42px, 4.5vw, 72px);
       line-height: 0.96;
       letter-spacing: -0.05em;
       font-kerning: normal;
@@ -228,6 +234,40 @@
     .hero-signal { display: inline-flex; align-items: center; gap: 8px; }
     .hero-signal::before { content: "·"; color: var(--moss); font-weight: 600; font-size: 1.2em; }
     .hero-signal:first-child::before { content: ""; margin: 0; }
+
+    /* Hero image */
+    .hero-visual {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .hero-visual img {
+      width: 100%;
+      max-width: 580px;
+      height: auto;
+      border-radius: 12px;
+      box-shadow:
+        0 24px 60px rgba(0, 0, 0, 0.10),
+        0 8px 20px rgba(0, 0, 0, 0.06);
+      transform: perspective(1200px) rotateY(-4deg) rotateX(2deg);
+      transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.5s ease;
+    }
+    .hero-visual img:hover {
+      transform: perspective(1200px) rotateY(-1deg) rotateX(0.5deg);
+      box-shadow:
+        0 32px 80px rgba(0, 0, 0, 0.12),
+        0 12px 28px rgba(0, 0, 0, 0.08);
+    }
+    .hero-visual::after {
+      content: '';
+      position: absolute;
+      inset: -20px;
+      border-radius: 24px;
+      background: radial-gradient(ellipse at 60% 40%, rgba(26, 26, 26, 0.06) 0%, transparent 70%);
+      z-index: -1;
+      pointer-events: none;
+    }
 
     /* ─── Section frame ─── */
     .section { padding: clamp(72px, 11vw, 132px) 0; }
@@ -264,7 +304,7 @@
       color: var(--ink-soft);
       max-width: 60ch;
     }
-    .section--ink .section-head__sub { color: #E9E4DAB3; }
+    .section--ink .section-head__sub { color: #ffffffB3; }
 
     /* ─── Scroll reveal ─── */
     .reveal {
@@ -473,7 +513,7 @@
       left: calc(100% / 14);
       right: calc(100% / 14);
       height: 1px;
-      background: linear-gradient(90deg, transparent, var(--moss) 8%, var(--moss) 92%, transparent);
+      background: linear-gradient(90deg, transparent, var(--ink) 8%, var(--ink) 92%, transparent);
     }
     .pipeline-node { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 12px; gap: 14px; }
     .pipeline-node__dot {
@@ -551,7 +591,7 @@
     .preview-image-wrap {
       position: relative;
       aspect-ratio: 4 / 3;
-      background: linear-gradient(135deg, var(--ink), #3D3B32);
+      background: linear-gradient(135deg, var(--ink), #333333);
       overflow: hidden;
       border-radius: 8px;
     }
@@ -564,13 +604,13 @@
     }
     .preview-image-tint {
       position: absolute; inset: 0;
-      background: #31423520;
+      background: #1a1a1a20;
       mix-blend-mode: color;
       pointer-events: none;
     }
     .preview-image-overlay {
       position: absolute; inset: 0;
-      background: linear-gradient(180deg, transparent 55%, #2c2c2c8C 100%);
+      background: linear-gradient(180deg, transparent 55%, #1a1a1a8C 100%);
       pointer-events: none;
     }
     .preview-image-tag {
@@ -795,12 +835,12 @@
     }
     .tier--featured .tier__price { color: var(--paper); }
     .tier__period { font-size: var(--text-sm); color: var(--ink-soft); margin-top: var(--space-1); }
-    .tier--featured .tier__period { color: #E9E4DA99; }
+    .tier--featured .tier__period { color: #ffffff99; }
     .tier__per {
       font-family: var(--font-mix); font-style: italic; font-size: var(--text-sm);
       color: var(--ink-soft); margin-top: 6px; margin-bottom: 30px;
     }
-    .tier--featured .tier__per { color: #E9E4DABF; }
+    .tier--featured .tier__per { color: #ffffffBF; }
     .tier__features { list-style: none; flex: 1; margin-bottom: 28px; }
     .tier__feature {
       font-size: var(--text-base); line-height: 1.5; padding: var(--space-3) 0;
@@ -810,8 +850,8 @@
     }
     .tier__feature::before { content: "·"; color: var(--ink); font-weight: 600; }
     .tier--featured .tier__feature {
-      color: #E9E4DADB;
-      border-color: #E9E4DA2E;
+      color: #ffffffDB;
+      border-color: #ffffff2E;
     }
     .tier--featured .tier__feature::before { color: var(--paper); }
     .tier__cta { margin-top: auto; }
@@ -839,17 +879,17 @@
     .final-cta-lede {
       font-family: var(--font-mix); font-style: italic;
       font-size: clamp(var(--text-md), 1.4vw, var(--text-xl));
-      color: #E9E4DAB3;
+      color: #ffffffB3;
       margin-bottom: 36px;
     }
 
     /* ─── Footer ─── */
-    .footer { padding: 40px 0 56px; background: var(--earth); color: #E9E4DA8C; }
+    .footer { padding: 40px 0 56px; background: var(--earth); color: #ffffff8C; }
     .footer-inner { display: flex; justify-content: space-between; align-items: center; gap: var(--space-5); flex-wrap: wrap; font-size: var(--text-sm); }
     .footer-left { font-family: var(--font-mix); font-style: italic; }
     .footer-right { display: flex; gap: 22px; }
     .footer-link {
-      color: #E9E4DA8C;
+      color: #ffffff8C;
       text-decoration: none;
       transition: color 0.18s;
     }
@@ -859,7 +899,7 @@
     .modal-overlay {
       position: fixed; inset: 0; z-index: 9999;
       display: flex; align-items: center; justify-content: center;
-      background: #2c2c2cD1;
+      background: #1a1a1aD1;
       animation: modal-fade-in 0.22s cubic-bezier(0.22, 1, 0.36, 1);
     }
     @keyframes modal-fade-in { from { opacity: 0; } to { opacity: 1; } }
@@ -931,6 +971,11 @@
     /* ─── Responsive ─── */
     @media (max-width: 1024px) {
       .hero { padding: 48px 0 72px; }
+      .hero-inner { grid-template-columns: 1fr; }
+      .hero-copy { max-width: 900px; }
+      .hero-visual { margin-top: var(--space-6); }
+      .hero-visual img { transform: none; }
+      .hero-visual img:hover { transform: none; }
       .shift-grid { grid-template-columns: repeat(2, 1fr); }
       .shift-card:nth-child(2) { border-right: none; }
       .shift-card:nth-child(n+3) { border-top: 1px solid var(--border); }
@@ -941,7 +986,7 @@
       .pipeline-flow::before {
         top: 0; bottom: 0; left: 21px; right: auto;
         width: 1px; height: auto;
-        background: linear-gradient(180deg, transparent, var(--ink) 8%, var(--ink) 92%, transparent);
+        background: linear-gradient(180deg, transparent, var(--moss) 8%, var(--moss) 92%, transparent);
       }
       .pipeline-node { flex-direction: row; align-items: center; text-align: left; gap: 18px; padding: 12px 0; }
       .pipeline-node__dot { flex-shrink: 0; }
@@ -1049,30 +1094,35 @@
         <section className="hero">
           <div className="container">
             <div className="hero-inner">
-              <div className="hero-eyebrow">
-                <span className="hero-eyebrow-dot" />
-                Brand-native content at scale
+              <div className="hero-copy">
+                <div className="hero-eyebrow">
+                  <span className="hero-eyebrow-dot" />
+                  Brand-native content at scale
+                </div>
+                <h1 className="hero-headline">
+                  The Growth Answer for <em>AI Search.</em>
+                </h1>
+                <p className="hero-tagline">
+                  AI throughput. Editorial taste.
+                </p>
+                <p className="hero-lede">
+                  Organic is a content intelligence and generation platform — it creates brand-aligned articles, fact-checks them with multiple AI models, scores their quality, and optimizes them for AI search retrieval.
+                </p>
+                <div className="hero-ctas">
+                  <button className="btn btn--ink" onClick={onStart}>
+                    Start free <span className="btn-arrow">↗</span>
+                  </button>
+                  <a href="#product" className="btn btn--ghost">See how it works</a>
+                </div>
+                <div className="hero-signals">
+                  <span className="hero-signal">Voice modeling</span>
+                  <span className="hero-signal">Editorial enforcement</span>
+                  <span className="hero-signal">AI search readiness</span>
+                  <span className="hero-signal">Multi-brand governance</span>
+                </div>
               </div>
-              <h1 className="hero-headline">
-                The growth platform for <em>AI Search.</em>
-              </h1>
-              <p className="hero-tagline">
-                AI throughput. Editorial taste.
-              </p>
-              <p className="hero-lede">
-                Organic is a content intelligence and generation platform — it creates brand-aligned articles, fact-checks them with multiple AI models, scores their quality, and optimizes them for AI search retrieval.
-              </p>
-              <div className="hero-ctas">
-                <button className="btn btn--ink" onClick={onStart}>
-                  Start free <span className="btn-arrow">↗</span>
-                </button>
-                <a href="#product" className="btn btn--ghost">See how it works</a>
-              </div>
-              <div className="hero-signals">
-                <span className="hero-signal">Voice modeling</span>
-                <span className="hero-signal">Editorial enforcement</span>
-                <span className="hero-signal">AI search readiness</span>
-                <span className="hero-signal">Multi-brand governance</span>
+              <div className="hero-visual">
+                <img src="hero-dashboard.png" alt="Organic studio dashboard showing brand voice settings, quality scores, and editorial content" loading="eager" />
               </div>
             </div>
           </div>
@@ -1648,7 +1698,7 @@
         <section className="final-cta">
           <div className="container">
             <h2 className="final-cta-headline">
-              AI speed.<br /> <em>Your editorial taste.</em>
+              Less AI.<br /> <em>More Organic.</em>
             </h2>
             <p className="final-cta-lede">
               Content that sounds like you. Not like everyone else.

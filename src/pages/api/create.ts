@@ -34,6 +34,7 @@ import {
     getTextResponse,
     generateImageBase64,
 } from "@/lib/ai-client";
+import { compileGlobalFeedback } from "@/lib/compileGlobalFeedback";
 
 const BlogSchema = {
     type: "object",
@@ -407,6 +408,10 @@ async function runArticlePipeline({
     }
 
     let system = compileBlogSystemPrompt(brand, { baseOverride: baseSystemPromptOverride });
+
+    // Append globally-active user feedback directives
+    const feedbackSection = await compileGlobalFeedback(company_id);
+    if (feedbackSection) system += feedbackSection;
 
     // Inject reference articles
     if (refArticlesResult.status === "fulfilled" && refArticlesResult.value) {
