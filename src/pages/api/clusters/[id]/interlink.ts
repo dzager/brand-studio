@@ -8,6 +8,11 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getSupabase } from "@/lib/supabase";
 import { getTextResponse } from "@/lib/ai-client";
 
+export const config = {
+    api: { responseLimit: false },
+    maxDuration: 300,
+};
+
 type SiblingInfo = {
     id: string;
     title: string;
@@ -117,26 +122,17 @@ export default async function handler(
             excerpt: a.excerpt,
         }));
 
-        const results: {
-            id: string;
-            title: string;
-            success: boolean;
-            links_added: number;
-            error?: string;
-        }[] = [];
-
-        // Process each article
-        for (const article of articlesToProcess) {
+        // Process all articles in parallel to avoid timeout on sequential AI calls
+        const articlePromises = articlesToProcess.map(async (article) => {
             const articleData = article as any;
             if (!articleData.html) {
-                results.push({
+                return {
                     id: articleData.id,
                     title: articleData.title,
                     success: false,
                     links_added: 0,
                     error: "No HTML content",
-                });
-                continue;
+                };
             }
 
             // Siblings = all articles in cluster except this one
@@ -164,14 +160,13 @@ export default async function handler(
                 );
 
                 if (!updatedHtml || updatedHtml.length < 100) {
-                    results.push({
+                    return {
                         id: articleData.id,
                         title: articleData.title,
                         success: false,
                         links_added: 0,
                         error: "AI returned empty or too-short response",
-                    });
-                    continue;
+                    };
                 }
 
                 // Clean up any markdown fencing the AI might have added
@@ -196,22 +191,29 @@ export default async function handler(
 
                 if (updateErr) throw updateErr;
 
-                results.push({
+                return {
                     id: articleData.id,
                     title: articleData.title,
                     success: true,
                     links_added: Math.max(0, linksAdded),
-                });
+                };
             } catch (articleErr: any) {
-                results.push({
+                return {
                     id: articleData.id,
                     title: articleData.title,
                     success: false,
                     links_added: 0,
                     error: articleErr.message,
-                });
+                };
             }
-        }
+        });
+
+        const settled = await Promise.allSettled(articlePromises);
+        const results = settled.map((r) =>
+            r.status === "fulfilled"
+                ? r.value
+                : { id: "unknown", title: "unknown", success: false, links_added: 0, error: r.reason?.message ?? "Unknown error" }
+        );
 
         const totalLinksAdded = results.reduce((sum, r) => sum + r.links_added, 0);
         const successCount = results.filter((r) => r.success).length;
