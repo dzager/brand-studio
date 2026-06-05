@@ -15,7 +15,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   ShieldCheck, Plus, AlertCircle, Globe, Clock, CheckCircle2,
   XCircle, Loader2, ChevronRight, ChevronDown, ExternalLink,
-  AlertTriangle, Info, Download, Trash2, FileText,
+  AlertTriangle, Info, Download, Trash2, FileText, StopCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -441,6 +441,25 @@ export default function FreshnessPage() {
     if (selectedId === id) setSelectedId(null);
   }
 
+  async function onStopAudit(id: string) {
+    try {
+      const resp = await fetch("/api/freshness-audit", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (resp.ok) {
+        setAudits(prev =>
+          prev.map(a =>
+            a.id === id ? { ...a, status: "cancelled", error: "Stopped by user", completed_at: new Date().toISOString() } : a
+          )
+        );
+      }
+    } catch (e) {
+      console.error("Failed to stop audit:", e);
+    }
+  }
+
   const companyMap = Object.fromEntries(companies.map(c => [c.id, c.name]));
 
   return (
@@ -546,6 +565,7 @@ export default function FreshnessPage() {
                     const isSelected = selectedId === audit.id;
                     const isRunning = audit.status === "running";
                     const isFailed = audit.status === "failed";
+                    const isCancelled = audit.status === "cancelled";
 
                     return (
                       <div key={audit.id} className="group relative">
@@ -558,17 +578,28 @@ export default function FreshnessPage() {
                         >
                           {isRunning ? <Loader2 className="h-4 w-4 text-blue-500 animate-spin shrink-0" /> :
                            isFailed ? <XCircle className="h-4 w-4 text-destructive shrink-0" /> :
+                           isCancelled ? <StopCircle className="h-4 w-4 text-amber-500 shrink-0" /> :
                            <div className={cn("text-xs font-bold w-8 h-8 rounded-full flex items-center justify-center shrink-0 border", healthBg(audit.overall_health), healthColor(audit.overall_health))}>{audit.overall_health}</div>}
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{audit.site_url.replace(/^https?:\/\//, "")}</p>
                             <div className="flex items-center gap-1.5 mt-0.5">
                               {audit.company_id && <span className="text-[10px] text-muted-foreground">{companyMap[audit.company_id] || ""}</span>}
                               <span className="text-[10px] text-muted-foreground">{formatDate(audit.created_at)}</span>
-                              {!isRunning && !isFailed && <span className="text-[10px] text-muted-foreground">· {audit.issues_found} issues</span>}
+                              {isCancelled && <span className="text-[10px] text-amber-500">· stopped</span>}
+                              {!isRunning && !isFailed && !isCancelled && <span className="text-[10px] text-muted-foreground">· {audit.issues_found} issues</span>}
                             </div>
                           </div>
                           <ChevronRight className={cn("h-3.5 w-3.5 text-muted-foreground/50 shrink-0", isSelected ? "opacity-100" : "opacity-0")} />
                         </button>
+                        {isRunning && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onStopAudit(audit.id); }}
+                            className="absolute right-7 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-80 hover:!opacity-100 p-1 rounded transition-opacity"
+                            title="Stop audit"
+                          >
+                            <StopCircle className="h-3.5 w-3.5 text-amber-500" />
+                          </button>
+                        )}
                         <button
                           onClick={(e) => { e.stopPropagation(); onDeleteAudit(audit.id); }}
                           className="absolute right-1 top-1 opacity-0 group-hover:opacity-60 hover:!opacity-100 p-1 rounded transition-opacity"

@@ -25,6 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === "GET") return handleList(res, accountIds);
     if (req.method === "POST") return handleCreate(req, res, accounts);
+    if (req.method === "PATCH") return handleCancel(req, res, accountIds);
     return res.status(405).json({ error: "Method not allowed" });
 }
 
@@ -82,6 +83,42 @@ async function handleCreate(
     });
 }
 
+async function handleCancel(
+    req: NextApiRequest,
+    res: NextApiResponse,
+    accountIds: string[]
+) {
+    const { id } = req.body ?? {};
+    if (!id || typeof id !== "string") {
+        return res.status(400).json({ error: "Audit ID is required." });
+    }
+
+    const sb = getSupabase();
+
+    // Verify the audit belongs to one of the user's accounts
+    const { data: audit } = await sb
+        .from("freshness_audits")
+        .select("id, status, account_id")
+        .eq("id", id)
+        .single();
+
+    if (!audit || !accountIds.includes(audit.account_id)) {
+        return res.status(404).json({ error: "Audit not found." });
+    }
+
+    if (audit.status !== "running") {
+        return res.status(400).json({ error: "Audit is not running." });
+    }
+
+    const { error } = await sb
+        .from("freshness_audits")
+        .update({ status: "cancelled", error: "Stopped by user", completed_at: new Date().toISOString() })
+        .eq("id", id);
+
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ id, status: "cancelled" });
+}
+
 /**
  * Runs the full crawl → extract → verify → report pipeline.
  * Called fire-and-forget after the HTTP response has been sent.
@@ -94,6 +131,16 @@ async function runAuditPipeline(
     maxPages: number | undefined,
     singlePage: boolean
 ) {
+    // Helper: check if audit was cancelled by the user
+    async function isCancelled(): Promise<boolean> {
+        const { data } = await sb
+            .from("freshness_audits")
+            .select("status")
+            .eq("id", auditId)
+            .single();
+        return data?.status !== "running";
+    }
+
     try {
         const crawlResult = singlePage
             ? await crawlSinglePage(siteUrl)
@@ -103,15 +150,20 @@ async function runAuditPipeline(
             throw new Error("No pages could be crawled. The website may be blocking automated bot requests (e.g., Cloudflare protection or HTTP 403/404).");
         }
 
+        // Check for cancellation before the expensive audit step
+        if (await isCancelled()) return;
+
         await sb.from("freshness_audits")
             .update({ pages_crawled: crawlResult.pages_crawled })
-            .eq("id", auditId);
+            .eq("id", auditId)
+            .eq("status", "running");
 
         const report = await runAudit(
             crawlResult,
             companyId || "",
             undefined, // onProgress
             async (partialReport) => {
+                // Only write partial updates if still running
                 await sb.from("freshness_audits")
                     .update({
                         pages_crawled: partialReport.pages_crawled,
@@ -121,10 +173,12 @@ async function runAuditPipeline(
                         overall_health: partialReport.overall_health,
                         report: partialReport
                     })
-                    .eq("id", auditId);
+                    .eq("id", auditId)
+                    .eq("status", "running");
             }
         );
 
+        // Only mark complete if the audit wasn't cancelled while running
         await sb.from("freshness_audits")
             .update({
                 status: "complete",
@@ -136,11 +190,14 @@ async function runAuditPipeline(
                 report,
                 completed_at: new Date().toISOString(),
             })
-            .eq("id", auditId);
+            .eq("id", auditId)
+            .eq("status", "running");
     } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
+        // Only mark failed if the audit wasn't cancelled
         await sb.from("freshness_audits")
             .update({ status: "failed", error: message, completed_at: new Date().toISOString() })
-            .eq("id", auditId);
+            .eq("id", auditId)
+            .eq("status", "running");
     }
 }

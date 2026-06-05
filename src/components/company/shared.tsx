@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, Trash2, Copy as CopyIcon, CheckCircle2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Trash2, Copy as CopyIcon, CheckCircle2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ImageStyleCategory } from "@/brand/engine";
 
@@ -71,15 +71,99 @@ export function FieldList({ label, items, editing, onChange, placeholder }: {
     label: string; items?: string[] | null;
     editing?: boolean; onChange?: (v: string[]) => void; placeholder?: string;
 }) {
+    const [editingIdx, setEditingIdx] = useState<number | null>(null);
+    const [editValue, setEditValue] = useState("");
+    const [newValue, setNewValue] = useState("");
+
     if (!editing && (!items || items.length === 0)) return null;
+
+    const safeItems = items ?? [];
+
+    function startEdit(idx: number) {
+        setEditingIdx(idx);
+        setEditValue(safeItems[idx]);
+    }
+
+    function commitEdit() {
+        if (editingIdx === null) return;
+        const trimmed = editValue.trim();
+        if (trimmed) {
+            const updated = [...safeItems];
+            updated[editingIdx] = trimmed;
+            onChange?.(updated);
+        }
+        setEditingIdx(null);
+        setEditValue("");
+    }
+
+    function removeItem(idx: number) {
+        onChange?.(safeItems.filter((_, i) => i !== idx));
+        if (editingIdx === idx) { setEditingIdx(null); setEditValue(""); }
+    }
+
+    function addItem() {
+        const trimmed = newValue.trim();
+        if (!trimmed) return;
+        // Support comma-separated bulk entry
+        const parts = trimmed.split(",").map(s => s.trim()).filter(Boolean);
+        onChange?.([...safeItems, ...parts]);
+        setNewValue("");
+    }
+
     return (
-        <div className="space-y-1">
+        <div className="space-y-1.5">
             <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
             {editing ? (
-                <Input value={(items ?? []).join(", ")} onChange={(e) => onChange?.(e.target.value.split(",").map(s => s.trim()).filter(Boolean))} placeholder={placeholder ?? "comma-separated"} className="text-sm" />
+                <div className="space-y-1.5">
+                    {safeItems.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                            {safeItems.map((item, i) => (
+                                editingIdx === i ? (
+                                    <div key={i} className="flex items-center gap-1">
+                                        <Input
+                                            value={editValue}
+                                            onChange={(e) => setEditValue(e.target.value)}
+                                            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitEdit(); } if (e.key === "Escape") { setEditingIdx(null); setEditValue(""); } }}
+                                            onBlur={commitEdit}
+                                            autoFocus
+                                            className="h-6 text-xs px-2 w-auto min-w-[120px]"
+                                        />
+                                    </div>
+                                ) : (
+                                    <Badge
+                                        key={i}
+                                        variant="secondary"
+                                        className="text-xs cursor-pointer hover:bg-muted group gap-1 pr-1"
+                                    >
+                                        <span onClick={() => startEdit(i)} className="py-0.5">{item}</span>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); removeItem(i); }}
+                                            className="ml-0.5 rounded-full hover:bg-destructive/20 hover:text-destructive p-0.5 opacity-50 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            <X className="h-2.5 w-2.5" />
+                                        </button>
+                                    </Badge>
+                                )
+                            ))}
+                        </div>
+                    )}
+                    <div className="flex gap-1.5">
+                        <Input
+                            value={newValue}
+                            onChange={(e) => setNewValue(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addItem(); } }}
+                            placeholder={placeholder ?? "Add item (comma-separated)"}
+                            className="text-xs h-7"
+                        />
+                        <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs shrink-0" disabled={!newValue.trim()} onClick={addItem}>
+                            Add
+                        </Button>
+                    </div>
+                </div>
             ) : (
                 <div className="flex flex-wrap gap-1.5">
-                    {items!.map((item, i) => <Badge key={i} variant="secondary" className="text-xs">{item}</Badge>)}
+                    {safeItems.map((item, i) => <Badge key={i} variant="secondary" className="text-xs">{item}</Badge>)}
                 </div>
             )}
         </div>

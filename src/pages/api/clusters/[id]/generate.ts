@@ -278,7 +278,7 @@ Which style best fits this article? Respond with JSON only.`;
 
         let savedArticleId: string | null = null;
         try {
-            const { data: savedArticle } = await supabase.from("articles").insert({
+            const { data: savedArticle, error: insertErr } = await supabase.from("articles").insert({
                 title: page.title || "Generating…",
                 slug: placeholderSlug,
                 excerpt: "Generating article…",
@@ -295,7 +295,18 @@ Which style best fits this article? Respond with JSON only.`;
                 cluster_role: role,
                 status: "generating",
             }).select("id").single();
+
+            if (insertErr) {
+                console.error("Supabase insert error for cluster article:", insertErr);
+                return res.status(500).json({ error: `Failed to create article: ${insertErr.message}` });
+            }
+
             savedArticleId = savedArticle?.id ?? null;
+
+            if (!savedArticleId) {
+                console.error("Supabase insert returned no ID for cluster article (slug:", placeholderSlug, ")");
+                return res.status(500).json({ error: "Failed to create article record — no ID returned" });
+            }
         } catch (saveErr) {
             console.error("Failed to create placeholder cluster article:", saveErr);
             return res.status(500).json({ error: "Failed to create article record" });

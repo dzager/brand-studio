@@ -558,7 +558,7 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto">
-          <div className={cn("mx-auto w-full px-6 py-6", !fullWidth && "max-w-7xl", tasks.length > 0 && "pb-20")}>
+          <div className={cn("mx-auto w-full px-6 py-6", !fullWidth && "max-w-7xl", tasks.length > 0 && "pt-12")}>
             {children}
           </div>
         </main>

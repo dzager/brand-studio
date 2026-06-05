@@ -268,45 +268,7 @@ export default function OutlineView({
 
     return (
         <div className="py-2 space-y-1">
-            {/* Compact creation actions */}
-            {(hasClusterActions || onNewArticle) && (
-                <div className="flex gap-1 pb-1">
-                    {onNewArticle && (
-                        <Button variant="ghost" size="sm" className="gap-1 text-xs h-7 text-muted-foreground hover:text-foreground" onClick={onNewArticle}>
-                            <FilePlus2 className="h-3.5 w-3.5" /> New Article
-                        </Button>
-                    )}
-                    {hasClusterActions && (
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="gap-1 text-xs h-7 text-muted-foreground hover:text-foreground">
-                                    <Plus className="h-3.5 w-3.5" /> New Cluster
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" className="w-56">
-                                {onCreateAiCluster && (
-                                    <DropdownMenuItem onClick={onCreateAiCluster} className="gap-2 cursor-pointer">
-                                        <Wand2 className="h-4 w-4 text-primary" />
-                                        AI Cluster
-                                    </DropdownMenuItem>
-                                )}
-                                {onCreateManualCluster && (
-                                    <DropdownMenuItem onClick={onCreateManualCluster} className="gap-2 cursor-pointer">
-                                        <FolderPlus className="h-4 w-4 text-muted-foreground" />
-                                        Manual Cluster
-                                    </DropdownMenuItem>
-                                )}
-                                {onAutoCluster && (
-                                    <DropdownMenuItem onClick={onAutoCluster} className="gap-2 cursor-pointer">
-                                        <Sparkles className="h-4 w-4 text-amber-500" />
-                                        Auto-Cluster
-                                    </DropdownMenuItem>
-                                )}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    )}
-                </div>
-            )}
+
 
             {tree.map((company) => {
                 const companyKey = `company-${company.companyId}`;

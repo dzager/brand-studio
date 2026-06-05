@@ -215,7 +215,7 @@ export default async function handler(
 
         let savedArticleId: string | null = null;
         try {
-            const { data: savedArticle } = await getSupabase().from("articles").insert({
+            const { data: savedArticle, error: insertErr } = await getSupabase().from("articles").insert({
                 title: placeholderTitle,
                 slug: placeholderSlug,
                 excerpt: "Generating article…",
@@ -232,7 +232,18 @@ export default async function handler(
                 cluster_id: cluster_id || null,
                 cluster_role: cluster_id ? "supporting" : null,
             }).select("id").single();
+
+            if (insertErr) {
+                console.error("Supabase insert error for article:", insertErr);
+                return res.status(500).json({ error: `Failed to create article: ${insertErr.message}` });
+            }
+
             savedArticleId = savedArticle?.id ?? null;
+
+            if (!savedArticleId) {
+                console.error("Supabase insert returned no ID for article (slug:", placeholderSlug, ")");
+                return res.status(500).json({ error: "Failed to create article record — no ID returned" });
+            }
         } catch (saveErr) {
             console.error("Failed to create placeholder article:", saveErr);
             return res.status(500).json({ error: "Failed to create article record" });

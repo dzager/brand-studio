@@ -53,7 +53,8 @@ type Action =
   | { type: "FAIL_TASK"; id: string; error: string }
   | { type: "CANCEL_TASK"; id: string }
   | { type: "REMOVE_TASK"; id: string }
-  | { type: "CLEAR_COMPLETED" };
+  | { type: "CLEAR_COMPLETED" }
+  | { type: "CLEAR_ALL" };
 
 function taskReducer(state: Task[], action: Action): Task[] {
   switch (action.type) {
@@ -92,6 +93,9 @@ function taskReducer(state: Task[], action: Action): Task[] {
     case "CLEAR_COMPLETED":
       return state.filter((t) => t.status === "running" || t.status === "queued");
 
+    case "CLEAR_ALL":
+      return [];
+
     default:
       return state;
   }
@@ -111,6 +115,7 @@ interface TaskStoreAPI {
   registerAbort: (taskId: string, controller: AbortController) => void;
   removeTask: (id: string) => void;
   clearCompleted: () => void;
+  clearAll: () => void;
 }
 
 const TaskContext = createContext<TaskStoreAPI | null>(null);
@@ -208,6 +213,11 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const clearAll = useCallback(
+    () => dispatch({ type: "CLEAR_ALL" }),
+    []
+  );
+
   const activeTasks = useMemo(
     () => tasks.filter((t) => t.status === "running" || t.status === "queued"),
     [tasks]
@@ -228,8 +238,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       registerAbort,
       removeTask,
       clearCompleted,
+      clearAll,
     }),
-    [tasks, activeTasks, hasActiveTasks, addTask, updateTask, completeTask, failTask, cancelTask, registerAbort, removeTask, clearCompleted]
+    [tasks, activeTasks, hasActiveTasks, addTask, updateTask, completeTask, failTask, cancelTask, registerAbort, removeTask, clearCompleted, clearAll]
   );
 
   return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;

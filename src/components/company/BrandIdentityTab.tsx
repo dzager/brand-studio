@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { TabProps } from "./types";
 import { Section, Field, FieldList, useCopyToClipboard, CopyButton } from "./shared";
+import { VoiceToneTab } from "./VoiceToneTab";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,6 +34,9 @@ export function BrandIdentityTab({ company, form, setForm, setField, editing }: 
                     <FieldList label="Target Audiences" items={editing ? form.target_audiences : company.target_audiences} editing={editing} onChange={v => setField("target_audiences", v)} />
                 </div>
             </Section>
+
+            {/* Voice & Tone */}
+            <VoiceToneTab company={company} form={form} setForm={setForm} setField={setField} editing={editing} />
 
             {/* Editorial + SEO Guidelines — two-column layout */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

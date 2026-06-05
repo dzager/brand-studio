@@ -689,6 +689,108 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
         finally { setRegenerating(false); }
     }
 
+    /** Regenerate article text only — skip image generation */
+    async function handleRegenerateArticleOnly() {
+        setRegenerating(true); setRegenErr(null);
+        try {
+            const createResp = await fetch("/api/create", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    creation_prompt: article.title,
+                    image_style: "none",
+                    company_id: article.company_id ?? undefined,
+                    skip_image: true,
+                }),
+            });
+            const createData = await createResp.json();
+            if (!createResp.ok) throw new Error(createData.error || "Failed to start regeneration");
+            const tempArticleId = createData.id;
+            if (!tempArticleId) throw new Error("No article ID returned");
+
+            // Poll until article content is ready (no need to wait for image)
+            const maxWait = 300_000;
+            const pollInterval = 5_000;
+            const startTime = Date.now();
+            let tempArticle: any = null;
+
+            while (Date.now() - startTime < maxWait) {
+                await new Promise((r) => setTimeout(r, pollInterval));
+                try {
+                    const r = await fetch(`/api/articles/${tempArticleId}`);
+                    if (!r.ok) continue;
+                    const data = await r.json();
+                    const hasContent = data.html && data.excerpt
+                        && data.excerpt !== "Generating article…"
+                        && data.excerpt !== "Generation failed — please regenerate.";
+                    if (hasContent) { tempArticle = data; break; }
+                } catch { /* keep polling */ }
+            }
+
+            if (!tempArticle) throw new Error("Regeneration timed out — the new article is still generating. Check the activity log.");
+
+            // Copy only text content (preserve existing image)
+            const saveResp = await fetch(`/api/articles/${article.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title: tempArticle.title,
+                    html: tempArticle.html,
+                    excerpt: tempArticle.excerpt,
+                }),
+            });
+            const saveData = await saveResp.json();
+            if (!saveResp.ok) throw new Error(saveData.error || "Failed to save regenerated content");
+            onUpdate({ ...article, ...saveData });
+            setFullArticle({ ...article, ...saveData });
+
+            // Delete the temporary article (best-effort)
+            try { await fetch(`/api/articles/${tempArticleId}`, { method: "DELETE" }); } catch { /* best-effort */ }
+        } catch (e: any) { setRegenErr(e.message); }
+        finally { setRegenerating(false); }
+    }
+
+    /** Regenerate only the featured image — keep article content intact */
+    function handleRegenerateImageOnly() {
+        setRegenErr(null);
+        const capturedArticle = { ...article };
+        const capturedSelectedStyle = selectedStyle;
+        const cleanBase = `Hero image for article: ${capturedArticle.title}${capturedArticle.excerpt ? `. ${capturedArticle.excerpt}` : ""}`;
+        const payload: Record<string, unknown> = {
+            base_prompt: cleanBase,
+            custom_prompt: undefined,
+            image_style: capturedSelectedStyle,
+            company_id: capturedArticle.company_id ?? undefined,
+        };
+        if (pvIsCompositeStyle && pvCsProductUrl) {
+            payload.composite_product_image_url = pvCsProductUrl;
+            payload.article_title = capturedArticle.title;
+            payload.article_excerpt = capturedArticle.excerpt;
+            if (pvCsBgImageUrl.trim()) payload.composite_bg_image_url = pvCsBgImageUrl.trim();
+            if (pvCsBgPrompt.trim()) payload.composite_bg_prompt = pvCsBgPrompt.trim();
+        }
+        runTask({
+            type: "image-regen",
+            label: `Hero: ${capturedArticle.title.slice(0, 50)}`,
+            endpoint: "/api/regenerate-image",
+            body: payload,
+            meta: { articleId: capturedArticle.id, companyId: capturedArticle.company_id, imageTask: true },
+            onSuccess: async (data: any) => {
+                try {
+                    const saveResp = await fetch(`/api/articles/${capturedArticle.id}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ image_base64: data.image_base64, image_prompt: data.final_prompt, image_style: capturedSelectedStyle }),
+                    });
+                    const saveData = await saveResp.json();
+                    if (!saveResp.ok) throw new Error(saveData.error || "Failed to save");
+                    try { onUpdate({ ...capturedArticle, image_base64: data.image_base64, image_prompt: data.final_prompt, image_style: capturedSelectedStyle }); } catch {}
+                } catch (e: any) { setRegenErr(e.message); }
+            },
+            onError: (errMsg) => { setRegenErr(errMsg); },
+        });
+    }
+
     async function handleShorten(targetWords: number) {
         if (!displayArticle.html) return;
         setShortening(true); setShortenErr(null); setShortened(false); setShortenInfo(null);
@@ -2337,9 +2439,41 @@ export default function PanelView({ article, companies, onUpdate, onDelete, onSe
                 <Separator orientation="vertical" className="h-6 mx-1" />
 
                 {/* ── Transform ── */}
-                <Button variant="outline" size="sm" onClick={handleRegenerate} disabled={regenerating} className="gap-1.5">
-                    <RefreshCw className={cn("h-3.5 w-3.5", regenerating && "animate-spin")} /> {regenerating ? "Regenerating…" : "Regenerate"}
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" disabled={regenerating} className="gap-1.5">
+                            <RefreshCw className={cn("h-3.5 w-3.5", regenerating && "animate-spin")} />
+                            {regenerating ? "Regenerating…" : "Regenerate"}
+                            {!regenerating && <ChevronDown className="h-3 w-3 ml-0.5 opacity-60" />}
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="min-w-[220px]">
+                        <DropdownMenuLabel>Regenerate</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={handleRegenerateArticleOnly} disabled={regenerating} className="gap-2 cursor-pointer">
+                            <FileText className="h-4 w-4" />
+                            <div>
+                                <div className="font-medium">Article Only</div>
+                                <div className="text-xs text-muted-foreground">New text, keep current image</div>
+                            </div>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleRegenerateImageOnly} disabled={regenerating || refreshingImage} className="gap-2 cursor-pointer">
+                            <ImageIcon className="h-4 w-4" />
+                            <div>
+                                <div className="font-medium">Image Only</div>
+                                <div className="text-xs text-muted-foreground">New hero image, keep article</div>
+                            </div>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={handleRegenerate} disabled={regenerating} className="gap-2 cursor-pointer">
+                            <RefreshCw className="h-4 w-4" />
+                            <div>
+                                <div className="font-medium">Both</div>
+                                <div className="text-xs text-muted-foreground">Regenerate article and image</div>
+                            </div>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="outline" size="sm" disabled={shortening || !displayArticle.html}
