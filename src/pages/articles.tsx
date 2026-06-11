@@ -6,6 +6,7 @@ import type { GetServerSideProps } from "next";
 import AppLayout from "@/components/layout/AppLayout";
 import OutlineView from "@/components/articles/OutlineView";
 import PanelView from "@/components/articles/PanelView";
+import GraphView from "@/components/articles/GraphView";
 import ClusterPanel from "@/components/articles/ClusterPanel";
 import { AiClusterModal, ManualClusterModal, AutoClusterModal } from "@/components/articles/ClusterModals";
 import CreateArticleModal from "@/components/articles/CreateArticleModal";
@@ -17,7 +18,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { List, FileText, AlertCircle, Plus } from "lucide-react";
+import { List, FileText, AlertCircle, Plus, LayoutGrid } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 
 
@@ -60,6 +62,7 @@ type Cluster = {
 export default function ArticlesPage() {
     const [articles, setArticles] = useState<Article[]>([]);
     const [clusters, setClusters] = useState<Cluster[]>([]);
+    const [viewMode, setViewMode] = useState<"outline" | "graph">("outline");
     const [companies, setCompanies] = useState<Record<string, string>>({});
     const [companyList, setCompanyList] = useState<{ id: string; name: string }[]>([]);
     const [loading, setLoading] = useState(true);
@@ -285,6 +288,28 @@ export default function ArticlesPage() {
                             Organize your content into topic clusters — a pillar page anchors each cluster while supporting and long-tail articles build depth and internal linking, helping search engines recognize your topical authority.
                         </div>
                     </div>
+                    <div className="flex items-center gap-1 border rounded-md p-0.5">
+                        <button
+                            onClick={() => setViewMode("outline")}
+                            className={cn(
+                                "p-1.5 rounded transition-colors",
+                                viewMode === "outline" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                            )}
+                            title="Outline view"
+                        >
+                            <List className="h-4 w-4" />
+                        </button>
+                        <button
+                            onClick={() => setViewMode("graph")}
+                            className={cn(
+                                "p-1.5 rounded transition-colors",
+                                viewMode === "graph" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                            )}
+                            title="Graph view"
+                        >
+                            <LayoutGrid className="h-4 w-4" />
+                        </button>
+                    </div>
                     <Button onClick={() => setShowCreateModal(true)} className="gap-1.5 shrink-0">
                         <Plus className="h-4 w-4" /> Create
                     </Button>
@@ -322,7 +347,7 @@ export default function ArticlesPage() {
 
 
                         {/* Outline View — sidebar tree + detail pane */}
-                        {(
+                        {viewMode === "outline" && (
                             <div className="flex h-full gap-0">
                                 {/* Sidebar tree */}
                                 <div className="shrink-0 overflow-y-auto pr-1" style={{ width: sidebarWidth }}>
@@ -383,6 +408,16 @@ export default function ArticlesPage() {
                                     )}
                                 </div>
                             </div>
+                        )}
+
+                        {/* Graph View — multi-cluster hub-and-spoke visualization */}
+                        {viewMode === "graph" && (
+                            <GraphView
+                                articles={articles}
+                                clusters={clusters}
+                                companies={companies}
+                                onSelectArticle={(id) => { handleSelectArticle(id); setViewMode("outline"); }}
+                            />
                         )}
                     </div>
                 )}

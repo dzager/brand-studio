@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   Building2, Network, FileText, Check, ChevronRight, ChevronLeft,
   Sparkles, RefreshCw, Settings, ChevronDown, Search, Layers,
-  Eye, AlertCircle, Bookmark, Mic,
+  Eye, AlertCircle, Bookmark, Mic, Globe, Link2, Loader2, FolderPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -31,8 +31,8 @@ interface WizardProps {
   setCompanyId: (id: string) => void;
   isScopedMember: boolean;
   // Mode
-  mode: "single" | "cluster";
-  setMode: (m: "single" | "cluster") => void;
+  mode: "single" | "cluster" | "import" | "blank-cluster";
+  setMode: (m: "single" | "cluster" | "import" | "blank-cluster") => void;
   // Single article
   prompt: string;
   setPrompt: (p: string) => void;
@@ -93,6 +93,16 @@ interface WizardProps {
   companyClusters?: { id: string; name: string; status: string }[];
   selectedClusterId?: string;
   setSelectedClusterId?: (id: string) => void;
+  // Import from URL
+  importUrl?: string;
+  setImportUrl?: (url: string) => void;
+  importData?: { title: string; html: string; excerpt: string } | null;
+  importLoading?: boolean;
+  importError?: string | null;
+  onFetchArticle?: () => void;
+  onImportArticle?: () => void;
+  // Blank cluster
+  onCreateBlankCluster?: () => void;
 }
 
 const ALL_STEPS = [
@@ -122,6 +132,9 @@ export default function ContentWizard(props: WizardProps) {
     onPreviewPrompt, previewing, onBakeoffModelSelected,
     snippetCollections, selectedCollectionId, setSelectedCollectionId,
     companyClusters, selectedClusterId, setSelectedClusterId,
+    importUrl, setImportUrl, importData, importLoading, importError,
+    onFetchArticle, onImportArticle,
+    onCreateBlankCluster,
   } = props;
 
   const err = props.err;
@@ -152,6 +165,8 @@ export default function ContentWizard(props: WizardProps) {
       case 1: return companiesLoaded && !!companyId;
       case 2: return true; // mode always has a default
       case 3:
+        if (mode === "import") return !!importData;
+        if (mode === "blank-cluster") return clusterTopic.trim().length >= 2;
         return mode === "single"
           ? prompt.trim().length >= 5
           : clusterTopic.trim().length >= 5;
@@ -296,6 +311,7 @@ export default function ContentWizard(props: WizardProps) {
               </p>
             </div>
 
+            {/* Primary options */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 onClick={() => setMode("single")}
@@ -349,6 +365,68 @@ export default function ContentWizard(props: WizardProps) {
                 )}
               </button>
             </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3 mt-4 mb-2">
+              <div className="h-px flex-1 bg-border/60" />
+              <span className="text-[11px] text-muted-foreground/60 font-medium uppercase tracking-wider">More options</span>
+              <div className="h-px flex-1 bg-border/60" />
+            </div>
+
+            {/* Secondary / deemphasized options */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 opacity-70 hover:opacity-100 transition-opacity duration-200">
+              <button
+                onClick={() => setMode("import")}
+                className={cn(
+                  "wizard-format-card py-3",
+                  mode === "import" && "selected !opacity-100",
+                )}
+              >
+                <div className={cn(
+                  "wizard-format-icon !h-8 !w-8",
+                  mode === "import" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
+                )}>
+                  <Globe className="h-4 w-4" />
+                </div>
+                <div className="text-left">
+                  <div className="font-medium text-xs">Import from URL</div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                    Import an existing published article from a live website.
+                  </p>
+                </div>
+                {mode === "import" && (
+                  <span className="absolute top-2 right-2 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                    <Check className="h-2.5 w-2.5" />
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => setMode("blank-cluster")}
+                className={cn(
+                  "wizard-format-card py-3",
+                  mode === "blank-cluster" && "selected !opacity-100",
+                )}
+              >
+                <div className={cn(
+                  "wizard-format-icon !h-8 !w-8",
+                  mode === "blank-cluster" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
+                )}>
+                  <FolderPlus className="h-4 w-4" />
+                </div>
+                <div className="text-left">
+                  <div className="font-medium text-xs">Blank cluster</div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                    Create an empty cluster and manually add articles.
+                  </p>
+                </div>
+                {mode === "blank-cluster" && (
+                  <span className="absolute top-2 right-2 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                    <Check className="h-2.5 w-2.5" />
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
         )}
 
@@ -357,11 +435,15 @@ export default function ContentWizard(props: WizardProps) {
           <div className="wizard-card">
             <div className="text-center mb-6">
               <h2 className="text-xl font-semibold tracking-tight">
-                {mode === "single" ? "Describe your article" : "Describe your cluster"}
+                {mode === "single" ? "Describe your article" : mode === "blank-cluster" ? "Name your cluster" : mode === "import" ? "Import your article" : "Describe your cluster"}
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
                 {mode === "single"
                   ? "Tell us the topic, angle, and audience. Be as specific as you like."
+                  : mode === "blank-cluster"
+                  ? "Give your cluster a name. You can add articles to it later."
+                  : mode === "import"
+                  ? "Paste the URL of a published article to import."
                   : "Describe the broad topic. AI will design the pillar + supporting pages."}
               </p>
             </div>
@@ -503,8 +585,108 @@ export default function ContentWizard(props: WizardProps) {
               )}
             </>)}
 
+            {/* Import from URL */}
+            {mode === "import" && (<>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="wizard-import-url" className="text-sm font-medium">Article URL</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="wizard-import-url"
+                      type="url"
+                      value={importUrl || ""}
+                      onChange={(e) => setImportUrl?.(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && importUrl?.trim()) onFetchArticle?.(); }}
+                      placeholder="https://example.com/blog/your-article"
+                      className="text-sm flex-1"
+                      autoFocus
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onFetchArticle}
+                      disabled={importLoading || !importUrl?.trim()}
+                      className="gap-1.5 whitespace-nowrap"
+                    >
+                      {importLoading ? (
+                        <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Fetching…</>
+                      ) : (
+                        <><Globe className="h-3.5 w-3.5" /> Fetch Article</>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Error */}
+                {importError && (
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                    <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                    <p className="text-sm text-destructive">{importError}</p>
+                  </div>
+                )}
+
+                {/* Success preview */}
+                {importData && (
+                  <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Check className="h-4 w-4 text-green-600" />
+                      <span className="text-xs font-medium text-green-700 uppercase tracking-wider">Article found</span>
+                    </div>
+                    <h3 className="text-sm font-semibold leading-snug">{importData.title}</h3>
+                    <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">{importData.excerpt}</p>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <Link2 className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-[10px] text-muted-foreground truncate">{importUrl}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Assign to cluster — optional picker (reuse from single mode) */}
+              {companyClusters && companyClusters.length > 0 && setSelectedClusterId && (
+                <div className="mt-4 p-3 rounded-lg border border-border/60 bg-muted/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Network className="h-3.5 w-3.5 text-primary" />
+                    <Label className="text-xs font-medium">Add to cluster</Label>
+                    <span className="text-[10px] text-muted-foreground">optional</span>
+                  </div>
+                  <select
+                    value={selectedClusterId || ""}
+                    onChange={(e) => setSelectedClusterId(e.target.value)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">Standalone (no cluster)</option>
+                    {companyClusters.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}{c.status === "complete" ? " ✓" : c.status === "in_progress" ? " ⏳" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedClusterId && (
+                    <p className="text-[10px] text-muted-foreground mt-1.5">
+                      This article will be added to the selected cluster as a supporting page.
+                    </p>
+                  )}
+                </div>
+              )}
+            </>)}
+
+            {/* Blank cluster: just a name */}
+            {mode === "blank-cluster" && (
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Cluster Name</Label>
+                <Input
+                  value={clusterTopic}
+                  onChange={(e) => setClusterTopic(e.target.value)}
+                  placeholder="e.g., Product comparisons, Patient education, Travel guides…"
+                  className="text-sm"
+                  autoFocus
+                />
+              </div>
+            )}
+
             {/* Cluster: topic */}
-            {mode === "cluster" && (
+            {mode === "cluster" && (<>
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium">Cluster Topic</Label>
                 <Textarea
@@ -516,7 +698,44 @@ export default function ContentWizard(props: WizardProps) {
                   autoFocus
                 />
               </div>
-            )}
+
+              {/* Voice persona pills for cluster mode */}
+              {companyPrompts.length > 0 && (() => {
+                const voicePrompts = companyPrompts.filter((t) => isVoicePrompt(t.body));
+                if (voicePrompts.length === 0) return null;
+                return (
+                  <div className="mt-4">
+                    <Label className="text-xs text-muted-foreground mb-2 block">Voice / Persona</Label>
+                    <div className="flex gap-2 flex-wrap">
+                      {voicePrompts.map((t) => {
+                        const isActive = activeVoiceId === t.id;
+                        return (
+                          <Button
+                            key={t.id}
+                            variant={isActive ? "default" : "outline"}
+                            size="sm"
+                            className={cn(
+                              "rounded-full gap-1 text-xs transition-all",
+                              isActive && "ring-2 ring-primary/30 shadow-sm",
+                            )}
+                            onClick={() => setActiveVoiceId(isActive ? null : t.id)}
+                          >
+                            <Mic className="h-3 w-3" /> {t.name}
+                            {isActive && <Check className="h-3 w-3 ml-0.5" />}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    {activeVoiceId && (
+                      <p className="text-[11px] text-primary mt-1.5 flex items-center gap-1">
+                        <Mic className="h-3 w-3" />
+                        Voice profile will guide article generation within this cluster.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+            </>)}
 
             {/* Advanced options (collapsed) */}
             <details className="group mt-5">
@@ -664,6 +883,10 @@ export default function ContentWizard(props: WizardProps) {
                 <div className="flex items-center gap-2">
                   {mode === "cluster"
                     ? <><Network className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-sm">Content cluster</span></>
+                    : mode === "blank-cluster"
+                    ? <><FolderPlus className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-sm">Blank cluster</span></>
+                    : mode === "import"
+                    ? <><Globe className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-sm">Import from URL</span></>
                     : <><FileText className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-sm">Single article</span></>
                   }
                 </div>
@@ -671,16 +894,21 @@ export default function ContentWizard(props: WizardProps) {
 
               <div className="wizard-summary-row">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  {mode === "single" ? "Prompt" : "Topic"}
+                  {mode === "single" ? "Prompt" : mode === "import" ? "Source" : mode === "blank-cluster" ? "Name" : "Topic"}
                 </span>
-                <p className="text-sm text-foreground/80 leading-relaxed line-clamp-3">
-                  {mode === "single" ? prompt : clusterTopic}
-                </p>
-              </div>
-
-              <div className="wizard-summary-row">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Model</span>
-                <span className="text-sm">{availableModels.find(m => m.id === model)?.label ?? model}</span>
+                {mode === "import" ? (
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">{importData?.title}</p>
+                    <div className="flex items-center gap-1.5">
+                      <Link2 className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground truncate">{importUrl}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-foreground/80 leading-relaxed line-clamp-3">
+                    {mode === "single" ? prompt : clusterTopic}
+                  </p>
+                )}
               </div>
 
               {mode === "single" && (
@@ -694,6 +922,13 @@ export default function ContentWizard(props: WizardProps) {
                     <span className="text-sm">{LENGTH_LABELS[wordCount] ?? wordCount}</span>
                   </div>
                 </>
+              )}
+
+              {mode !== "import" && mode !== "blank-cluster" && (
+                <div className="wizard-summary-row">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Model</span>
+                  <span className="text-sm">{availableModels.find(m => m.id === model)?.label ?? model}</span>
+                </div>
               )}
 
               {activeVoiceId && (
@@ -739,15 +974,21 @@ export default function ContentWizard(props: WizardProps) {
             {/* Action */}
             <div className="flex flex-col gap-3 items-center">
               <Button
-                onClick={() => { console.log("[ContentWizard] Create button clicked", { mode, isWorking }); mode === "single" ? onCreate() : onCreateCluster(); }}
-                disabled={isWorking}
+                onClick={() => { console.log("[ContentWizard] Create button clicked", { mode, isWorking }); mode === "single" ? onCreate() : mode === "import" ? onImportArticle?.() : mode === "blank-cluster" ? onCreateBlankCluster?.() : onCreateCluster(); }}
+                disabled={isWorking || (mode === "import" && !importData)}
                 size="lg"
                 className="w-full max-w-xs gap-2"
               >
                 {isWorking ? (
-                  <><RefreshCw className="h-4 w-4 animate-spin" /> {mode === "single" ? "Creating article…" : "Generating strategy…"}</>
+                  <><RefreshCw className="h-4 w-4 animate-spin" /> {mode === "import" ? "Importing…" : mode === "blank-cluster" ? "Creating…" : mode === "single" ? "Creating article…" : "Generating strategy…"}</>
                 ) : (
-                  <><Sparkles className="h-4 w-4" /> {mode === "single" ? "Create Article" : "Generate Cluster Strategy"}</>
+                  mode === "import"
+                    ? <><Globe className="h-4 w-4" /> Import Article</>
+                    : mode === "blank-cluster"
+                    ? <><FolderPlus className="h-4 w-4" /> Create Cluster</>
+                    : mode === "single"
+                    ? <><Sparkles className="h-4 w-4" /> Create Article</>
+                    : <><Sparkles className="h-4 w-4" /> Generate Cluster Strategy</>
                 )}
               </Button>
               {mode === "single" && (
@@ -755,7 +996,12 @@ export default function ContentWizard(props: WizardProps) {
                   <Eye className="h-3.5 w-3.5" /> {previewing ? "Loading…" : "Preview prompt"}
                 </Button>
               )}
-              <p className="text-xs text-muted-foreground">~2 min · uses 1 credit</p>
+              {mode !== "import" && mode !== "blank-cluster" && (
+                <p className="text-xs text-muted-foreground">~2 min · uses 1 credit</p>
+              )}
+              {(mode === "import" || mode === "blank-cluster") && (
+                <p className="text-xs text-muted-foreground">Instant · no credits used</p>
+              )}
               {err && (
                 <p className="text-sm text-destructive mt-1">{err}</p>
               )}

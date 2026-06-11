@@ -1,7 +1,7 @@
 /**
  * Freshness Audit Page — Site-wide fact verification dashboard
  */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { GetServerSideProps } from "next";
 import AppLayout from "@/components/layout/AppLayout";
 import { useTaskRunner } from "@/hooks/useTaskRunner";
@@ -15,9 +15,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   ShieldCheck, Plus, AlertCircle, Globe, Clock, CheckCircle2,
   XCircle, Loader2, ChevronRight, ChevronDown, ExternalLink,
-  AlertTriangle, Info, Download, Trash2, FileText, StopCircle,
+  AlertTriangle, Info, Download, Trash2, FileText, StopCircle, Pencil,
+  ArrowRight, Link2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { generateFreshnessAuditPdf } from "@/lib/freshnessPdf";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
@@ -29,9 +31,11 @@ export const getServerSideProps: GetServerSideProps = async () => ({ props: {} }
 type AuditSummary = {
   id: string;
   site_url: string;
+  title: string | null;
   status: string;
   company_id: string | null;
   pages_crawled: number;
+  pages_discovered: number | null;
   total_facts: number;
   issues_found: number;
   critical_issues: number;
@@ -82,6 +86,8 @@ type InternalConflict = {
 type FullReport = {
   site_url: string;
   pages_crawled: number;
+  pages_discovered?: number;
+  remaining_urls?: string[];
   total_facts_extracted: number;
   total_facts_verified: number;
   issues_found: number;
@@ -128,7 +134,8 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function formatDuration(ms: number) {
+function formatDuration(ms: number | undefined | null) {
+  if (ms == null || isNaN(ms)) return "—";
   const s = Math.round(ms / 1000);
   if (s < 60) return `${s}s`;
   return `${Math.floor(s / 60)}m ${s % 60}s`;
@@ -237,17 +244,27 @@ function PageCard({ page }: { page: PageReport }) {
 
 /* ── Report Viewer ─────────────────────────────────── */
 
-function ReportViewer({ auditId, status }: { auditId: string; status?: string }) {
+function ReportViewer({ auditId, status: parentStatus, onContinue }: { auditId: string; status?: string; onContinue?: (id: string) => void }) {
   const [report, setReport] = useState<FullReport | null>(null);
+  const [auditStatus, setAuditStatus] = useState(parentStatus ?? "running");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "critical" | "warning" | "info">("all");
+  const [continuing, setContinuing] = useState(false);
+  const [autoScan, setAutoScan] = useState(true);
+  const prevStatusRef = useRef(parentStatus);
+
+  // Sync parent status changes
+  useEffect(() => {
+    if (parentStatus) setAuditStatus(parentStatus);
+  }, [parentStatus]);
 
   const fetchReport = useCallback((background = false) => {
     fetch(`/api/freshness-report?id=${auditId}`)
       .then(r => r.ok ? r.json() : r.json().then(d => { throw new Error(d.error); }))
       .then(data => {
         setReport(data.report);
+        if (data.status) setAuditStatus(data.status);
         if (!background) setLoading(false);
       })
       .catch(e => { setError(e.message); if (!background) setLoading(false); });
@@ -259,12 +276,36 @@ function ReportViewer({ auditId, status }: { auditId: string; status?: string })
     fetchReport();
   }, [fetchReport]);
 
+  // Poll while running
   useEffect(() => {
-    if (status === "running") {
+    if (auditStatus === "running") {
       const interval = setInterval(() => fetchReport(true), 3000);
       return () => clearInterval(interval);
     }
-  }, [status, fetchReport]);
+  }, [auditStatus, fetchReport]);
+
+  // Auto-continue: when audit completes with remaining URLs, automatically trigger next batch
+  useEffect(() => {
+    prevStatusRef.current = auditStatus;
+
+    if (auditStatus !== "running") {
+      setContinuing(false);
+    }
+
+    if (
+      autoScan &&
+      auditStatus === "complete" &&
+      report?.remaining_urls &&
+      report.remaining_urls.length > 0 &&
+      onContinue
+    ) {
+      setContinuing(true);
+      const timer = setTimeout(() => {
+        onContinue(auditId);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [autoScan, auditStatus, report?.remaining_urls?.length, auditId, onContinue]);
 
   if (loading) return <div className="p-6 space-y-3"><Skeleton className="h-20 w-full" /><Skeleton className="h-20 w-full" /><Skeleton className="h-14 w-3/4" /></div>;
   if (error) return <Alert variant="destructive" className="m-6"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>;
@@ -327,7 +368,68 @@ function ReportViewer({ auditId, status }: { auditId: string; status?: string })
         </div>
       </TooltipProvider>
 
-      <p className="text-xs text-muted-foreground">Completed in {formatDuration(report.elapsed_ms)} · {report.total_facts_verified} of {report.total_facts_extracted} facts verified externally</p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">Completed in {formatDuration(report.elapsed_ms)} · {report.total_facts_verified} of {report.total_facts_extracted} facts verified externally</p>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5 text-xs h-7 shrink-0"
+          onClick={() => generateFreshnessAuditPdf(report)}
+        >
+          <Download className="h-3 w-3" />
+          Download PDF
+        </Button>
+      </div>
+
+      {/* Continue crawling banner */}
+      {auditStatus !== "running" && report.remaining_urls && report.remaining_urls.length > 0 && (
+        <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4 flex items-center gap-4">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium flex items-center gap-2">
+              {autoScan && <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />}
+              {report.pages_crawled} of {report.pages_discovered ?? (report.pages_crawled + report.remaining_urls.length)} pages audited
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {autoScan
+                ? `Auditing remaining ${report.remaining_urls.length} page${report.remaining_urls.length !== 1 ? "s" : ""} automatically…`
+                : `${report.remaining_urls.length} more page${report.remaining_urls.length !== 1 ? "s" : ""} discovered and ready to audit.`
+              }
+            </p>
+          </div>
+          {autoScan ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 shrink-0"
+              onClick={() => setAutoScan(false)}
+            >
+              <StopCircle className="h-3.5 w-3.5" />
+              Stop
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              className="gap-1.5 shrink-0"
+              disabled={continuing}
+              onClick={() => {
+                setAutoScan(true);
+                setContinuing(true);
+                onContinue?.(auditId);
+              }}
+            >
+              {continuing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5" />}
+              {continuing ? "Continuing…" : "Continue Crawling"}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {auditStatus !== "running" && report.remaining_urls && report.remaining_urls.length === 0 && report.pages_discovered && report.pages_discovered > report.pages_crawled && (
+        <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3 flex items-center gap-3">
+          <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+          <p className="text-xs text-muted-foreground">All {report.pages_crawled} discovered pages have been audited.</p>
+        </div>
+      )}
 
       {/* Internal conflicts */}
       {report.internal_conflicts.length > 0 && (
@@ -379,12 +481,15 @@ export default function FreshnessPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
 
   // New audit form
   const [showForm, setShowForm] = useState(false);
   const [auditUrl, setAuditUrl] = useState("");
   const [auditCompanyId, setAuditCompanyId] = useState("");
   const [auditScope, setAuditScope] = useState<"site" | "page">("site");
+  const [alsoRunLinks, setAlsoRunLinks] = useState(false);
 
   const fetchData = useCallback(async (background = false) => {
     if (!background) setLoading(true);
@@ -419,26 +524,45 @@ export default function FreshnessPage() {
     const url = auditUrl.trim();
     const companyId = auditCompanyId || undefined;
     const isSinglePage = auditScope === "page";
+    const wantLinks = alsoRunLinks;
     // Reset form immediately — the API returns instantly now
     setAuditUrl("");
     setShowForm(false);
-    runTask({
-      type: "freshness-audit",
-      label: `${isSinglePage ? "Page" : "Site"}: ${url.replace(/^https?:\/\//, "").slice(0, 40)}`,
-      endpoint: "/api/freshness-audit",
-      body: { url, company_id: companyId, max_pages: isSinglePage ? 1 : 30, single_page: isSinglePage },
-      meta: { link: "/freshness" },
-      onSuccess: (data: any) => {
-        fetchData().then(() => { if (data?.id) setSelectedId(data.id); });
-      },
-      onError: () => { fetchData(); },
-    });
+    setAlsoRunLinks(false);
+
+    if (wantLinks) {
+      // Use combo endpoint — single crawl for both audits
+      runTask({
+        type: "site-audit",
+        label: `${isSinglePage ? "Page" : "Site"}: ${url.replace(/^https?:\/\//, "").slice(0, 40)}`,
+        endpoint: "/api/site-audit",
+        body: { url, company_id: companyId, max_pages: isSinglePage ? 1 : 30, single_page: isSinglePage, analyses: ["freshness", "links"] },
+        meta: { link: "/freshness" },
+        onSuccess: (data: any) => {
+          fetchData().then(() => { if (data?.freshness_id) setSelectedId(data.freshness_id); });
+        },
+        onError: () => { fetchData(); },
+      });
+    } else {
+      runTask({
+        type: "freshness-audit",
+        label: `${isSinglePage ? "Page" : "Site"}: ${url.replace(/^https?:\/\//, "").slice(0, 40)}`,
+        endpoint: "/api/freshness-audit",
+        body: { url, company_id: companyId, max_pages: isSinglePage ? 1 : 30, single_page: isSinglePage },
+        meta: { link: "/freshness" },
+        onSuccess: (data: any) => {
+          fetchData().then(() => { if (data?.id) setSelectedId(data.id); });
+        },
+        onError: () => { fetchData(); },
+      });
+    }
   }
 
   async function onDeleteAudit(id: string) {
     await fetch(`/api/freshness-report?id=${id}`, { method: "DELETE" });
     setAudits(prev => prev.filter(a => a.id !== id));
     if (selectedId === id) setSelectedId(null);
+    if (editingId === id) setEditingId(null);
   }
 
   async function onStopAudit(id: string) {
@@ -460,7 +584,42 @@ export default function FreshnessPage() {
     }
   }
 
+  async function onContinueAudit(id: string) {
+    try {
+      const resp = await fetch("/api/freshness-audit", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (resp.ok) {
+        // Optimistically set status to running so polling kicks in
+        setAudits(prev =>
+          prev.map(a =>
+            a.id === id ? { ...a, status: "running", completed_at: null } : a
+          )
+        );
+      }
+    } catch (e) {
+      console.error("Failed to continue audit:", e);
+    }
+  }
+
   const companyMap = Object.fromEntries(companies.map(c => [c.id, c.name]));
+
+  async function onRenameAudit(id: string, newTitle: string) {
+    const trimmed = newTitle.trim();
+    setAudits(prev => prev.map(a => a.id === id ? { ...a, title: trimmed || null } : a));
+    setEditingId(null);
+    try {
+      await fetch(`/api/freshness-report?id=${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: trimmed }),
+      });
+    } catch (e) {
+      console.error("Failed to rename audit:", e);
+    }
+  }
 
   return (
     <AppLayout fullWidth>
@@ -532,12 +691,25 @@ export default function FreshnessPage() {
             {auditScope === "page" && (
               <p className="text-[11px] text-muted-foreground">Single-page mode skips site crawling and audits only the specific URL you provide.</p>
             )}
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
-              <Button size="sm" onClick={onStartAudit} disabled={!auditUrl.trim()} className="gap-1.5">
-                <ShieldCheck className="h-3.5 w-3.5" />
-                {auditScope === "page" ? "Audit Page" : "Audit Site"}
-              </Button>
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={alsoRunLinks}
+                  onChange={e => setAlsoRunLinks(e.target.checked)}
+                  className="rounded border-input h-3.5 w-3.5 accent-primary"
+                />
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Link2 className="h-3 w-3" /> Also run Link Audit
+                </span>
+              </label>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
+                <Button size="sm" onClick={onStartAudit} disabled={!auditUrl.trim()} className="gap-1.5">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  {auditScope === "page" ? "Audit Page" : "Audit Site"}
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -581,7 +753,35 @@ export default function FreshnessPage() {
                            isCancelled ? <StopCircle className="h-4 w-4 text-amber-500 shrink-0" /> :
                            <div className={cn("text-xs font-bold w-8 h-8 rounded-full flex items-center justify-center shrink-0 border", healthBg(audit.overall_health), healthColor(audit.overall_health))}>{audit.overall_health}</div>}
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{audit.site_url.replace(/^https?:\/\//, "")}</p>
+                            {editingId === audit.id ? (
+                              <input
+                                autoFocus
+                                className="text-sm font-medium bg-background border border-input rounded px-1.5 py-0.5 w-full outline-none focus:ring-1 focus:ring-ring"
+                                value={editingTitle}
+                                onChange={e => setEditingTitle(e.target.value)}
+                                onBlur={() => onRenameAudit(audit.id, editingTitle)}
+                                onKeyDown={e => {
+                                  if (e.key === "Enter") onRenameAudit(audit.id, editingTitle);
+                                  if (e.key === "Escape") setEditingId(null);
+                                }}
+                                onClick={e => e.stopPropagation()}
+                              />
+                            ) : (
+                              <div className="flex items-center gap-1 group/title">
+                                <p className="text-sm font-medium truncate">{audit.title || audit.site_url.replace(/^https?:\/\//, "")}</p>
+                                <button
+                                  className="opacity-0 group-hover/title:opacity-60 hover:!opacity-100 p-0.5 rounded transition-opacity shrink-0"
+                                  title="Rename audit"
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    setEditingId(audit.id);
+                                    setEditingTitle(audit.title || audit.site_url.replace(/^https?:\/\//, ""));
+                                  }}
+                                >
+                                  <Pencil className="h-2.5 w-2.5" />
+                                </button>
+                              </div>
+                            )}
                             <div className="flex items-center gap-1.5 mt-0.5">
                               {audit.company_id && <span className="text-[10px] text-muted-foreground">{companyMap[audit.company_id] || ""}</span>}
                               <span className="text-[10px] text-muted-foreground">{formatDate(audit.created_at)}</span>
@@ -616,7 +816,7 @@ export default function FreshnessPage() {
               {/* Detail View */}
               <div className="flex-1 overflow-hidden">
                 {selectedId ? (
-                  <ReportViewer key={selectedId} auditId={selectedId} status={audits.find(a => a.id === selectedId)?.status} />
+                  <ReportViewer key={selectedId} auditId={selectedId} status={audits.find(a => a.id === selectedId)?.status} onContinue={onContinueAudit} />
                 ) : (
                   <div className="flex items-center justify-center h-full text-muted-foreground">
                     <div className="text-center">

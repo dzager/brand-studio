@@ -1,7 +1,7 @@
 import { useRouter } from "next/router";
 import dynamic from "next/dynamic";
 import TaskPanel from "@/components/layout/TaskPanel";
-import { useTaskStore } from "@/lib/taskStore";
+
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { useEffect, useState, useCallback, useMemo } from "react";
@@ -27,6 +27,7 @@ import {
   Eye,
   HelpCircle,
   ShieldCheck,
+  Link2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -58,6 +59,7 @@ const NAV_ITEMS = [
   { href: "/companies", label: "Companies", icon: Building2, description: "Manage brands", minRole: "member" },
   { href: "/research", label: "Research", icon: Search, description: "Topic deep dives", minRole: "member", badge: "Beta" },
   { href: "/freshness", label: "Freshness", icon: ShieldCheck, description: "Fact verification", minRole: "member", badge: "Beta" },
+  { href: "/links", label: "Links", icon: Link2, description: "Link health audit", minRole: "member", badge: "Beta" },
   { href: "/admin", label: "Admin", icon: Shield, description: "Platform dashboard", minRole: "admin" },
 ];
 
@@ -116,7 +118,7 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [companyCount, setCompanyCount] = useState<number | null>(null);
   const { user, activeAccount, accounts, isAdmin, signOut, switchAccount } = useAuth();
-  const { tasks } = useTaskStore();
+
   const { startTour, resetTour } = useProductTour();
 
   // Fetch usage for sidebar widget
@@ -558,7 +560,7 @@ export default function AppLayout({ children, fullWidth }: { children: React.Rea
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto">
-          <div className={cn("mx-auto w-full px-6 py-6", !fullWidth && "max-w-7xl", tasks.length > 0 && "pt-12")}>
+          <div className={cn("mx-auto w-full px-6 py-6", !fullWidth && "max-w-7xl")}>
             {children}
           </div>
         </main>

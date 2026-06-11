@@ -285,6 +285,40 @@ export default async function handler(
                 return res.status(400).json({ error: "company_id and topic are required" });
             }
 
+            // ── Blank cluster: skip AI generation ────────────────────────
+            if (req.body.blank === true) {
+                // Look up account_id from the company
+                const { data: co } = await supabase
+                    .from("companies")
+                    .select("account_id")
+                    .eq("id", company_id)
+                    .single();
+
+                const emptyStrategy = {
+                    cluster_name: topic.trim(),
+                    pillar: { title: "", keyword: "", slug: "", description: "", word_count: "", links_to: [] },
+                    supporting: [],
+                    long_tail: [],
+                };
+
+                const { data: cluster, error: saveErr } = await adminSupabase
+                    .from("clusters")
+                    .insert({
+                        company_id,
+                        name: topic.trim(),
+                        pillar_topic: topic.trim(),
+                        strategy: emptyStrategy,
+                        status: "draft",
+                        page_embeddings: [],
+                        account_id: co?.account_id || null,
+                    })
+                    .select()
+                    .single();
+
+                if (saveErr) throw saveErr;
+                return res.status(201).json(cluster);
+            }
+
             // Build brand engine for company context
             const { data: companyData, error: companyErr } = await supabase
                 .from("companies")

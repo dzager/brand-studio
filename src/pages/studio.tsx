@@ -122,7 +122,7 @@ export default function Home() {
     const { defaults } = useModelDefaults();
 
     // ── Creation Mode ───────────────────────────────────────────────
-    const [mode, setMode] = useState<"single" | "cluster">("single");
+    const [mode, setMode] = useState<"single" | "cluster" | "import" | "blank-cluster">("single");
 
     // ── Cluster Mode State ──────────────────────────────────────────
     const [clusterTopic, setClusterTopic] = useState("");

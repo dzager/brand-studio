@@ -209,7 +209,7 @@ export async function generateImageBase64(
                     prompt,
                     size: (options?.size as any) ?? "1792x1024",
                     output_format: "png",
-                    quality: "high",
+                    quality: "medium",
                 } as any);
 
                 const b64 = imageResp.data?.[0]?.b64_json ?? null;
@@ -262,7 +262,7 @@ export async function generateImageBase64(
                     prompt,
                     size: (options?.size as any) ?? "1792x1024",
                     output_format: "png",
-                    quality: "high",
+                    quality: "medium",
                 } as any);
                 const b64 = imageResp.data?.[0]?.b64_json ?? null;
                 if (b64) return b64;

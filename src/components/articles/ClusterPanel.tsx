@@ -2,6 +2,7 @@
 // Renders in the panel slot when a cluster is selected (instead of PanelView for articles)
 
 import { useState, useEffect, useCallback } from "react";
+import ClusterDiagram from "@/components/articles/ClusterDiagram";
 
 import { useTaskRunner } from "@/hooks/useTaskRunner";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,9 +29,11 @@ import {
     FileText, Sparkles,
     Download, LinkIcon, Plus, ImageIcon,
     UserPlus, Mail, Copy,
-    MoreHorizontal,
+    MoreHorizontal, Mic, Palette, Check,
+    ChevronDown, Network,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { IMAGE_STYLE_CATEGORIES, type ImageStyleCategory } from "@/brand/engine";
 
 type ClusterPage = {
     title: string;
@@ -100,6 +104,11 @@ const ROLE_VARIANTS: Record<string, "default" | "secondary" | "outline"> = {
     long_tail: "outline",
 };
 
+/** Voice-type prompts contain this marker in their body */
+function isVoicePrompt(body: string): boolean {
+    return body.includes("# VOICE PROFILE") || body.includes("VOICE PROFILE — PRIORITY DIRECTIVE");
+}
+
 export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete, onSelectArticle }: Props) {
     const [cluster, setCluster] = useState<Cluster | null>(null);
     const [loading, setLoading] = useState(true);
@@ -151,7 +160,17 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
 
     const [imageMode, setImageMode] = useState<"ai" | "search">("ai");
 
+    // ── Image style & voice persona state ───────────────────────────
+    const [imageStyleCategories, setImageStyleCategories] = useState<ImageStyleCategory[]>(IMAGE_STYLE_CATEGORIES);
+    const [selectedImageStyle, setSelectedImageStyle] = useState<string>("auto");
+    const [companyPrompts, setCompanyPrompts] = useState<{ id: string; name: string; body: string }[]>([]);
+    const [activeVoiceId, setActiveVoiceId] = useState<string | null>(null);
+
     const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({ pillar: true, supporting: true, long_tail: true });
+
+    // Hub-and-spoke diagram state
+    const [highlightedSlug, setHighlightedSlug] = useState<string | null>(null);
+    const [diagramOpen, setDiagramOpen] = useState(true);
 
     // ── Share cluster state ────────────────────────────────────────
     const [showSharePanel, setShowSharePanel] = useState(false);
@@ -187,8 +206,19 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                 } else {
                     setImageMode("ai");
                 }
+                // Load company image style categories
+                if (data?.image_style_categories && Array.isArray(data.image_style_categories) && data.image_style_categories.length > 0) {
+                    setImageStyleCategories(data.image_style_categories);
+                } else {
+                    setImageStyleCategories(IMAGE_STYLE_CATEGORIES);
+                }
             })
             .catch(() => { /* keep default */ });
+        // Load company prompts (templates/voices)
+        fetch(`/api/prompts?company_id=${cluster.company_id}`)
+            .then((r) => r.json())
+            .then((data) => { if (Array.isArray(data)) setCompanyPrompts(data); })
+            .catch(() => { setCompanyPrompts([]); });
     }, [cluster?.company_id]);
 
     // ── Auto-refresh when articles are still generating ─────────────
@@ -273,11 +303,18 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
 
     async function generatePage(pageType: string, pageIndex: number, pageKey: string) {
         setGeneratingPage(pageKey); setPageGenErr(null);
+        const voiceBody = activeVoiceId ? companyPrompts.find((p) => p.id === activeVoiceId)?.body : undefined;
         await runTask({
             type: "cluster-page",
             label: `Page: ${pageKey}`,
             endpoint: `/api/clusters/${clusterId}/generate`,
-            body: { page_type: pageType, page_index: pageIndex, image_mode: imageMode },
+            body: {
+                page_type: pageType,
+                page_index: pageIndex,
+                image_mode: imageMode,
+                image_style: selectedImageStyle,
+                voice_prompt_body: voiceBody || undefined,
+            },
             meta: { clusterId, pageType, pageIndex },
             onSuccess: async () => {
                 await loadCluster();
@@ -320,6 +357,8 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
             }
         }
 
+        const voiceBody = activeVoiceId ? companyPrompts.find((p) => p.id === activeVoiceId)?.body : undefined;
+
         setBatchGenerating(true); setBatchProgress({ current: 0, total: pages.length }); setPageGenErr(null);
 
         await runBatchTask({
@@ -327,7 +366,13 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
             label: `Batch: ${cluster.name} (${pages.length} pages)`,
             items: pages.map((p) => ({
                 endpoint: `/api/clusters/${clusterId}/generate`,
-                body: { page_type: p.type, page_index: p.index, image_mode: imageMode },
+                body: {
+                    page_type: p.type,
+                    page_index: p.index,
+                    image_mode: imageMode,
+                    image_style: selectedImageStyle,
+                    voice_prompt_body: voiceBody || undefined,
+                },
                 label: `${p.type}: ${p.slug}`,
             })),
             concurrency: 2,
@@ -812,6 +857,111 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
                 </div>
             </div>
 
+            {/* Hub-and-Spoke Diagram */}
+            {strategy && (
+                <Collapsible open={diagramOpen} onOpenChange={setDiagramOpen}>
+                    <CollapsibleTrigger className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/40">
+                        <Network className="h-3.5 w-3.5" />
+                        <span>Cluster Topology</span>
+                        <ChevronDown className={cn("h-3.5 w-3.5 ml-auto transition-transform duration-200", !diagramOpen && "-rotate-90")} />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                        <div className="border border-border/60 rounded-lg bg-muted/10 p-2 mt-1">
+                            <ClusterDiagram
+                                strategy={strategy}
+                                articles={cluster.articles ?? []}
+                                onSelectArticle={onSelectArticle}
+                                onHighlightSlug={setHighlightedSlug}
+                            />
+                        </div>
+                    </CollapsibleContent>
+                </Collapsible>
+            )}
+
+            {/* Image Style & Voice Persona — collapsible settings strip */}
+            {(imageStyleCategories.length > 1 || companyPrompts.length > 0) && (
+                <details className="group border border-border/60 rounded-lg bg-muted/20">
+                    <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium select-none list-none [&::-webkit-details-marker]:hidden px-3 py-2.5">
+                        <Palette className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span>Generation Settings</span>
+                        <span className="ml-auto text-xs font-normal text-muted-foreground group-open:hidden flex items-center gap-2">
+                            {selectedImageStyle === "auto"
+                                ? "Auto-select style"
+                                : imageStyleCategories.find(s => s.id === selectedImageStyle)?.label ?? selectedImageStyle}
+                            {activeVoiceId && (
+                                <span className="inline-flex items-center gap-1 text-primary">
+                                    <Mic className="h-3 w-3" />
+                                    {companyPrompts.find(p => p.id === activeVoiceId)?.name ?? "Voice"}
+                                </span>
+                            )}
+                        </span>
+                    </summary>
+                    <div className="px-3 pb-3 space-y-3 border-t border-border/40 pt-3">
+                        {/* Image style picker */}
+                        {imageStyleCategories.length > 1 && (
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-medium">Hero Image Style</Label>
+                                <select
+                                    value={selectedImageStyle}
+                                    onChange={(e) => setSelectedImageStyle(e.target.value)}
+                                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                >
+                                    <option value="auto">✨ Auto-select (AI recommends per article)</option>
+                                    {imageStyleCategories.map((cat) => (
+                                        <option key={cat.id} value={cat.id}>
+                                            {cat.type === "composite" ? `🧩 ${cat.label}` : cat.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                {selectedImageStyle !== "auto" && (
+                                    <p className="text-[10px] text-muted-foreground">
+                                        All generated articles will use this image style instead of AI auto-selection.
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Voice persona pills */}
+                        {companyPrompts.length > 0 && (
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-medium">Voice / Persona</Label>
+                                <div className="flex gap-2 flex-wrap">
+                                    {companyPrompts.map((t) => {
+                                        const isVoice = isVoicePrompt(t.body);
+                                        const isActive = isVoice
+                                            ? activeVoiceId === t.id
+                                            : false; // templates aren't used for cluster generation
+                                        if (!isVoice) return null; // Only show voice personas for cluster generation
+
+                                        return (
+                                            <Button
+                                                key={t.id}
+                                                variant={isActive ? "default" : "outline"}
+                                                size="sm"
+                                                className={cn(
+                                                    "rounded-full gap-1 text-xs transition-all",
+                                                    isActive && "ring-2 ring-primary/30 shadow-sm",
+                                                )}
+                                                onClick={() => setActiveVoiceId(isActive ? null : t.id)}
+                                            >
+                                                <Mic className="h-3 w-3" /> {t.name}
+                                                {isActive && <Check className="h-3 w-3 ml-0.5" />}
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
+                                {activeVoiceId && (
+                                    <p className="text-[10px] text-primary flex items-center gap-1">
+                                        <Mic className="h-3 w-3" />
+                                        Voice profile will be applied to all generated articles in this cluster.
+                                    </p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </details>
+            )}
+
             {/* In-progress generation banner */}
             {(generatingPage || batchGenerating) && (
                 <Alert className="border-primary/40 bg-primary/5 animate-pulse">
@@ -1078,8 +1228,10 @@ export default function ClusterPanel({ clusterId, companies, onUpdate, onDelete,
 
                         return (
                             <div key={pageKey} className={cn(
-                                "flex items-center gap-2.5 px-3 py-2 rounded-md transition-colors group",
-                                generated ? "bg-green-500/5" : articleIsGenerating ? "bg-amber-500/5" : articleHasFailed ? "bg-destructive/5" : "hover:bg-muted/40"
+                                "flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-200 group",
+                                highlightedSlug === page.slug
+                                    ? "bg-primary/10 ring-1 ring-primary/30"
+                                    : generated ? "bg-green-500/5" : articleIsGenerating ? "bg-amber-500/5" : articleHasFailed ? "bg-destructive/5" : "hover:bg-muted/40"
                             )}>
                                 <TooltipProvider>
                                     <Tooltip>

@@ -130,6 +130,7 @@ export default async function handler(
             model: requestedModel,
             image_style: rawStyle,
             image_mode,
+            voice_prompt_body,
         } = req.body ?? {};
 
         if (!page_type || typeof page_index !== "number") {
@@ -213,11 +214,13 @@ export default async function handler(
 
         const selectedModel = resolveModelId(requestedModel);
 
-        // Resolve image style — auto-recommend if not explicitly provided
+        // Resolve image style — auto-recommend if "auto" or not explicitly provided
         let styleId = "default";
         const brandCategories = getImageStyleCategories(brand);
-        if (typeof rawStyle === "string" && brandCategories.some((c) => c.id === rawStyle)) {
+        const isExplicitStyle = typeof rawStyle === "string" && rawStyle !== "auto" && brandCategories.some((c) => c.id === rawStyle);
+        if (isExplicitStyle) {
             styleId = rawStyle;
+            console.log(`Using explicit image style "${styleId}" for page "${page.slug}"`);
         } else if (brandCategories.length > 1) {
             // Auto-recommend style based on page content
             try {
@@ -256,6 +259,12 @@ Which style best fits this article? Respond with JSON only.`;
 
         // Build system prompt
         let system = compileBlogSystemPrompt(brand);
+
+        // Inject voice prompt if provided by the user
+        if (typeof voice_prompt_body === "string" && voice_prompt_body.trim()) {
+            system = `${voice_prompt_body.trim()}\n\n---\n\n${system}`;
+            console.log(`[cluster-gen] Voice prompt injected for page "${page.slug}" (${voice_prompt_body.length} chars)`);
+        }
 
         // Inject reference articles
         if (brand.reference_articles && brand.reference_articles.length > 0) {

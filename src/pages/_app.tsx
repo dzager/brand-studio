@@ -17,7 +17,7 @@ if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
 }
 
 // Routes that don't require authentication
-const PUBLIC_ROUTES = ["/login", "/register", "/invite"];
+const PUBLIC_ROUTES = ["/login", "/register", "/invite", "/reset-password"];
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
     const { user, loading } = useAuth();

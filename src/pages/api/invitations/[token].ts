@@ -71,30 +71,59 @@ export default async function handler(
                 return res.status(400).json({ error: "Password must be at least 6 characters" });
             }
 
-            // Check if user already exists
-            const { data: existingUsers } = await admin.auth.admin.listUsers();
-            const existingUser = existingUsers?.users?.find(
-                (u) => u.email?.toLowerCase() === invitation.email.toLowerCase()
-            );
-
+            // Try to create the user first — if they already exist, createUser
+            // returns an error and we look them up. This avoids the old
+            // listUsers() call (no email filter in Supabase JS v2) which
+            // fetched ALL users and timed out at scale.
             let userId: string;
+            let isNewUser = true;
 
-            if (existingUser) {
-                userId = existingUser.id;
-            } else {
-                // Create new user
-                const { data: newUser, error: createError } =
-                    await admin.auth.admin.createUser({
-                        email: invitation.email,
-                        password,
-                        email_confirm: true,
-                        user_metadata: {
-                            full_name: full_name?.trim() || "",
-                        },
-                    });
+            const { data: newUser, error: createError } =
+                await admin.auth.admin.createUser({
+                    email: invitation.email,
+                    password,
+                    email_confirm: true,
+                    user_metadata: {
+                        full_name: full_name?.trim() || "",
+                    },
+                });
 
-                if (createError) throw createError;
+            if (newUser?.user) {
                 userId = newUser.user.id;
+            } else if (
+                createError &&
+                (createError.message?.includes("already been registered") ||
+                 createError.message?.includes("already exists") ||
+                 (createError as any).status === 422)
+            ) {
+                // User already exists — look up by email via GoTrue REST API
+                // (the JS SDK's listUsers has no email filter)
+                isNewUser = false;
+                const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+                const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+                const lookupRes = await fetch(
+                    `${supabaseUrl}/auth/v1/admin/users?filter=${encodeURIComponent(invitation.email.toLowerCase())}`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${serviceKey}`,
+                            apikey: serviceKey,
+                        },
+                    }
+                );
+                const lookupData = await lookupRes.json();
+                const match = lookupData?.users?.find(
+                    (u: any) =>
+                        u.email?.toLowerCase() ===
+                        invitation.email.toLowerCase()
+                );
+                if (!match) {
+                    throw new Error(
+                        "User already registered but could not be found"
+                    );
+                }
+                userId = match.id;
+            } else {
+                throw createError || new Error("Failed to create user");
             }
 
             let companyId: string | undefined;
@@ -138,7 +167,7 @@ export default async function handler(
                 success: true,
                 account_id: invitation.account_id,
                 user_id: userId,
-                is_new_user: !existingUser,
+                is_new_user: isNewUser,
                 cluster_id: invitation.cluster_id || null,
             });
         }

@@ -9,6 +9,12 @@ import * as cheerio from "cheerio";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
+export type CrawledLink = {
+    href: string;
+    anchor_text: string;
+    is_internal: boolean;
+};
+
 export type CrawledFactPage = {
     url: string;
     title: string;
@@ -18,6 +24,7 @@ export type CrawledFactPage = {
     page_type: "blog" | "landing" | "service" | "resource" | "other";
     word_count: number;
     headings: string[];
+    links_found?: CrawledLink[];  // all links on the page (for link audit)
 };
 
 export type DeepCrawlResult = {
@@ -27,6 +34,7 @@ export type DeepCrawlResult = {
     pages_crawled: number;     // successfully fetched
     pages_skipped: number;     // filtered out or failed
     elapsed_ms: number;
+    remaining_urls: string[];  // uncrawled URLs available for continuation
 };
 
 export type DeepCrawlOptions = {
@@ -39,7 +47,9 @@ export type DeepCrawlOptions = {
 // ── Constants ────────────────────────────────────────────────────────────
 
 const DEFAULT_MAX_PAGES = 50;
-const FETCH_TIMEOUT_MS = 12000;
+const FETCH_TIMEOUT_MS = 8000;
+const SITEMAP_TIMEOUT_MS = 5000;
+const MAX_CRAWL_DURATION_MS = 180000; // 3 minutes overall deadline
 const MAX_BODY_TEXT_PER_PAGE = 12000;
 const USER_AGENT = "Mozilla/5.0 (compatible; BrandStudio/1.0)";
 const CONCURRENT_FETCHES = 4;
@@ -129,56 +139,61 @@ function urlPriority(url: string): number {
 async function discoverFromSitemap(rootUrl: string): Promise<string[]> {
     const urls: string[] = [];
     const base = new URL(rootUrl);
-    const sitemapUrls = [
+    const sitemapCandidates = [
         `${base.origin}/sitemap.xml`,
         `${base.origin}/sitemap_index.xml`,
         `${base.origin}/post-sitemap.xml`,
         `${base.origin}/page-sitemap.xml`,
     ];
 
-    for (const sitemapUrl of sitemapUrls) {
-        try {
+    // Fetch all sitemap candidates in parallel (instead of sequentially)
+    const results = await Promise.allSettled(
+        sitemapCandidates.map(async (sitemapUrl) => {
             const resp = await fetch(sitemapUrl, {
                 headers: { "User-Agent": USER_AGENT },
-                signal: AbortSignal.timeout(8000),
+                signal: AbortSignal.timeout(SITEMAP_TIMEOUT_MS),
                 redirect: "follow",
             });
-            if (!resp.ok) continue;
-
+            if (!resp.ok) return null;
             const xml = await resp.text();
-            if (!xml.includes("<url") && !xml.includes("<sitemap")) continue;
+            if (!xml.includes("<url") && !xml.includes("<sitemap")) return null;
+            return xml;
+        })
+    );
 
-            // Extract all <loc> tags
-            const locMatches = xml.match(/<loc>\s*(.*?)\s*<\/loc>/gi) ?? [];
-            for (const match of locMatches) {
-                const loc = match.replace(/<\/?loc>/gi, "").trim();
-                if (loc && loc.startsWith("http")) {
-                    // If it's a sub-sitemap, try to parse it too (one level deep)
-                    if (loc.includes("sitemap") && loc.endsWith(".xml")) {
-                        try {
-                            const subResp = await fetch(loc, {
-                                headers: { "User-Agent": USER_AGENT },
-                                signal: AbortSignal.timeout(8000),
-                            });
-                            if (subResp.ok) {
-                                const subXml = await subResp.text();
-                                const subLocs = subXml.match(/<loc>\s*(.*?)\s*<\/loc>/gi) ?? [];
-                                for (const subMatch of subLocs) {
-                                    const subLoc = subMatch.replace(/<\/?loc>/gi, "").trim();
-                                    if (subLoc && subLoc.startsWith("http") && !subLoc.includes("sitemap")) {
-                                        urls.push(subLoc);
-                                    }
+    for (const result of results) {
+        if (result.status !== "fulfilled" || !result.value) continue;
+        const xml = result.value;
+
+        const locMatches = xml.match(/<loc>\s*(.*?)\s*<\/loc>/gi) ?? [];
+        for (const match of locMatches) {
+            const loc = match.replace(/<\/?loc>/gi, "").trim();
+            if (loc && loc.startsWith("http")) {
+                // If it's a sub-sitemap, try to parse it too (one level deep)
+                if (loc.includes("sitemap") && loc.endsWith(".xml")) {
+                    try {
+                        const subResp = await fetch(loc, {
+                            headers: { "User-Agent": USER_AGENT },
+                            signal: AbortSignal.timeout(SITEMAP_TIMEOUT_MS),
+                        });
+                        if (subResp.ok) {
+                            const subXml = await subResp.text();
+                            const subLocs = subXml.match(/<loc>\s*(.*?)\s*<\/loc>/gi) ?? [];
+                            for (const subMatch of subLocs) {
+                                const subLoc = subMatch.replace(/<\/?loc>/gi, "").trim();
+                                if (subLoc && subLoc.startsWith("http") && !subLoc.includes("sitemap")) {
+                                    urls.push(subLoc);
                                 }
                             }
-                        } catch { /* skip failed sub-sitemaps */ }
-                    } else {
-                        urls.push(loc);
-                    }
+                        }
+                    } catch { /* skip failed sub-sitemaps */ }
+                } else {
+                    urls.push(loc);
                 }
             }
+        }
 
-            if (urls.length > 0) break; // found a working sitemap
-        } catch { /* sitemap not available */ }
+        if (urls.length > 0) break; // found a working sitemap
     }
 
     return urls;
@@ -307,12 +322,34 @@ async function fetchFactPage(url: string, firecrawlApiKey?: string): Promise<Cra
 
         const wordCount = bodyText.split(/\s+/).filter(Boolean).length;
 
-        // Discover internal links for BFS
+        // Discover internal links for BFS + collect all links for link audit
         const links: string[] = [];
         const seen = new Set<string>();
+        const allPageLinks: CrawledLink[] = [];
+        const baseHostname = new URL(url).hostname;
+
         $("a[href]").each((_i, el) => {
             const href = $(el).attr("href");
             if (!href) return;
+            const anchorText = $(el).text().trim().slice(0, 200);
+
+            // Try to resolve absolute URL for classification
+            let resolvedHref = href;
+            let isInternal = false;
+            try {
+                const parsed = new URL(href, url);
+                resolvedHref = parsed.toString();
+                isInternal = parsed.hostname === baseHostname;
+            } catch { /* keep raw href */ }
+
+            // Collect for link audit
+            allPageLinks.push({
+                href: resolvedHref,
+                anchor_text: anchorText,
+                is_internal: isInternal,
+            });
+
+            // Internal links for BFS (deduplicated)
             const normalized = normalizeUrl(href, url);
             if (normalized && !seen.has(normalized) && normalized !== url) {
                 seen.add(normalized);
@@ -329,6 +366,7 @@ async function fetchFactPage(url: string, firecrawlApiKey?: string): Promise<Cra
             page_type: classifyPageType(url),
             word_count: wordCount,
             headings,
+            links_found: allPageLinks,
             // Store links temporarily for BFS (not in final type, stripped later)
             ...(links.length > 0 ? { _links: links } : {}),
         } as CrawledFactPage & { _links?: string[] };
@@ -361,10 +399,11 @@ export async function crawlSinglePage(pageUrl: string): Promise<DeepCrawlResult>
             pages_crawled: 0,
             pages_skipped: 1,
             elapsed_ms: Date.now() - startTime,
+            remaining_urls: [],
         };
     }
 
-    // Strip internal BFS links if present
+    // Strip internal BFS links if present (keep links_found for link audit)
     delete (page as any)._links;
 
     return {
@@ -374,6 +413,7 @@ export async function crawlSinglePage(pageUrl: string): Promise<DeepCrawlResult>
         pages_crawled: 1,
         pages_skipped: 0,
         elapsed_ms: Date.now() - startTime,
+        remaining_urls: [],
     };
 }
 
@@ -438,6 +478,12 @@ export async function deepCrawl(
     }
 
     while (urlQueue.length > 0 && crawled.size < maxPages) {
+        // Bail out if we've exceeded the overall crawl deadline
+        if (Date.now() - startTime > MAX_CRAWL_DURATION_MS) {
+            console.warn(`[freshness-crawl] Crawl deadline reached (${MAX_CRAWL_DURATION_MS / 1000}s). Stopping with ${crawled.size} pages.`);
+            break;
+        }
+
         // Take a batch
         const batch = urlQueue.splice(0, Math.min(CONCURRENT_FETCHES, maxPages - crawled.size));
 
@@ -450,7 +496,7 @@ export async function deepCrawl(
 
             const page = result.value as CrawledFactPage & { _links?: string[] };
             const discoveredLinks = page._links ?? [];
-            delete (page as any)._links;
+            delete (page as any)._links;  // keep links_found for link audit
 
             crawled.set(page.url, page);
 
@@ -472,7 +518,8 @@ export async function deepCrawl(
     }
 
     const pages = Array.from(crawled.values());
-    console.log(`[freshness-crawl] Crawl complete: ${pages.length} pages from ${normalizedRoot}`);
+    const remainingUrls = urlQueue.filter(u => !crawled.has(u));
+    console.log(`[freshness-crawl] Crawl complete: ${pages.length} pages from ${normalizedRoot}, ${remainingUrls.length} remaining`);
 
     return {
         root_url: normalizedRoot,
@@ -481,5 +528,60 @@ export async function deepCrawl(
         pages_crawled: pages.length,
         pages_skipped: pagesDiscovered - pages.length,
         elapsed_ms: Date.now() - startTime,
+        remaining_urls: remainingUrls,
+    };
+}
+
+/**
+ * Crawl a specific list of URLs (no sitemap/BFS discovery).
+ * Used to continue an audit from its remaining URLs.
+ */
+export async function crawlUrls(
+    rootUrl: string,
+    urls: string[],
+    options?: { maxPages?: number; onProgress?: (crawled: number, total: number) => void }
+): Promise<DeepCrawlResult> {
+    const startTime = Date.now();
+    const maxPages = options?.maxPages ?? urls.length;
+    const urlsToCrawl = urls.slice(0, maxPages);
+    const leftover = urls.slice(maxPages);
+
+    const crawled = new Map<string, CrawledFactPage>();
+    const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
+
+    console.log(`[freshness-crawl] Continuing crawl: ${urlsToCrawl.length} URLs from ${rootUrl}`);
+
+    for (let i = 0; i < urlsToCrawl.length && crawled.size < maxPages; i += CONCURRENT_FETCHES) {
+        const batch = urlsToCrawl.slice(i, Math.min(i + CONCURRENT_FETCHES, maxPages - crawled.size + i));
+
+        const results = await Promise.allSettled(
+            batch.map(url => fetchFactPage(url, firecrawlApiKey))
+        );
+
+        for (const result of results) {
+            if (result.status !== "fulfilled" || !result.value) continue;
+            const page = result.value as CrawledFactPage & { _links?: string[] };
+            delete (page as any)._links;
+            crawled.set(page.url, page);
+        }
+
+        options?.onProgress?.(crawled.size, Math.min(urlsToCrawl.length, maxPages));
+    }
+
+    const pages = Array.from(crawled.values());
+    // Remaining = URLs we didn't attempt + URLs that failed
+    const failedOrSkipped = urlsToCrawl.filter(u => !crawled.has(u));
+    const remaining = [...leftover];
+
+    console.log(`[freshness-crawl] Continuation complete: ${pages.length} pages, ${remaining.length} remaining`);
+
+    return {
+        root_url: rootUrl,
+        pages,
+        pages_discovered: urls.length,
+        pages_crawled: pages.length,
+        pages_skipped: failedOrSkipped.length,
+        elapsed_ms: Date.now() - startTime,
+        remaining_urls: remaining,
     };
 }

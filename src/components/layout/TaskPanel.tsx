@@ -35,6 +35,7 @@ const TYPE_LABELS: Record<string, string> = {
   "research-brief": "Brief",
   "research-article": "Research → Article",
   "freshness-audit": "Freshness Audit",
+  "link-audit": "Link Audit",
 };
 
 /* ── Elapsed Timer Hook ────────────────────────────────── */
@@ -127,7 +128,7 @@ function TaskLine({
   return (
     <div>
       <div
-        className="group flex items-start gap-0 leading-[1.4] whitespace-nowrap"
+        className="group flex items-start gap-0 leading-[1.4]"
         style={{ color: lineColor, fontSize: 12.5 }}
       >
         {/* Timestamp */}
@@ -269,11 +270,10 @@ function TaskLine({
   );
 }
 
-/* ── Fixed Footer Task Panel ─────────────────────────────── */
+/* ── Right Sidebar Activity Panel ─────────────────────────── */
 
 export default function TaskPanel() {
   const { tasks, activeTasks, hasActiveTasks, removeTask, clearCompleted, clearAll, cancelTask } = useTaskStore();
-  const [expanded, setExpanded] = useState(false);
   const prevActiveCountRef = useRef(0);
 
   // Entrance / exit animation state
@@ -295,11 +295,8 @@ export default function TaskPanel() {
     }
   }, [hasTasks, mounted]);
 
-  // Auto-expand when a new task starts
+  // Auto-open when a new task starts
   useEffect(() => {
-    if (activeTasks.length > prevActiveCountRef.current && activeTasks.length > 0) {
-      setExpanded(true);
-    }
     prevActiveCountRef.current = activeTasks.length;
   }, [activeTasks.length]);
 
@@ -323,44 +320,46 @@ export default function TaskPanel() {
   if (runningCount > 0) titleParts.push(`${runningCount} running`);
   if (completedCount > 0) titleParts.push(`${completedCount} done`);
   if (failedCount > 0) titleParts.push(`${failedCount} failed`);
-  const chromeTitle = titleParts.length > 0 ? `activity.log — ${titleParts.join(", ")}` : "activity.log";
+  const chromeTitle = titleParts.length > 0 ? titleParts.join(" · ") : "idle";
 
   return (
     <div
       className={cn(
-        "fixed top-0 left-0 right-0 z-50",
+        "fixed top-0 right-0 bottom-0 z-50 flex flex-col",
         visible ? "opacity-100" : "opacity-0 pointer-events-none",
       )}
       style={{
+        width: 320,
         fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace",
         transition: "opacity 0.3s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)",
-        transform: visible ? "translateY(0)" : "translateY(-100%)",
+        transform: visible ? "translateX(0)" : "translateX(100%)",
       }}
     >
-      {/* Terminal shell */}
+      {/* Terminal shell — full height sidebar */}
       <div
         style={{
           background: "#2c2c2c",
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
-          overflow: "hidden",
+          borderLeft: "1px solid rgba(255,255,255,0.08)",
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
           boxShadow:
-            "0 2px 8px rgba(0,0,0,0.2), " +
-            "0 8px 24px rgba(0,0,0,0.15), " +
-            "0 20px 60px rgba(0,0,0,0.1)",
+            "-2px 0 8px rgba(0,0,0,0.2), " +
+            "-8px 0 24px rgba(0,0,0,0.15), " +
+            "-20px 0 60px rgba(0,0,0,0.1)",
         }}
       >
-        {/* Chrome bar */}
+        {/* Chrome header */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: 8,
-            padding: "5px 12px",
+            padding: "8px 12px",
             background: "#222",
-            borderBottom: expanded ? "1px solid rgba(255,255,255,0.06)" : "none",
-            cursor: "pointer",
+            borderBottom: "1px solid rgba(255,255,255,0.06)",
+            flexShrink: 0,
           }}
-          onClick={() => setExpanded(!expanded)}
         >
           {/* Pulse for active tasks */}
           {hasActiveTasks && (
@@ -385,6 +384,17 @@ export default function TaskPanel() {
               flex: 1,
               overflow: "hidden",
               textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            activity.log
+          </span>
+
+          {/* Status summary */}
+          <span
+            style={{
+              fontSize: 10,
+              color: hasActiveTasks ? "#7aad5a" : "rgba(255,255,255,0.2)",
               whiteSpace: "nowrap",
             }}
           >
@@ -413,25 +423,6 @@ export default function TaskPanel() {
             </span>
           )}
 
-          {/* Expand/collapse toggle */}
-          <span
-            onClick={(e) => {
-              e.stopPropagation();
-              setExpanded(!expanded);
-            }}
-            style={{
-              fontSize: 10,
-              color: "rgba(255,255,255,0.25)",
-              transform: expanded ? "rotate(0deg)" : "rotate(180deg)",
-              transition: "transform 0.2s ease",
-              display: "inline-block",
-              cursor: "pointer",
-              padding: "2px 4px",
-            }}
-          >
-            ▲
-          </span>
-
           {/* Close / dismiss all */}
           <span
             onClick={(e) => {
@@ -439,49 +430,53 @@ export default function TaskPanel() {
               clearAll();
             }}
             style={{
-              fontSize: 11,
-              color: "rgba(255,255,255,0.2)",
+              fontSize: 13,
+              color: "rgba(255,255,255,0.5)",
               cursor: "pointer",
-              padding: "2px 4px",
-              transition: "color 0.15s",
+              padding: "2px 8px",
+              borderRadius: 4,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              transition: "all 0.15s",
               lineHeight: 1,
+              fontWeight: 500,
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.5)")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.2)")}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "#e05a5a";
+              e.currentTarget.style.background = "rgba(224,90,90,0.12)";
+              e.currentTarget.style.borderColor = "rgba(224,90,90,0.25)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "rgba(255,255,255,0.5)";
+              e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+              e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
+            }}
             title="Dismiss activity panel"
           >
             ✕
           </span>
         </div>
 
-        {/* Terminal body */}
+        {/* Task list — scrollable body */}
         <div
           style={{
-            overflow: "hidden",
-            transition: "max-height 0.3s ease-in-out",
-            maxHeight: expanded ? 300 : 0,
+            flex: 1,
+            overflowY: "auto",
+            padding: "8px 12px",
+            fontSize: 12.5,
+            lineHeight: 1.5,
+            color: "rgba(255,255,255,0.7)",
           }}
         >
-          <div
-            style={{
-              padding: "6px 12px 8px",
-              fontSize: 12.5,
-              lineHeight: 1.5,
-              color: "rgba(255,255,255,0.7)",
-              overflowY: "auto",
-              maxHeight: 280,
-            }}
-          >
-            {visibleTasks.length === 0 ? (
-              <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 12 }}>
-                # no tasks
-              </div>
-            ) : (
-              visibleTasks.map((task) => (
-                <TaskLine key={task.id} task={task} onRemove={removeTask} onCancel={cancelTask} />
-              ))
-            )}
-          </div>
+          {visibleTasks.length === 0 ? (
+            <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 12, marginTop: 8 }}>
+              # no tasks
+            </div>
+          ) : (
+            visibleTasks.map((task) => (
+              <TaskLine key={task.id} task={task} onRemove={removeTask} onCancel={cancelTask} />
+            ))
+          )}
         </div>
       </div>
     </div>

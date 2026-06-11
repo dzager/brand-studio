@@ -1,8 +1,8 @@
 /**
- * Freshness Report API
+ * Link Report API
  *
- * GET /api/freshness-report?id=<audit_id> — Get full audit report
- * DELETE /api/freshness-report?id=<audit_id> — Delete an audit
+ * GET /api/link-report?id=<audit_id> — Get full audit report
+ * DELETE /api/link-report?id=<audit_id> — Delete an audit
  */
 
 import type { NextApiRequest, NextApiResponse } from "next";
@@ -22,7 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === "GET") {
         const { data, error } = await sb
-            .from("freshness_audits")
+            .from("link_audits")
             .select("*")
             .eq("id", id)
             .single();
@@ -31,21 +31,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(200).json(data);
     }
 
-    if (req.method === "PATCH") {
-        const { title } = req.body ?? {};
-        if (typeof title !== "string") {
-            return res.status(400).json({ error: "A title string is required" });
-        }
-        const { error } = await sb
-            .from("freshness_audits")
-            .update({ title: title.trim() || null })
-            .eq("id", id);
-        if (error) return res.status(500).json({ error: error.message });
-        return res.status(200).json({ success: true });
-    }
-
     if (req.method === "DELETE") {
-        const { error } = await sb.from("freshness_audits").delete().eq("id", id);
+        const { error } = await sb.from("link_audits").delete().eq("id", id);
         if (error) return res.status(500).json({ error: error.message });
         return res.status(200).json({ success: true });
     }

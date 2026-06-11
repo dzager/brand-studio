@@ -39,6 +39,8 @@ interface AuthState {
     ) => Promise<{ error?: string }>;
     signOut: () => Promise<void>;
     switchAccount: (accountId: string) => void;
+    resetPassword: (email: string) => Promise<{ error?: string }>;
+    updatePassword: (newPassword: string) => Promise<{ error?: string }>;
 }
 
 const ACTIVE_ACCOUNT_KEY = "organic_active_account_id";
@@ -53,6 +55,8 @@ const AuthContext = createContext<AuthState>({
     signUp: async () => ({}),
     signOut: async () => {},
     switchAccount: () => {},
+    resetPassword: async () => ({}),
+    updatePassword: async () => ({}),
 });
 
 // ── Provider ───────────────────────────────────────────────────────
@@ -194,6 +198,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         window.location.href = "/login";
     }, [supabase]);
 
+    const resetPassword = useCallback(
+        async (email: string) => {
+            const redirectTo =
+                (process.env.NEXT_PUBLIC_APP_URL || window.location.origin) +
+                "/reset-password";
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo,
+            });
+            if (error) return { error: error.message };
+            return {};
+        },
+        [supabase]
+    );
+
+    const updatePassword = useCallback(
+        async (newPassword: string) => {
+            const { error } = await supabase.auth.updateUser({
+                password: newPassword,
+            });
+            if (error) return { error: error.message };
+            return {};
+        },
+        [supabase]
+    );
+
     const switchAccount = useCallback(
         (accountId: string) => {
             const account = accounts.find((a) => a.account_id === accountId);
@@ -217,6 +246,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 signUp,
                 signOut,
                 switchAccount,
+                resetPassword,
+                updatePassword,
             }}
         >
             {children}

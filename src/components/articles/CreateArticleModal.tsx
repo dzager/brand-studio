@@ -6,6 +6,7 @@ import { useModelDefaults } from "@/hooks/useModelDefaults";
 import { IMAGE_STYLE_CATEGORIES, type ImageStyleCategory } from "@/brand/engine";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import ContentWizard from "@/components/layout/ContentWizard";
+import slugify from "slugify";
 
 
 interface CreateArticleModalProps {
@@ -51,7 +52,13 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
   const isScopedMember = !isAdmin && !!activeAccount?.company_id;
 
   // ── Creation Mode ──────────────────────────────────────────────────
-  const [mode, setMode] = useState<"single" | "cluster">("single");
+  const [mode, setMode] = useState<"single" | "cluster" | "import" | "blank-cluster">("single");
+
+  // ── Import Mode State ──────────────────────────────────────────────
+  const [importUrl, setImportUrl] = useState("");
+  const [importData, setImportData] = useState<{ title: string; html: string; excerpt: string } | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
 
   // ── Cluster Mode State ─────────────────────────────────────────────
   const [clusterTopic, setClusterTopic] = useState("");
@@ -286,6 +293,85 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
     finally { setPreviewing(false); }
   }
 
+  async function onFetchArticle() {
+    if (!importUrl.trim()) return;
+    setImportLoading(true);
+    setImportError(null);
+    setImportData(null);
+    try {
+      const r = await fetch("/api/scrape-article", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: importUrl.trim() }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data?.error || `Scrape failed (${r.status})`);
+      setImportData(data);
+    } catch (e: any) {
+      setImportError(e.message || "Failed to fetch article");
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
+  async function onImportArticle() {
+    if (!importData || !companyId) return;
+    setLoading(true);
+    setErr(null);
+    try {
+      const slug = slugify(importData.title, { lower: true, strict: true }).slice(0, 80);
+      const r = await fetch("/api/articles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: importData.title,
+          slug,
+          excerpt: importData.excerpt,
+          html: importData.html,
+          model_used: "imported",
+          company_id: companyId,
+          cluster_id: selectedClusterId || null,
+          cluster_role: selectedClusterId ? "supporting" : null,
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data?.error || `Import failed (${r.status})`);
+      onOpenChange(false);
+      resetState();
+      window.dispatchEvent(new Event("article-created"));
+      onCreated?.();
+    } catch (e: any) {
+      setErr(e.message || "Failed to import article");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onCreateBlankCluster() {
+    if (!companyId || !clusterTopic.trim()) return;
+    setLoading(true);
+    setErr(null);
+    try {
+      const r = await fetch("/api/clusters", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company_id: companyId, topic: clusterTopic.trim(), blank: true }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data?.error || `Failed to create cluster (${r.status})`);
+      onOpenChange(false);
+      resetState();
+      onCreated?.();
+      if (data?.id) {
+        router.push(`/articles?cluster=${data.id}`);
+      }
+    } catch (e: any) {
+      setErr(e.message || "Failed to create blank cluster");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function resetState() {
     setMode("single");
     setPrompt("");
@@ -308,6 +394,10 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
     setSelectedCollectionId("");
     setCompanyClusters([]);
     setSelectedClusterId("");
+    setImportUrl("");
+    setImportData(null);
+    setImportLoading(false);
+    setImportError(null);
   }
 
   return (
@@ -381,6 +471,14 @@ export default function CreateArticleModal({ open, onOpenChange, onCreated }: Cr
               companyClusters={companyClusters}
               selectedClusterId={selectedClusterId}
               setSelectedClusterId={setSelectedClusterId}
+              importUrl={importUrl}
+              setImportUrl={setImportUrl}
+              importData={importData}
+              importLoading={importLoading}
+              importError={importError}
+              onFetchArticle={onFetchArticle}
+              onImportArticle={onImportArticle}
+              onCreateBlankCluster={onCreateBlankCluster}
             />
           </div>
         </DialogContent>

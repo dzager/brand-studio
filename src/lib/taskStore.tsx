@@ -27,6 +27,8 @@ export type TaskType =
   | "research-brief"
   | "research-article"
   | "freshness-audit"
+  | "link-audit"
+  | "site-audit"
   | "compare"
   | "quality-rating";
 
