@@ -3,10 +3,22 @@
  * POST /api/invitations        — Create a new invitation (owner/admin only)
  */
 import type { NextApiRequest, NextApiResponse } from "next";
-import { createServerSupabase, getAdminSupabase } from "@/lib/supabase";
+import { randomBytes } from "crypto";
+import { getAdminSupabase } from "@/lib/supabase";
 import { requireAuth, getUserAccounts, isPlatformAdmin } from "@/lib/auth";
-import { getPlanLimits } from "@/lib/plans";
 import { sendClusterInviteEmail, buildInviteUrl } from "@/lib/email";
+
+const INVITATION_EXPIRY_DAYS = 7;
+
+function generateInvitationToken(): string {
+    return randomBytes(32).toString("hex");
+}
+
+function getInvitationExpiry(): string {
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + INVITATION_EXPIRY_DAYS);
+    return expiresAt.toISOString();
+}
 
 export default async function handler(
     req: NextApiRequest,
@@ -88,29 +100,8 @@ export default async function handler(
                 return res.status(400).json({ error: "Valid email is required" });
             }
 
+            const normalizedEmail = email.trim().toLowerCase();
             const inviteRole = role === "owner" ? "owner" : "member";
-
-            // Check seat limits
-            const { data: account } = await admin
-                .from("accounts")
-                .select("plan")
-                .eq("id", accountId)
-                .single();
-
-            const limits = getPlanLimits(account?.plan || "starter");
-
-            const { count: memberCount } = await admin
-                .from("account_members")
-                .select("*", { count: "exact", head: true })
-                .eq("account_id", accountId);
-
-            const { count: pendingCount } = await admin
-                .from("invitations")
-                .select("*", { count: "exact", head: true })
-                .eq("account_id", accountId)
-                .is("accepted_at", null);
-
-            const totalSeats = (memberCount || 0) + (pendingCount || 0);
 
             // Seat limits are tracked but no longer block invitations
             // All plans (including Starter) can invite collaborators
@@ -120,21 +111,23 @@ export default async function handler(
                 .from("invitations")
                 .select("*")
                 .eq("account_id", accountId)
-                .eq("email", email.trim().toLowerCase())
+                .eq("email", normalizedEmail)
                 .is("accepted_at", null)
                 .limit(1)
                 .maybeSingle();
 
             let invitation;
             if (existing) {
-                // If the user has already been invited, update their invitation and resend the email
+                // Re-invites should produce a truly fresh link, not resend an expired token.
                 const { data: updatedInvite, error: updateError } = await admin
                     .from("invitations")
                     .update({
                         cluster_id: cluster_id || existing.cluster_id,
                         role: inviteRole,
                         invited_by: user.id,
-                        created_at: new Date().toISOString() // Refresh the timestamp
+                        token: generateInvitationToken(),
+                        created_at: new Date().toISOString(),
+                        expires_at: getInvitationExpiry(),
                     })
                     .eq("id", existing.id)
                     .select()
@@ -148,10 +141,12 @@ export default async function handler(
                     .from("invitations")
                     .insert({
                         account_id: accountId,
-                        email: email.trim().toLowerCase(),
+                        email: normalizedEmail,
                         role: inviteRole,
                         invited_by: user.id,
                         cluster_id: cluster_id || null,
+                        token: generateInvitationToken(),
+                        expires_at: getInvitationExpiry(),
                     })
                     .select()
                     .single();
@@ -182,7 +177,7 @@ export default async function handler(
 
             // Fire-and-forget email — don't block the response
             sendClusterInviteEmail({
-                to: email.trim().toLowerCase(),
+                to: normalizedEmail,
                 inviterName: user.email || "A team member",
                 accountName: acctData?.name || "your team",
                 clusterName,
